@@ -49,7 +49,12 @@ func TestResolvedBinary(t *testing.T) {
 	t.Cleanup(func() { askBin = old })
 	r := s.ask("seen")
 	eq(t, r.code, 0)
-	eq(t, r.stdout, old+"\n")
+	// The binary's own path, symlinks resolved too: macOS's temp folder sits under a symlink.
+	want, e := filepath.EvalSymlinks(old)
+	if e != nil {
+		t.Fatal(e)
+	}
+	eq(t, r.stdout, want+"\n")
 }
 
 // TestParentDeath checks the Linux guarantee that a killed ask cannot leave its direct agent alive.
