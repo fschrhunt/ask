@@ -1,16 +1,16 @@
 /*
- * Harnesses are executables that ask runs to reach an agent CLI; see docs/harnesses.md for the
- * contract. A harness named NAME is ~/.ask/harnesses/NAME. They are local only: ask ships none and
- * knows nothing about any particular agent; everything specific to one lives in its harness.
+ * Agents are executables that each run one coding agent's CLI for ask; see docs/agents.md for the
+ * contract. An agent named NAME is ~/.ask/agents/NAME. They are local only: ask ships none and
+ * knows nothing about any coding agent; everything specific to one lives in its agent.
  */
 import { accessSync, constants, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { LOCAL_HARNESSES, UsageError } from './home.js';
+import { AGENTS, UsageError } from './home.js';
 import { run } from './process.js';
 
 const NAME = /^[a-z0-9][a-z0-9_-]*$/;
-// Seconds a harness gets to list its models.
+// Seconds an agent gets to list its models.
 const LIST_TIMEOUT_MS = 10_000;
 
 const executable = (path) => {
@@ -21,73 +21,73 @@ const executable = (path) => {
     return false;
   }
 };
-/* Every harness installed here, sorted by name. */
-export function harnessNames() {
+/* Every agent installed here, sorted by name. */
+export function agentNames() {
   try {
-    return readdirSync(LOCAL_HARNESSES).filter((name) => NAME.test(name) && executable(join(LOCAL_HARNESSES, name))).sort();
+    return readdirSync(AGENTS).filter((name) => NAME.test(name) && executable(join(AGENTS, name))).sort();
   } catch {
     return [];
   }
 }
 
-/* The executable for a harness, or null when it is not installed. */
-export function harnessPath(name) {
-  return NAME.test(name) && executable(join(LOCAL_HARNESSES, name)) ? join(LOCAL_HARNESSES, name) : null;
+/* The executable for an agent, or null when it is not installed. */
+export function agentPath(name) {
+  return NAME.test(name) && executable(join(AGENTS, name)) ? join(AGENTS, name) : null;
 }
 
-/* Splits "harness:id#effort". A malformed spec or a harness that is not installed is a usage error. */
+/* Splits "agent:id#effort". A malformed spec or an agent that is not installed is a usage error. */
 export function parseModel(spec) {
   const match = /^([a-z0-9][a-z0-9_-]*):([^#\s]+)(?:#(\S+))?$/.exec(spec || '');
-  if (!match) throw new UsageError(`bad model "${spec}": expected harness:id[#effort]; see \`ask models\``);
-  if (!harnessPath(match[1]))
-    throw new UsageError(`no harness "${match[1]}" in ${LOCAL_HARNESSES}; installed: ${harnessNames().join(', ') || 'none'}; see docs/harnesses.md`);
-  return { spec, harness: match[1], model: match[2], effort: match[3] };
+  if (!match) throw new UsageError(`bad model "${spec}": expected agent:id[#effort]; see \`ask models\``);
+  if (!agentPath(match[1]))
+    throw new UsageError(`no agent "${match[1]}" in ${AGENTS}; installed: ${agentNames().join(', ') || 'none'}; see docs/agents.md`);
+  return { spec, agent: match[1], model: match[2], effort: match[3] };
 }
 
 const listed = new Map();
 
 /*
- * The models a harness offers, from `<harness> models` (one "id" or "id<TAB>name" per line) plus
- * its ids in models.json, as { models: [{ id, name }], error }. The harness's own list is cached;
- * a harness that fails to list offers only its models.json ids, and error says why.
+ * The models an agent offers, from `<agent> models` (one "id" or "id<TAB>name" per line) plus
+ * its ids in models.json, as { models: [{ id, name }], error }. The agent's own list is cached;
+ * an agent that fails to list offers only its models.json ids, and error says why.
  */
-export async function harnessModels(harness, config = {}) {
-  if (!listed.has(harness)) {
-    const r = await run(harnessPath(harness), ['models'], { env: contractEnv({}), timeoutMs: LIST_TIMEOUT_MS });
+export async function agentModels(agent, config = {}) {
+  if (!listed.has(agent)) {
+    const r = await run(agentPath(agent), ['models'], { env: contractEnv({}), timeoutMs: LIST_TIMEOUT_MS });
     const lines = r.code === 0 ? r.stdout.split('\n').filter((line) => line.trim()) : [];
     const error = r.code === 0 ? '' : reason(r.stderr) || (r.timedOut ? 'timed out' : `exit ${r.code}`);
-    listed.set(harness, { own: lines.map((line) => line.split('\t')).map(([id, name]) => ({ id: id.trim(), name: name?.trim() || undefined })), error });
+    listed.set(agent, { own: lines.map((line) => line.split('\t')).map(([id, name]) => ({ id: id.trim(), name: name?.trim() || undefined })), error });
   }
-  const { own, error } = listed.get(harness);
-  return { models: [...own, ...(config[harness] || []).map((id) => ({ id }))], error };
+  const { own, error } = listed.get(agent);
+  return { models: [...own, ...(config[agent] || []).map((id) => ({ id }))], error };
 }
 
-/* Every "harness:id" offered here, in harness order, and the listing failures as "harness: reason". */
+/* Every "agent:id" offered here, in agent order, and the listing failures as "agent: reason". */
 export async function listModels(config) {
-  const all = await Promise.all(harnessNames().map(async (harness) => ({ harness, ...(await harnessModels(harness, config)) })));
+  const all = await Promise.all(agentNames().map(async (agent) => ({ agent, ...(await agentModels(agent, config)) })));
   return {
-    ids: all.flatMap(({ harness, models }) => models.map((m) => `${harness}:${m.id}`)),
-    errors: all.filter((x) => x.error).map((x) => `${x.harness}: ${x.error}`),
+    ids: all.flatMap(({ agent, models }) => models.map((m) => `${agent}:${m.id}`)),
+    errors: all.filter((x) => x.error).map((x) => `${x.agent}: ${x.error}`),
   };
 }
 
-/* An id in title case (provider/atlas-2.1-mini -> Atlas 2.1 Mini), for a harness that names no model. */
+/* An id in title case (provider/atlas-2.1-mini -> Atlas 2.1 Mini), for an agent that names no model. */
 const titleCase = (id) => id.split('/').filter(Boolean).pop()?.split('-').filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(' ') || id;
 
 /*
- * The model's own name for people reading status lines: what the harness reported it ran, else the
+ * The model's own name for people reading status lines: what the agent reported it ran, else the
  * name it lists for the id, else the id in title case. Effort is appended, e.g. "GPT-6.1 Sol (high)".
  */
 export async function modelName(m, reported) {
-  const name = reported || (await harnessModels(m.harness)).models.find((x) => x.id === m.model)?.name || titleCase(m.model);
+  const name = reported || (await agentModels(m.agent)).models.find((x) => x.id === m.model)?.name || titleCase(m.model);
   return m.effort ? `${name} (${m.effort})` : name;
 }
 
-/* The last line a failed harness wrote to stderr, which the contract makes its reason. */
+/* The last line a failed agent wrote to stderr, which the contract makes its reason. */
 const reason = (stderr) => stderr.trim().split('\n').filter((line) => line.trim()).pop()?.trim().slice(0, 300);
 
 /*
- * ask's environment for a harness, with the contract's variables exactly as given: one inherited
+ * ask's environment for an agent, with the contract's variables exactly as given: one inherited
  * from an ask further up (an agent that itself runs ask) must not leak into this run.
  */
 function contractEnv(vars) {
@@ -116,17 +116,17 @@ function readReport(path) {
 }
 
 /*
- * Runs one prompt through a harness, continuing `session` when given. Resolves with { ok, text,
- * note, usage, name, session }: text is the harness's stdout; the rest comes from its report, which
+ * Runs one prompt through an agent, continuing `session` when given. Resolves with { ok, text,
+ * note, usage, name, session }: text is the agent's stdout; the rest comes from its report, which
  * is read even after a failure or timeout so the session can still be continued. Never rejects.
  */
-export async function runHarness(m, prompt, { write, schema, session, dir, timeoutMs }) {
+export async function runAgent(m, prompt, { write, schema, session, dir, timeoutMs }) {
   const work = mkdtempSync(join(tmpdir(), 'ask-'));
   try {
     const vars = { ASK_MODEL: m.model, ASK_EFFORT: m.effort || '', ASK_ACCESS: write ? 'write' : 'read', ASK_REPORT: join(work, 'report.json') };
     if (schema) writeFileSync((vars.ASK_SCHEMA = join(work, 'schema.json')), JSON.stringify(schema));
     if (session) vars.ASK_SESSION = session;
-    const r = await run(harnessPath(m.harness), [], { input: prompt, cwd: dir, env: contractEnv(vars), timeoutMs });
+    const r = await run(agentPath(m.agent), [], { input: prompt, cwd: dir, env: contractEnv(vars), timeoutMs });
     const report = readReport(vars.ASK_REPORT);
     const meta = { usage: report.usage, name: report.name, session: report.session || session };
     if (r.timedOut) return { ok: false, note: 'timed out', ...meta };

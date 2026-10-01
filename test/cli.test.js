@@ -21,13 +21,13 @@ test('a missing -m is a usage error that lists the models', async () => {
   assert.equal(calls().length, 0);
 });
 
-test('a malformed model or an unknown harness is a usage error', async () => {
+test('a malformed model or an unknown agent is a usage error', async () => {
   const bad = await ask(['-m', 'opus', 'hello']);
   assert.equal(bad.code, 2);
-  assert.match(bad.stderr, /expected harness:id/);
+  assert.match(bad.stderr, /expected agent:id/);
   const unknown = await ask(['-m', 'gemini:x', 'hello']);
   assert.equal(unknown.code, 2);
-  assert.match(unknown.stderr, /no harness "gemini" in .*; installed: fake;/);
+  assert.match(unknown.stderr, /no agent "gemini" in .*; installed: fake;/);
 });
 
 test('-r and -w together are refused', async () => {
@@ -129,7 +129,7 @@ test('a run that reports no usage prints no usage', async () => {
   assert.doesNotMatch(r.stderr, / in .* out/);
 });
 
-test('an answer from a harness that exited nonzero fails', async () => {
+test('an answer from an agent that exited nonzero fails', async () => {
   const r = await ask(['-m', 'fake:small', 'hi'], { extra: { FAKE_EXIT: '1' } });
   assert.equal(r.code, 1);
   assert.match(r.stderr, / · failed · .*exit 1$/m);
@@ -181,7 +181,7 @@ test('schema checks use own properties and compare enums by value', async () => 
 });
 
 test('a report that is not an object is ignored, not fatal', async () => {
-  writeFileSync(join(env.ASK_HOME, 'harnesses', 'odd'), '#!/bin/sh\necho null > "$ASK_REPORT"; echo fine\n', { mode: 0o755 });
+  writeFileSync(join(env.ASK_HOME, 'agents', 'odd'), '#!/bin/sh\necho null > "$ASK_REPORT"; echo fine\n', { mode: 0o755 });
   const r = await ask(['-m', 'odd:x', 'go']);
   assert.equal(r.code, 0);
   assert.equal(r.stdout, 'fine\n');

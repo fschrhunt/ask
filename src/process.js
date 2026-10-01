@@ -1,5 +1,5 @@
 /*
- * Starting and stopping harness processes. Each harness runs in its own process group, and when it
+ * Starting and stopping agent processes. Each agent runs in its own process group, and when it
  * exits, anything left in its group is stopped too, so an agent CLI never outlives its run. Stopping
  * ask (SIGINT or SIGTERM) stops every group it started and exits 130. Stopping means SIGTERM, then
  * SIGKILL after GRACE_MS. Once stopping, nothing new starts.

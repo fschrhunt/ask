@@ -1,11 +1,11 @@
 /*
  * One task, start to finish: where it runs (its directory, or a worktree), the prompt ask sends,
- * the harness run, what it changed, and the checks on the answer. A task is { id, prompt, model,
+ * the agent run, what it changed, and the checks on the answer. A task is { id, prompt, model,
  * write, json, schema, dir, timeout, worktree, session }; worktree is a worktree name and session the
  * agent session a follow-up continues (see runs.js).
  */
 import { addWorktree, changes, removeWorktree, snapshot } from './git.js';
-import { modelName, parseModel, runHarness } from './harness.js';
+import { modelName, parseModel, runAgent } from './agent.js';
 import { schemaMismatch } from './schema.js';
 
 // Delegated read runs answer from memory unless told otherwise; measured with one at low effort,
@@ -60,7 +60,7 @@ export async function runTask(task, started = () => {}) {
     }
     started({ dir, worktree });
     const before = task.write ? snapshot(dir) : null;
-    r = await runHarness(m, fullPrompt(task), { write: task.write, schema: task.schema, session: task.session, dir, timeoutMs: 1000 * (task.timeout || 900) });
+    r = await runAgent(m, fullPrompt(task), { write: task.write, schema: task.schema, session: task.session, dir, timeoutMs: 1000 * (task.timeout || 900) });
     if (before) diff = changes(before);
     if (r.ok && (task.json || task.schema)) {
       const { answer, problem } = checkJson(r.text, task.schema);
@@ -74,7 +74,7 @@ export async function runTask(task, started = () => {}) {
   return {
     id: task.id,
     model: m.spec,
-    name: m.harness ? await modelName(m, r.name).catch(() => m.spec) : m.spec,
+    name: m.agent ? await modelName(m, r.name).catch(() => m.spec) : m.spec,
     ok: r.ok,
     ...(r.ok ? { answer: r.answer } : { error: r.note }),
     ...(r.ok && r.note ? { note: r.note } : {}),

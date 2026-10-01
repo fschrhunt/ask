@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Harnesses are now called agents: they live in `~/.ask/agents/`, a model is `agent:id`, and the
+  contract is in `docs/agents.md`. Move `~/.ask/harnesses` to `~/.ask/agents`.
 - Docs: a model naming convention for harnesses (lowercase family-version-variant, no aliases or
   provider prefixes), and every example follows it.
 - Runs are subagents you can come back to. Every run gets a short id, shown at the start of its

@@ -1,6 +1,6 @@
 /*
- * Where ask keeps its local state: ~/.ask, or $ASK_HOME. It holds harnesses/ (the executables that
- * reach each agent), models.json (extra model ids per harness), runs/ (every run, for show, -c and
+ * Where ask keeps its local state: ~/.ask, or $ASK_HOME. It holds agents/ (one executable per coding
+ * agent), models.json (extra model ids per agent), runs/ (every run, for show, -c and
  * --resume) and worktrees/ (the git worktrees of --worktree runs).
  */
 import { readFileSync, renameSync, writeFileSync } from 'node:fs';
@@ -10,7 +10,7 @@ import { join } from 'node:path';
 export const HOME = process.env.ASK_HOME || join(homedir(), '.ask');
 export const RUNS = join(HOME, 'runs');
 export const WORKTREES = join(HOME, 'worktrees');
-export const LOCAL_HARNESSES = join(HOME, 'harnesses');
+export const AGENTS = join(HOME, 'agents');
 const MODELS = join(HOME, 'models.json');
 
 /* A mistake in how ask was called; main prints it with a pointer to --help and exits 2. */
@@ -35,7 +35,7 @@ export function readInput(path, what) {
 export const tilde = (path) => (path && path.startsWith(homedir()) ? `~${path.slice(homedir().length)}` : path);
 
 /*
- * models.json is optional: { "<harness>": ["model-id", ...] } adds ids to what each harness lists
+ * models.json is optional: { "<agent>": ["model-id", ...] } adds ids to what each agent lists
  * itself. A file that exists must parse and have that shape.
  */
 export function readModels() {
@@ -54,6 +54,6 @@ export function readModels() {
   }
   const lists = models && typeof models === 'object' && !Array.isArray(models) ? Object.values(models) : null;
   if (!lists?.every((ids) => Array.isArray(ids) && ids.every((id) => typeof id === 'string')))
-    throw new UsageError(`${MODELS} must map harness names to lists of model ids, like {"mycli": ["atlas-2.1"]}`);
+    throw new UsageError(`${MODELS} must map agent names to lists of model ids, like {"mycli": ["atlas-2.1"]}`);
   return models;
 }

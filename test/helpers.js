@@ -1,6 +1,6 @@
 /*
  * Shared setup for the tests: each test runs the real `bin/ask` with ASK_HOME and HOME inside a
- * fresh temp dir, and test/fake installed as the harness `fake`. No network, no real models. The
+ * fresh temp dir, and test/fake installed as the agent `fake`. No network, no real models. The
  * fake records each run in $FAKE_LOG; see it for the env vars that make it fail or hang. `tmp` and
  * `env` are the current test's.
  */
@@ -20,8 +20,8 @@ export let env;
 beforeEach(() => {
   tmp = realpathSync(mkdtempSync(join(tmpdir(), 'ask-test-')));
   env = { PATH, HOME: tmp, ASK_HOME: join(tmp, 'home'), FAKE_LOG: join(tmp, 'calls.jsonl') };
-  mkdirSync(join(env.ASK_HOME, 'harnesses'), { recursive: true });
-  symlinkSync(join(ROOT, 'test/fake'), join(env.ASK_HOME, 'harnesses', 'fake'));
+  mkdirSync(join(env.ASK_HOME, 'agents'), { recursive: true });
+  symlinkSync(join(ROOT, 'test/fake'), join(env.ASK_HOME, 'agents', 'fake'));
 });
 afterEach(() => rmSync(tmp, { recursive: true, force: true }));
 

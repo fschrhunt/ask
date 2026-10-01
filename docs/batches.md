@@ -24,7 +24,7 @@ A batch is a JSON array, or one JSON object per line:
 | --- | --- |
 | `prompt` | The task. Required. |
 | `id` | A name for the result. Default: the task's position, from 1. |
-| `model` | `harness:id[#effort]`. Required unless the batch's `-m` gives a default or the task continues a run. |
+| `model` | `agent:id[#effort]`. Required unless the batch's `-m` gives a default or the task continues a run. |
 | `write` | `true` for read and write. Default: the batch's `-w`, else read only. |
 | `worktree` | `true` to work in its own git worktree and branch (needs write). Default: the batch's `--worktree`. |
 | `continue` | A run to follow up, like `"k3f9a2"` or `"p81c0d/api"` (see [Runs](runs.md#follow-ups)). |
