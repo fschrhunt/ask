@@ -432,3 +432,17 @@ test('results and status lines name the model that ran', async () => {
   assert.deepEqual(names, { c: 'Opus 5.5', x: 'GPT-6.1 Sol (high)', o: 'Deepseek V4.1 Flash' });
   assert.match(r.stderr, /\[c\] Opus 5\.5 ok/);
 });
+
+test('runs shows an unfinished run whose ask is gone as stopped, with how to resume', async () => {
+  const dir = join(env.ASK_HOME, 'runs', '20260101T000000-999999999');
+  writeJson(join(dir, 'tasks.json'), [{ id: '1', model: 'claude:opus', prompt: 'p' }, { id: '2', model: 'claude:opus', prompt: 'p' }]);
+  writeJson(join(dir, 'results.json'), [{ id: '1', ok: true }, null]);
+  const r = await ask(['runs']);
+  assert.match(r.stdout, /1 ok\t0 failed\t1 stopped \(ask batch --resume .*999999999\)/);
+});
+
+test('a run that reports no usage prints no usage', async () => {
+  const r = await ask(['-m', 'opencode:p/m', 'hi'], { extra: { FAKE_NO_USAGE: '1' } });
+  assert.equal(r.code, 0);
+  assert.doesNotMatch(r.stderr, / in .* out/);
+});

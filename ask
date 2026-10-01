@@ -100,7 +100,8 @@ function addUsage(total, part) {
 }
 
 function formatUsage(usage) {
-  if (!usage) return '';
+  // Nothing reported (Opencode reports no usage for an answer that needed no steps) prints nothing.
+  if (!usage || (!usage.input && !usage.output && typeof usage.cost !== 'number')) return '';
   const k = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n || 0));
   const cost = typeof usage.cost === 'number' ? ` $${usage.cost.toFixed(4)}` : '';
   return ` ${k(usage.input)} in ${k(usage.output)} out${cost}`;
@@ -492,7 +493,11 @@ async function runBatch(tasks, jobs, dir) {
   return results;
 }
 
-/* Lists recent batch runs, newest first, with how many tasks finished. */
+/*
+ * Lists recent batch runs, newest first, with how many tasks finished. A run with unfinished tasks
+ * whose ask process is gone (its pid ends the run folder's name) is shown as stopped, with the
+ * command that resumes it.
+ */
 function listRuns() {
   let names = [];
   try {
@@ -507,7 +512,14 @@ function listRuns() {
     } catch {}
     const ok = results.filter((r) => r?.ok).length;
     const failed = results.filter((r) => r && !r.ok).length;
-    console.log(`${join(RUNS, name)}\t${ok} ok\t${failed} failed\t${tasks.length - ok - failed} pending`);
+    const pending = tasks.length - ok - failed;
+    const pid = Number(name.split('-').pop());
+    let alive = false;
+    try {
+      alive = pid > 0 && process.kill(pid, 0);
+    } catch {}
+    const left = pending && !alive ? `${pending} stopped (ask batch --resume ${join(RUNS, name)})` : `${pending} pending`;
+    console.log(`${join(RUNS, name)}\t${ok} ok\t${failed} failed\t${left}`);
   }
 }
 

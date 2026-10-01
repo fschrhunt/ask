@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `ask runs` shows an unfinished run whose ask process is gone as stopped, with the command that
+  resumes it.
+- A run that reports no usage (Opencode, for an answer that needed no steps) prints none instead of
+  `0 in 0 out`.
 - First public release: `ask -m MODEL PROMPT`, `ask batch` with `--resume`, `ask runs` and
   `ask models` across Claude Code, Codex and Opencode.
 - `models.json` is optional; without it there are no Opencode models.
