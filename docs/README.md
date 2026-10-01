@@ -10,6 +10,10 @@ everything it does, with examples you can copy.
 | [Runs](runs.md) | Run ids, follow-ups, listing, showing and stopping runs |
 | [Batches](batches.md) | Many tasks in parallel, recorded runs, resuming |
 | [Models](models.md) | Model ids, effort, and adding model ids |
-| [Agents](agents.md) | Reaching an agent: the contract, read-only, and examples |
+| [Agents](agents.md) | Reaching a coding agent: the contract, read-only, and examples |
+| [Hooks](hooks.md) | Changing tasks and checking results: verify, guard, add context |
+| [Commands](commands.md) | Your own `ask NAME` workflows, like a review by several models |
+| [Packages](packages.md) | Sharing agents, hooks and commands, and keeping them up to date |
+| [Compatibility](compatibility.md) | The contracts ask keeps across releases |
 
 Quick reference: `ask --help`.

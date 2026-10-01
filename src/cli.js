@@ -7,10 +7,15 @@
  * allows writing. Every run names its model as agent:id[#effort]; like a native subagent, ask
  * does not choose one for the caller.
  */
+import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { constants } from 'node:os';
 import { listModels } from './agent.js';
-import { AGENTS, readInput, readModels, UsageError } from './home.js';
+import { find } from './find.js';
+import { AGENTS, contractEnv, readInput, readModels, UsageError } from './home.js';
+import { contents, install, installed, remove, update } from './packages.js';
 import { createRun, executeRun, newRunId, openRun, prepareTasks, recentRuns, stopRun } from './runs.js';
-import { batchEnd, batchStart, doneLine, runsTable, startLine } from './status.js';
+import { batchEnd, batchStart, doneLine, hookLine, runsTable, startLine } from './status.js';
 
 const HELP = `ask: hand tasks to coding agents and get their answers back.
 
@@ -22,6 +27,11 @@ const HELP = `ask: hand tasks to coding agents and get their answers back.
   ask runs [-n N]                  list recent runs
   ask stop RUN                     stop a run that is going
   ask models                       list the model ids available here
+  ask install [SOURCE]             install a package from git (OWNER/REPO, a URL or a path),
+                                   or update every package
+  ask packages                     list installed packages and what they offer
+  ask remove PACKAGE               remove a package
+  ask COMMAND [ARGS]               run one of your commands (~/.ask/commands)
 
 options
   -m, --model ID      agent:id[#effort] from \`ask models\`, e.g. mycli:atlas-2.1#high
@@ -34,6 +44,7 @@ options
   -C, --dir DIR       directory the agent works in (default: current)
   -t, --timeout S     seconds per task (default: 900)
   -j N                tasks at once in a batch (default: 4)
+  --no-hooks          run without your hooks (~/.ask/hooks)
 
 Every run gets an id, shown in its status lines as "ask RUN · ...". A batch task is RUN/TASK.
 Batch tasks: a JSON array or one JSON object per line, each
@@ -42,17 +53,21 @@ with "prompt" required, and "model" unless batch -m gives one or the task contin
 Results: {"run", "id", "model", "name", "ok", "answer" | "error", "seconds", "usage", "session",
 "dir", "changes", "commits", "worktree"}; changes are the files a write run changed.
 
-Each agent is an executable in ~/.ask/agents that runs one coding agent's CLI. ask keeps its runs
-in ~/.ask/runs ($ASK_HOME moves both). Docs: https://github.com/fschrhunt/ask/tree/main/docs`;
+Make ask yours with executables in ~/.ask ($ASK_HOME), or from packages: agents/ run each coding
+agent's CLI, hooks/ change tasks and check results, commands/ add commands. Runs are kept in
+~/.ask/runs. Docs: https://github.com/fschrhunt/ask/tree/main/docs`;
 
 // The options each command takes; anything else is a usage error.
 const OPTIONS = {
-  run: ['-m', '-r', '-w', '--worktree', '-c', '--json', '--schema', '-C', '-t'],
-  batch: ['-m', '-r', '-w', '--worktree', '--json', '--schema', '-C', '-t', '-j', '--resume'],
+  run: ['-m', '-r', '-w', '--worktree', '-c', '--json', '--schema', '-C', '-t', '--no-hooks'],
+  batch: ['-m', '-r', '-w', '--worktree', '--json', '--schema', '-C', '-t', '-j', '--resume', '--no-hooks'],
   show: ['--json'],
   runs: ['-n'],
   stop: [],
   models: [],
+  install: [],
+  packages: [],
+  remove: [],
 };
 const LONG = { '--model': '-m', '--read': '-r', '--write': '-w', '--continue': '-c', '--dir': '-C', '--timeout': '-t' };
 const VALUE = new Set(['-m', '-c', '--schema', '-C', '-t', '-j', '-n', '--resume']);
@@ -132,8 +147,9 @@ async function prepare(items, defaults, id, single) {
   });
 }
 
-/* Prints each task's start and end lines on stderr. */
-const reporter = (run) => (kind, i, x) => console.error(kind === 'start' ? startLine(run, i, x) : doneLine(x));
+/* Prints each task's status lines on stderr: its start, hook notes and follow-ups, and its end. */
+const reporter = (run) => (kind, i, x) =>
+  console.error(kind === 'start' ? startLine(run, i, x) : kind === 'done' ? doneLine(x) : hookLine(run, i, kind, x));
 
 /* What a finished task prints on stdout: its answer as text, or as JSON for a JSON task. */
 const answerText = (task, result) => (task.json || task.schema ? JSON.stringify(result.answer) : result.answer);
@@ -147,7 +163,7 @@ async function runOne({ opts, words }) {
   const id = newRunId();
   const tasks = await prepare([{ ...taskOptions(opts), prompt, continue: opts['-c'] }], {}, id, true);
   const run = createRun(id, tasks);
-  const [result] = await executeRun(run, 1, reporter(run));
+  const [result] = await executeRun(run, 1, reporter(run), { hooks: !opts['--no-hooks'] });
   if (!result.ok) return (process.exitCode = 1);
   process.stdout.write(answerText(tasks[0], result) + '\n');
 }
@@ -156,8 +172,8 @@ async function batch({ opts, words }) {
   const jobs = opts['-j'] ? number('-j', opts['-j'], true) : 4;
   let run;
   if (opts['--resume']) {
-    const extra = [...Object.keys(opts).filter((flag) => !['--resume', '-j'].includes(flag)), ...words];
-    if (extra.length) throw new UsageError(`--resume reruns a batch as it was recorded; it takes only -j, not ${extra.join(' ')}`);
+    const extra = [...Object.keys(opts).filter((flag) => !['--resume', '-j', '--no-hooks'].includes(flag)), ...words];
+    if (extra.length) throw new UsageError(`--resume reruns a batch as it was recorded; it takes only -j and --no-hooks, not ${extra.join(' ')}`);
     run = openRun(opts['--resume']).run;
   } else {
     if (words.length > 1) throw new UsageError(`ask batch takes one file of tasks, not ${words.length}`);
@@ -167,7 +183,7 @@ async function batch({ opts, words }) {
   const todo = run.tasks.filter((_, i) => !run.results[i]?.ok).length;
   const begin = Date.now();
   console.error(batchStart(run, jobs, todo));
-  const results = await executeRun(run, jobs, reporter(run));
+  const results = await executeRun(run, jobs, reporter(run), { hooks: !opts['--no-hooks'] });
   console.error(batchEnd(run, (Date.now() - begin) / 1000));
   process.stdout.write(JSON.stringify(results, null, 2) + '\n');
   if (results.some((r) => !r?.ok)) process.exitCode = 1;
@@ -206,12 +222,69 @@ async function models() {
   for (const id of ids) console.log(id);
 }
 
-const COMMANDS = { batch, show, stop, runs, models };
+function installCommand({ words }) {
+  if (words.length > 1) throw new UsageError('ask install takes one source, like ask install owner/repo');
+  if (words.length) return console.error(`ask: ${install(words[0])}`);
+  const all = installed();
+  if (!all.length) return console.error('ask: no packages installed; ask install OWNER/REPO adds one');
+  for (const { name, dir } of all) {
+    try {
+      console.error(`ask: ${update(dir)}`);
+    } catch (error) {
+      console.error(`ask: ${name}: could not update: ${error.message}`);
+      process.exitCode = 1;
+    }
+  }
+}
+
+function packages() {
+  const all = installed();
+  if (!all.length) return console.error('ask: no packages installed; ask install OWNER/REPO adds one');
+  for (const { name, dir } of all) console.log(`${name}\t${contents(dir)}`);
+}
+
+function removeCommand({ words }) {
+  if (words.length !== 1) throw new UsageError('ask remove takes one package, like ask remove owner/repo');
+  console.error(`ask: ${remove(words[0])}`);
+}
+
+/* The one-line description a command gives itself on a line containing "ask-command: TEXT" near its top. */
+function describe(path) {
+  try {
+    return /ask-command:\s*(.+)/.exec(readFileSync(path, 'utf8').slice(0, 4096))?.[1].trim() || '';
+  } catch {
+    return '';
+  }
+}
+
+/* The help text, with your commands listed after ask's own. */
+function help() {
+  const commands = [...find('commands')].sort(([a], [b]) => a.localeCompare(b));
+  if (!commands.length) return HELP;
+  const width = Math.max(...commands.map(([name]) => name.length));
+  return `${HELP}\n\nyour commands\n${commands.map(([name, path]) => `  ask ${name.padEnd(width)}  ${describe(path)}`.trimEnd()).join('\n')}`;
+}
+
+/* Runs one of your commands with the rest of the arguments; ask exits with its exit code. */
+function runCommand(path, args) {
+  return new Promise((resolve) => {
+    const child = spawn(path, args, { stdio: 'inherit', env: contractEnv({}) });
+    child.on('error', (error) => {
+      console.error(`ask: cannot run ${path}: ${error.message}`);
+      resolve((process.exitCode = 1));
+    });
+    child.on('exit', (code, signal) => resolve((process.exitCode = code ?? 128 + (constants.signals[signal] || 0))));
+  });
+}
+
+const COMMANDS = { batch, show, stop, runs, models, install: installCommand, packages, remove: removeCommand };
 
 export async function main(argv) {
   const command = Object.hasOwn(COMMANDS, argv[0]) ? argv[0] : 'run';
+  const yours = command === 'run' && argv[0] && !argv[0].startsWith('-') && find('commands').get(argv[0]);
+  if (yours) return runCommand(yours, argv.slice(1));
   const parsed = parse(command, command === 'run' ? argv : argv.slice(1));
-  if (parsed.opts.help || argv.length === 0) return console.log(HELP);
+  if (parsed.opts.help || argv.length === 0) return console.log(help());
   await (COMMANDS[command] || runOne)(parsed);
 }
 

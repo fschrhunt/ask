@@ -1,39 +1,24 @@
 /*
  * Agents are executables that each run one coding agent's CLI for ask; see docs/agents.md for the
- * contract. An agent named NAME is ~/.ask/agents/NAME. They are local only: ask ships none and
- * knows nothing about any coding agent; everything specific to one lives in its agent.
+ * contract. An agent named NAME is ~/.ask/agents/NAME, or a package's (see find.js). They are local
+ * only: ask ships none and knows nothing about any coding agent; everything specific to one lives
+ * in its agent.
  */
-import { accessSync, constants, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AGENTS, UsageError } from './home.js';
-import { run } from './process.js';
+import { find } from './find.js';
+import { AGENTS, contractEnv, UsageError } from './home.js';
+import { reason, run } from './process.js';
 
-const NAME = /^[a-z0-9][a-z0-9_-]*$/;
-// Seconds an agent gets to list its models.
+// Milliseconds an agent gets to list its models.
 const LIST_TIMEOUT_MS = 10_000;
 
-const executable = (path) => {
-  try {
-    accessSync(path, constants.X_OK);
-    return statSync(path).isFile();
-  } catch {
-    return false;
-  }
-};
 /* Every agent installed here, sorted by name. */
-export function agentNames() {
-  try {
-    return readdirSync(AGENTS).filter((name) => NAME.test(name) && executable(join(AGENTS, name))).sort();
-  } catch {
-    return [];
-  }
-}
+export const agentNames = () => [...find('agents').keys()].sort();
 
 /* The executable for an agent, or null when it is not installed. */
-export function agentPath(name) {
-  return NAME.test(name) && executable(join(AGENTS, name)) ? join(AGENTS, name) : null;
-}
+export const agentPath = (name) => find('agents').get(name) || null;
 
 /* Splits "agent:id#effort". A malformed spec or an agent that is not installed is a usage error. */
 export function parseModel(spec) {
@@ -83,18 +68,6 @@ export async function modelName(m, reported) {
   return m.effort ? `${name} (${m.effort})` : name;
 }
 
-/* The last line a failed agent wrote to stderr, which the contract makes its reason. */
-const reason = (stderr) => stderr.trim().split('\n').filter((line) => line.trim()).pop()?.trim().slice(0, 300);
-
-/*
- * ask's environment for an agent, with the contract's variables exactly as given: one inherited
- * from an ask further up (an agent that itself runs ask) must not leak into this run.
- */
-function contractEnv(vars) {
-  const env = { ...process.env };
-  for (const key of ['ASK_MODEL', 'ASK_EFFORT', 'ASK_ACCESS', 'ASK_SCHEMA', 'ASK_SESSION', 'ASK_REPORT']) delete env[key];
-  return Object.assign(env, vars);
-}
 
 /* The report's fields ask uses, keeping only well-formed ones: strings for name, note and session, counts as numbers. */
 function readReport(path) {

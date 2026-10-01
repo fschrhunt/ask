@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Make ask yours. Hooks in `~/.ask/hooks` change tasks before they run and check results after:
+  refuse, fail, leave a note, or ask the same agent for a follow-up (up to three). They fail open,
+  and `--no-hooks` skips them. Commands in `~/.ask/commands` run as `ask NAME`. Packages share all
+  of these from git: `ask install`, `ask packages`, `ask remove`; yours always win.
+- Every agent, hook and command gets `ASK_CONTRACT` (now 1), `ASK_BIN` and `ASK_HOME`;
+  `docs/compatibility.md` says what stays stable and how it may change.
+- A process that crashes reports its error line, not the runtime's closing banner.
 - Harnesses are now called agents: they live in `~/.ask/agents/`, a model is `agent:id`, and the
   contract is in `docs/agents.md`. Move `~/.ask/harnesses` to `~/.ask/agents`.
 - Docs: a model naming convention for harnesses (lowercase family-version-variant, no aliases or

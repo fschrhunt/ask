@@ -47,6 +47,17 @@ for (const signal of ['SIGINT', 'SIGTERM'])
   });
 
 /*
+ * Why a failed process failed, from its stderr: the last line, as the agent and hook contracts ask,
+ * unless the process crashed. Then a runtime prints its error and then a stack or a banner, so the
+ * last line naming an error (Error:, SomeException:, panic:) is the reason.
+ */
+export function reason(stderr) {
+  const lines = stderr.split('\n').map((line) => line.trim()).filter(Boolean);
+  const error = lines.findLast((line) => /^(\w*(Error|Exception)|panic)\b[^:]*:/.test(line));
+  return (error || lines.at(-1) || '').slice(0, 300);
+}
+
+/*
  * Runs a command with `input` on stdin and a hard timeout. Resolves with { code, stdout, stderr,
  * timedOut } once the command and everything in its process group have ended; never rejects.
  */

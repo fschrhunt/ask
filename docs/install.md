@@ -45,7 +45,10 @@ Everything ask uses is in `~/.ask` (set `ASK_HOME` to move it):
 
 ```text
 ~/.ask/
-├── agents/    one executable per agent (see agents.md)
+├── agents/       one executable per coding agent (see agents.md)
+├── hooks/        change tasks and check results (see hooks.md)
+├── commands/     your own ask commands (see commands.md)
+├── packages/     installed packages (see packages.md)
 ├── models.json   extra model ids per agent (see models.md)
 └── runs/         recorded batches (see batches.md)
 ```

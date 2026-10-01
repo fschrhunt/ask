@@ -46,16 +46,25 @@ ask k3f9a2 · Atlas 2.1 · ok · 48.0s · 31.0k in · 812 out · $0.0874
 Every run is recorded: `ask runs` lists them, `ask show RUN` prints one again, and `ask stop RUN`
 stops one.
 
-### Any agent
+### Make it yours
 
-Each coding agent is reached through an agent: a small executable in `~/.ask/agents/` with a
-[simple contract](docs/agents.md). Agents are yours and stay local; a minimal one is a few
-lines of shell.
+ask stays small and you add to it with executables in `~/.ask`, in any language:
+
+- **agents/** run each coding agent's CLI: Claude Code, Codex, Opencode, or any other.
+- **hooks/** change tasks and check results: add context, guard writes, run the tests and have the
+  agent fix what fails.
+- **commands/** add `ask NAME` workflows, like a review by several models.
+
+Share them as [packages](docs/packages.md): `ask install owner/repo`, and `ask install` keeps them up
+to date. Yours always win over a package's, and the [contracts](docs/compatibility.md) they rely on
+stay stable across releases.
 
 ### Docs
 
 [Install](docs/install.md) · [Usage](docs/usage.md) · [Runs](docs/runs.md) ·
-[Batches](docs/batches.md) · [Models](docs/models.md) · [Agents](docs/agents.md)
+[Batches](docs/batches.md) · [Models](docs/models.md) · [Agents](docs/agents.md) ·
+[Hooks](docs/hooks.md) · [Commands](docs/commands.md) · [Packages](docs/packages.md) ·
+[Compatibility](docs/compatibility.md)
 
 ### License
 
