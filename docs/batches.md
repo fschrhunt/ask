@@ -124,5 +124,5 @@ again, exactly as recorded:
 ask batch --resume p81c0d
 ```
 
-`--resume` takes only `-j`. Only one ask can run a batch at a time; a second is refused while the
+`--resume` takes only `-j` and `--no-hooks`. Only one ask can run a batch at a time; a second is refused while the
 first is going. See [Runs](runs.md) for listing, showing and stopping runs.

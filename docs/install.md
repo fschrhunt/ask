@@ -1,14 +1,44 @@
 # Install
 
-ask needs Node 22 or newer. It has no dependencies.
+ask is a single binary with no language runtime or library dependencies. Git is needed for packages,
+worktrees and reporting changes. Your agents keep their own CLI and runtime requirements.
+
+## Release binary
+
+Download `ask_VERSION_OS_ARCH.tar.gz` for your system from
+[Releases](https://github.com/fschrhunt/ask/releases/latest): `linux` or `darwin` (macOS),
+and `amd64` (Intel/AMD) or `arm64` (Apple Silicon/ARM). Download `checksums.txt` from the same release.
+Verify the archive's SHA-256 against that file (`sha256sum` on Linux, `shasum -a 256` on macOS),
+then extract the archive and install the executable:
 
 ```sh
-git clone https://github.com/fschrhunt/ask ~/.local/share/ask
 mkdir -p ~/.local/bin
-ln -s ~/.local/share/ask/bin/ask ~/.local/bin/ask
+cp ask ~/.local/bin/ask
 ```
 
 Make sure `~/.local/bin` is on your `PATH`.
+
+## With Go
+
+Go 1.25 or newer can build and install ask:
+
+```sh
+go install github.com/fschrhunt/ask/cmd/ask@latest
+```
+
+Put `$(go env GOPATH)/bin` on your `PATH`.
+
+## From source
+
+```sh
+git clone https://github.com/fschrhunt/ask
+cd ask
+go build -o ask ./cmd/ask
+mkdir -p ~/.local/bin
+cp ask ~/.local/bin/ask
+```
+
+`ask --version` prints the release tag, or `dev` for an unversioned source build.
 
 ## Add an agent
 
@@ -35,9 +65,9 @@ ask -m mycli:atlas-2.1-mini "What is in this directory?"
 
 ## Update
 
-```sh
-git -C ~/.local/share/ask pull
-```
+Replace the binary with the latest release, or rerun `go install ...@latest`. For a source checkout,
+pull the changes, rebuild and copy the binary again. Your `~/.ask` agents, hooks, commands, packages
+and recorded runs keep working.
 
 ## Where ask keeps things
 
@@ -50,7 +80,8 @@ Everything ask uses is in `~/.ask` (set `ASK_HOME` to move it):
 ├── commands/     your own ask commands (see commands.md)
 ├── packages/     installed packages (see packages.md)
 ├── models.json   extra model ids per agent (see models.md)
-└── runs/         recorded batches (see batches.md)
+├── runs/         recorded runs (see runs.md)
+└── worktrees/    isolated write runs (see usage.md)
 ```
 
-ask creates `runs/` on the first batch.
+ask creates `runs/` on the first run, and `worktrees/` when needed.

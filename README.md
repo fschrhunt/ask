@@ -17,13 +17,29 @@ own login, tools and sandbox.
 
 ### Install
 
+Download the archive for your system from [Releases](https://github.com/fschrhunt/ask/releases/latest),
+extract it, and put `ask` on your `PATH`. ask is one binary; it needs no Node or other language runtime.
+Git is needed for worktrees, tracking changes and packages. Add an agent for each coding agent you
+use (below); agents may be written in any language and keep their own requirements.
+
+With Go 1.25 or newer:
+
 ```sh
-git clone https://github.com/fschrhunt/ask ~/.local/share/ask
-mkdir -p ~/.local/bin
-ln -s ~/.local/share/ask/bin/ask ~/.local/bin/ask
+go install github.com/fschrhunt/ask/cmd/ask@latest
 ```
 
-Requires Node 22+, `~/.local/bin` on your `PATH`, and an agent for each coding agent you use (below).
+Or build from source:
+
+```sh
+git clone https://github.com/fschrhunt/ask
+cd ask
+go build -o ask ./cmd/ask
+mkdir -p ~/.local/bin
+cp ask ~/.local/bin/ask
+```
+
+Make sure your install directory (`$(go env GOPATH)/bin` for `go install`, or `~/.local/bin` above)
+is on your `PATH`. See [Install](docs/install.md) for checksums and updates.
 
 ### Use
 

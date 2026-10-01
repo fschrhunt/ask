@@ -1,0 +1,131 @@
+// Package task runs one task, including worktrees, prompts, git changes and JSON checks.
+package task
+
+import (
+	"regexp"
+	"time"
+
+	"github.com/fschrhunt/ask/internal/agent"
+	"github.com/fschrhunt/ask/internal/git"
+	"github.com/fschrhunt/ask/internal/home"
+	"github.com/fschrhunt/ask/internal/schema"
+)
+
+const grounding = "Answer from the files in your working directory: search and read them before answering. Never guess file names, functions or facts; if you cannot find something, say so.\n\n"
+
+var fence = regexp.MustCompile("(?is)^\\s*```[a-z]*\\s*\\n(.*?)\\n\\s*```\\s*$")
+
+func fullPrompt(t home.Object) string {
+	prompt := t.S("prompt")
+	if !t.B("write") && !t.B("session") {
+		prompt = grounding + prompt
+	}
+	if t.B("schema") {
+		prompt += "\n\nAnswer ONLY with JSON matching this JSON Schema, no prose and no code fences:\n" + home.JSON(t.Get("schema"), false)
+	} else if t.B("json") {
+		prompt += "\n\nAnswer ONLY with JSON, no prose and no code fences."
+	}
+	return prompt
+}
+func checkJSON(text string, s any) (any, string) {
+	if m := fence.FindStringSubmatch(text); m != nil {
+		text = m[1]
+	}
+	v, e := home.ParseJSON(home.Trim(text))
+	if e != nil {
+		return nil, "answer was not valid JSON"
+	}
+	problem, err := schema.Mismatch(v, s, "$")
+	if err != nil {
+		return nil, err.Error()
+	}
+	if problem != "" {
+		return nil, "answer does not match the schema: " + problem
+	}
+	return v, ""
+}
+
+// Started is the actual working directory and optional worktree reported before the agent runs.
+type Started struct {
+	Dir      string
+	Worktree *git.Worktree
+}
+
+// Run returns one complete result, converting task errors into failed results.
+func Run(a *agent.Registry, t home.Object, started func(Started)) home.Object {
+	begin := time.Now()
+	dir := t.S("dir")
+	var w *git.Worktree
+	var files []any
+	commits := 0
+	diff := false
+	m, e := agent.Parse(a.Paths, t.S("model"))
+	r := home.Object{}
+	if e == nil && t.B("worktree") {
+		w, e = git.Add(a.Paths, dir, t.S("worktree"))
+		if e == nil {
+			dir = w.Dir
+		}
+	}
+	if e == nil {
+		started(Started{dir, w})
+		var before *git.Snapshot
+		if t.B("write") {
+			before = git.Take(dir)
+		}
+		runTask := t.Clone()
+		runTask.Set("dir", dir)
+		r = a.Run(m, fullPrompt(t), runTask)
+		if before != nil {
+			files, commits = git.Changes(before)
+			diff = true
+		}
+		if r.B("ok") && (t.B("json") || t.B("schema")) {
+			answer, problem := checkJSON(r.S("text"), t.Get("schema"))
+			if problem != "" {
+				r.Set("ok", false)
+				r.Set("note", problem)
+			} else {
+				r.Set("answer", answer)
+			}
+		} else if r.B("ok") {
+			r.Set("answer", home.TrimEnd(r.S("text")))
+		}
+		if w != nil && len(files) == 0 && commits == 0 {
+			git.Remove(w)
+		}
+	}
+	if e != nil {
+		r.Set("ok", false)
+		r.Set("note", e.Error())
+	}
+	name := t.S("model")
+	if m.Agent != "" {
+		name = a.Name(m, r.S("name"))
+	}
+	out := home.O("id", t.Get("id"), "model", t.Get("model"), "name", name, "ok", r.B("ok"))
+	if r.B("ok") {
+		out.Set("answer", r.Get("answer"))
+		if r.B("note") {
+			out.Set("note", r.Get("note"))
+		}
+	} else {
+		out.Set("error", r.Get("note"))
+	}
+	out.Set("seconds", home.Number(home.Fixed(float64(time.Since(begin).Milliseconds())/1000, 1)))
+	out.Set("usage", r.Get("usage"))
+	session := r.Get("session")
+	if !home.Truth(session) {
+		session = nil
+	}
+	out.Set("session", session)
+	out.Set("dir", dir)
+	if diff {
+		out.Set("changes", files)
+		out.Set("commits", commits)
+	}
+	if w != nil && (len(files) > 0 || commits > 0) {
+		out.Set("worktree", home.O("path", w.Path, "branch", w.Branch))
+	}
+	return out
+}

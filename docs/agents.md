@@ -70,6 +70,7 @@ ask handles everything else: timeouts, stopping, batches, recording runs, follow
 reporting what changed and checking JSON answers.
 It runs each agent in its own process group, so stopping a run also stops the CLI your agent
 started. Don't detach the CLI from that group.
+On Linux, agent processes also receive a parent-death signal, so killing ask outright kills the agent process.
 
 ## Sessions
 
