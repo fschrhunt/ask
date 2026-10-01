@@ -1,6 +1,7 @@
 package test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -72,7 +73,8 @@ func TestParentDeath(t *testing.T) {
 	eq(t, run.wait(t).code, -1)
 	until(t, func() bool {
 		b, e := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "stat"))
-		if os.IsNotExist(e) {
+		// The process can vanish while its stat is read; either way it is gone.
+		if os.IsNotExist(e) || errors.Is(e, syscall.ESRCH) {
 			return true
 		}
 		if e != nil {
