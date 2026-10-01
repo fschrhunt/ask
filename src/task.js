@@ -4,7 +4,7 @@
  */
 import { modelName, parseModel, runHarness } from './harness.js';
 
-// Delegated read runs answer from memory unless told otherwise; measured with Codex at #low,
+// Delegated read runs answer from memory unless told otherwise; measured with one at low effort,
 // which named a nonexistent function in 3 s without reading anything.
 const GROUNDING =
   'Answer from the files in your working directory: search and read them before answering. ' +

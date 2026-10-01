@@ -1,34 +1,11 @@
 # Harnesses
 
-A harness is a small program that ask runs to reach one agent CLI. ask itself knows nothing about
-any particular agent; everything specific to Claude Code, Codex or Opencode lives in its harness.
-That is how ask supports any agent: add a harness.
+A harness is a small program that ask runs to reach one agent CLI. ask knows nothing about any
+particular agent: everything specific to one, from its flags to how it reports usage, lives in its
+harness. That is how ask supports any agent.
 
-ask finds a harness named `NAME` at:
-
-1. `~/.ask/harnesses/NAME`, your own, if it exists, so yours wins;
-2. otherwise the one shipped with ask in `harnesses/NAME`.
-
-Three ship with ask: `claude`, `codex` and `opencode`.
-
-## Read-only
-
-Each harness decides how to keep a read run (`ASK_ACCESS=read`) from writing:
-
-- **codex** runs Codex in its read-only OS sandbox: the agent may run any command, but nothing can
-  write. Write runs use `workspace-write` with network access, so installs and tests work.
-- **claude** and **opencode** have no read-only shell, so read runs get only their file-reading and
-  search tools plus these inspection commands: `git diff`, `git log`, `git show`, `git status`,
-  `git blame`, `git ls-files`, `rg`, `grep`, `ls`, `wc`, `cat`, `head` and `tail`. A command with a
-  redirect, pipe, chain, quote, substitution, or an option that writes files or runs programs
-  (`--output`, `--ext-diff`, `--textconv`, `--pre`, `--hostname-bin`) is refused.
-
-These rules read the command, not what a repository configures; git can still run a diff filter
-that a repository defines. For a repository you don't trust, use `codex` for read runs.
-
-**Your own harness makes its own promise.** ask passes `ASK_ACCESS=read` and trusts the harness to
-keep it. If your harness can't make its agent read-only, refuse read runs (exit 1 with a reason)
-rather than ignore them.
+Harnesses are local. ask ships none; you keep yours in `~/.ask/harnesses/`, one executable per
+agent, named for it. A harness named `mycli` gives you models `mycli:...`.
 
 ## The contract
 
@@ -39,8 +16,8 @@ A harness is any executable: a shell script, Node, Python, a binary.
 Print one model per line, as `id` or `id<TAB>name`. The name is what status lines show.
 
 ```text
-small	Small One
-big
+fast	My Fast
+smart	My Smart
 ```
 
 Print nothing if the CLI has too many models to list; users add the ones they use to
@@ -53,7 +30,7 @@ ask runs the harness with no arguments, in the directory the agent should work i
 | Input | |
 | --- | --- |
 | stdin | The prompt, complete. ask has already added any read-run or JSON instructions. |
-| `ASK_MODEL` | The model id, without the harness or effort: `opus`. |
+| `ASK_MODEL` | The model id, without the harness or effort: `smart`. |
 | `ASK_EFFORT` | The effort from `#effort`, or empty. |
 | `ASK_ACCESS` | `read` or `write`. |
 | `ASK_SCHEMA` | Set only with `--schema`: a file holding the JSON Schema, for CLIs that enforce one. |
@@ -66,13 +43,24 @@ ask runs the harness with no arguments, in the directory the agent should work i
 | stderr | On failure, the reason as the last line. ask shows that line. |
 | `$ASK_REPORT` | Optional JSON: `{"name", "input", "output", "cached", "cost", "note"}`. |
 
-In the report, `name` is the model that actually ran (`Opus 5.5`), the counts are tokens, `cost` is
-in USD, and `note` is a short remark ask adds to the status line (`hit step cap; answer may be
+In the report, `name` is the model that actually ran (`My Smart 2`), the counts are tokens, `cost`
+is in USD, and `note` is a short remark ask adds to the status line (`hit step cap; answer may be
 partial`). Every field is optional.
 
 ask handles everything else: timeouts, stopping, batches, recording runs and checking JSON answers.
 It runs each harness in its own process group, so stopping a run also stops the CLI your harness
-started.
+started. Don't detach the CLI from that group.
+
+## Read-only
+
+ask passes `ASK_ACCESS=read` for read runs and trusts the harness to keep it. How depends on the
+CLI:
+
+- **An OS sandbox** is the strongest: the agent may run any command, but nothing can write.
+- **Tool and command rules**: allow only reading tools and a short list of inspection commands,
+  and refuse anything with redirects, pipes, chaining, quoting or substitution. Rules read the
+  command text, so they are weaker than a sandbox.
+- **Neither**: refuse read runs. Exit 1 with a reason rather than run with write access.
 
 ## Example: a harness in shell
 
@@ -81,7 +69,7 @@ has a `--readonly` flag:
 
 ```sh
 #!/bin/sh
-# ~/.ask/harnesses/mycli: runs mycli for ask. See ask's docs/harnesses.md.
+# ~/.ask/harnesses/mycli: runs mycli for ask.
 if [ "$1" = models ]; then
   printf 'fast\tMy Fast\nsmart\tMy Smart\n'
   exit 0
@@ -96,19 +84,43 @@ exec mycli "$@" -p "$(cat)"
 
 ```sh
 chmod +x ~/.ask/harnesses/mycli
-ask models | grep mycli
+ask models
 ask -m mycli:smart "What does this project do?"
 ```
 
-## Example: changing a shipped harness
+## Example: reporting usage
 
-Copy it into `~/.ask/harnesses/` and edit the copy. Yours wins from then on. The shipped harnesses
-import helpers from ask's `src/`, so point the copy's imports at your ask checkout:
+If the CLI prints JSON with its answer and token counts, a harness in any language can split them.
+In Node:
 
-```sh
-mkdir -p ~/.ask/harnesses
-sed "s|'\.\./src/|'$HOME/.local/share/ask/src/|" ~/.local/share/ask/harnesses/codex > ~/.ask/harnesses/codex
-chmod +x ~/.ask/harnesses/codex
+```js
+#!/usr/bin/env node
+// ~/.ask/harnesses/othercli: runs othercli for ask, with usage.
+import { execFileSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
+
+if (process.argv[2] === 'models') {
+  console.log('pro\tOther Pro');
+  process.exit(0);
+}
+const args = ['run', '--json', '--model', process.env.ASK_MODEL];
+if (process.env.ASK_ACCESS === 'read') args.push('--sandbox', 'read-only');
+try {
+  const out = JSON.parse(execFileSync('othercli', args, { input: readFileSync(0) }));
+  writeFileSync(process.env.ASK_REPORT, JSON.stringify({ input: out.tokens.in, output: out.tokens.out }));
+  console.log(out.answer);
+} catch (error) {
+  console.error(error.stderr?.toString().trim().split('\n').pop() || error.message);
+  process.exit(1);
+}
 ```
 
-Delete the copy to go back to the shipped one.
+## Keeping harnesses in sync
+
+`~/.ask/harnesses/` is plain files, so keep it wherever you keep your dotfiles and it follows you
+to every machine. Test a harness by running it the way ask does:
+
+```sh
+echo "say hi" | ASK_MODEL=fast ASK_ACCESS=read ASK_REPORT=/tmp/r.json ~/.ask/harnesses/mycli
+cat /tmp/r.json
+```

@@ -3,16 +3,15 @@
 A model id is `harness:id`, with an optional `#effort`:
 
 ```text
-claude:opus
-codex:gpt-6.1-sol#high
-opencode:opencode-go/glm-5.3-flash
+mycli:smart
+mycli:fast#high
+othercli:pro
 ```
 
-- **harness** is the program ask runs: `claude`, `codex`, `opencode`, or one of yours (see
+- **harness** is the executable in `~/.ask/harnesses/` that ask runs (see
   [Harnesses](harnesses.md)).
-- **id** is the model as that harness names it.
-- **effort** is passed to the harness, which passes it on in its CLI's own form (`--effort high`
-  for Claude Code, `model_reasoning_effort` for Codex, a model variant for Opencode).
+- **id** is the model as that harness's CLI names it.
+- **effort** is passed to the harness, which passes it on in its CLI's own form.
 
 ## Listing
 
@@ -20,13 +19,14 @@ opencode:opencode-go/glm-5.3-flash
 ask models
 ```
 
-Each harness lists its own models:
+```text
+mycli:fast
+mycli:smart
+othercli:pro
+```
 
-| Harness | Models it lists |
-| --- | --- |
-| `claude` | Claude Code's aliases: `fable`, `opus`, `sonnet`, `haiku` |
-| `codex` | Codex's model cache (`~/.codex/models_cache.json`, or `$CODEX_HOME`), without review models |
-| `opencode` | None: Opencode offers hundreds, so you name the ones you use |
+Each harness lists its own models with `NAME models`. A harness whose CLI offers too many to list
+lists none, and you name the ones you use.
 
 ## Adding model ids
 
@@ -34,8 +34,8 @@ Each harness lists its own models:
 
 ```json
 {
-  "opencode": ["opencode-go/glm-5.3-flash", "opencode-go/deepseek-v4.1-flash"],
-  "codex": ["gpt-6-luna"]
+  "mycli": ["experimental"],
+  "othercli": ["pro-mini", "pro-max"]
 }
 ```
 
@@ -44,13 +44,10 @@ listed or not. The list is for you and for agents that pick from `ask models`.
 
 ## Names in output
 
-Status lines and results use the model's own name, not its id:
+Status lines and results use the model's own name, not its id. ask takes the first of:
 
-| You ran | ask shows |
-| --- | --- |
-| `claude:opus` | `Opus 5.5`, the model the alias resolved to |
-| `codex:gpt-6.1-sol#high` | `GPT-6.1 Sol (high)`, Codex's display name |
-| `opencode:opencode-go/glm-5.3-flash` | `Glm 5.3 Flash`, the id in title case |
+1. the name the harness reports for the run (the model an alias resolved to, say `My Smart 2`);
+2. the name the harness lists next to the id (`My Smart`);
+3. the id in title case (`pro-mini` becomes `Pro Mini`).
 
-A harness gives the name in its report, or next to the id when it lists its models; otherwise ask
-title-cases the id.
+Effort is appended: `My Smart (high)`.

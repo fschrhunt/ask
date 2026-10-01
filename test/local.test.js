@@ -1,4 +1,4 @@
-/* The harness contract, through local harnesses in $ASK_HOME/harnesses written as shell scripts. */
+/* The harness contract, through harnesses in $ASK_HOME/harnesses written as shell scripts. */
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -12,7 +12,7 @@ function harness(name, body) {
   writeFileSync(join(dir, name), `#!/bin/sh\nPATH=/usr/bin:/bin:$PATH\nif [ "$1" = models ]; then printf 'small\\tSmall One\\nbig\\n'; exit 0; fi\n${body}\n`, { mode: 0o755 });
 }
 
-test('a local harness is listed, with its models.json ids, next to the shipped ones', async () => {
+test('a harness is listed with its models.json ids, next to the others', async () => {
   harness('echo', 'cat');
   writeJson(join(env.ASK_HOME, 'models.json'), { echo: ['extra'] });
   const r = await ask(['models']);
@@ -48,10 +48,4 @@ test("a failed harness's last stderr line is the error", async () => {
   const r = await ask(['-m', 'echo:big', 'go']);
   assert.equal(r.code, 1);
   assert.match(r.stderr, /failed after .*: quota exceeded$/m);
-});
-
-test('a local harness wins over the shipped one of the same name', async () => {
-  harness('claude', 'echo local');
-  const r = await ask(['-m', 'claude:opus', 'go']);
-  assert.equal(r.stdout, 'local\n');
 });
