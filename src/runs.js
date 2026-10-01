@@ -8,12 +8,15 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { parseModel } from './agent.js';
+import { afterTask, beforeTask } from './hooks.js';
 import { RUNS, UsageError, writeJson } from './home.js';
 import { runTask } from './task.js';
 
 // Seconds a task may run unless it says otherwise, and the most it may ask for (Node's timer limit).
 const DEFAULT_TIMEOUT = 900;
 const MAX_TIMEOUT = 2_000_000;
+// Follow-ups result hooks may ask for on one task, so a hook that is never satisfied cannot loop forever.
+const MAX_FOLLOWUPS = 3;
 
 const alive = (pid) => {
   try {
@@ -139,12 +142,70 @@ export function prepareTasks(items, defaults, runId, single, missingModel) {
   });
 }
 
+/* How a change to a file reads after two rounds of work on it, or null when it ended where it began. */
+function chain(first, second) {
+  if (first === 'added') return second === 'deleted' ? null : 'added';
+  if (first === 'deleted') return second === 'added' ? 'modified' : 'deleted';
+  return second;
+}
+
+/* One result for a task and its follow-up: the follow-up's answer, with time, usage and changes for both. */
+function combine(a, b) {
+  const usage = a.usage || b.usage ? {} : null;
+  for (const part of [a.usage, b.usage].filter(Boolean)) {
+    for (const key of ['input', 'output', 'cached']) usage[key] = (usage[key] || 0) + (part[key] || 0);
+    if (typeof part.cost === 'number') usage.cost = (usage.cost || 0) + part.cost;
+  }
+  const result = { ...b, seconds: Number((a.seconds + b.seconds).toFixed(1)), usage, followups: (a.followups || 0) + 1 };
+  if (a.changes || b.changes) {
+    const files = new Map((a.changes || []).map((c) => [c.path, c.change]));
+    for (const { path, change } of b.changes || []) files.set(path, files.has(path) ? chain(files.get(path), change) : change);
+    result.changes = [...files].filter(([, change]) => change).sort(([x], [y]) => x.localeCompare(y)).map(([path, change]) => ({ path, change }));
+    result.commits = (a.commits || 0) + (b.commits || 0);
+  }
+  if (a.worktree && !b.worktree && result.changes?.length) result.worktree = a.worktree;
+  return result;
+}
+
+/*
+ * Runs one task with its hooks: task hooks may change or refuse it, then result hooks may fail it
+ * or ask the same agent session for a follow-up, up to MAX_FOLLOWUPS times. `report` gets
+ * ('start', info), ('note', [hook, text]) and ('followup', [hook, prompt]).
+ */
+async function runWithHooks(task, ref, hooks, report) {
+  if (hooks) {
+    const before = await beforeTask(task, { ref });
+    before.notes.forEach((note) => report('note', note));
+    task = before.task;
+    if (before.refused)
+      return { id: task.id, model: task.model, name: task.model, ok: false, error: `refused by hook ${before.refused}`, seconds: 0, usage: null, session: null, dir: task.dir };
+  }
+  let result = await runTask(task, (info) => report('start', info));
+  for (let round = 0; hooks; round++) {
+    const after = await afterTask(task, { run: ref, ...result }, { ref });
+    after.notes.forEach((note) => report('note', note));
+    if (after.fail) {
+      const { answer, note, ...rest } = result;
+      return { ...rest, ok: false, error: `failed by hook ${after.fail[0]}: ${after.fail[1]}` };
+    }
+    if (!after.followup) break;
+    if (round === MAX_FOLLOWUPS || !result.session) {
+      report('note', [after.followup[0], round === MAX_FOLLOWUPS ? `asked for a follow-up after ${MAX_FOLLOWUPS}; stopping` : 'asked for a follow-up, but the agent reported no session']);
+      break;
+    }
+    report('followup', after.followup);
+    result = combine(result, await runTask({ ...task, prompt: after.followup[1], session: result.session }, (info) => report('start', info)));
+  }
+  return result;
+}
+
 /*
  * Runs a run's unfinished tasks, at most `jobs` at once, and returns all results in task order.
  * Results already ok are kept, which is how --resume skips finished work. results.json is saved
- * after every task. `report` gets ('start', i, info) and ('done', i, result) as tasks go.
+ * after every task. `report` gets ('start', i, info), ('note', i, [hook, text]), ('followup', i,
+ * [hook, prompt]) and ('done', i, result) as tasks go. Hooks run unless `hooks` is false.
  */
-export async function executeRun(run, jobs, report) {
+export async function executeRun(run, jobs, report, { hooks = true } = {}) {
   lock(run);
   try {
     const todo = run.tasks.map((_, i) => i).filter((i) => !run.results[i]?.ok);
@@ -152,7 +213,7 @@ export async function executeRun(run, jobs, report) {
     const worker = async () => {
       while (next < todo.length) {
         const i = todo[next++];
-        const result = await runTask(run.tasks[i], (info) => report('start', i, info));
+        const result = await runWithHooks(run.tasks[i], taskRef(run, i), hooks, (kind, x) => report(kind, i, x));
         run.results[i] = { run: taskRef(run, i), ...result };
         writeJson(join(run.dir, 'results.json'), run.results);
         report('done', i, run.results[i]);

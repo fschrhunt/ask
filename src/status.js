@@ -39,6 +39,13 @@ export function startLine(run, i, { dir, worktree }) {
   return lines.join('\n');
 }
 
+/* A hook's line: a note it left, or the follow-up it asked the agent for (its first line, clipped). */
+export function hookLine(run, i, kind, [hook, text]) {
+  const first = text.split('\n')[0];
+  const shown = first.length > 100 ? `${first.slice(0, 99)}…` : first;
+  return line(taskRef(run, i), [`hook ${hook}`, kind === 'followup' ? `follow-up: ${shown}` : shown]);
+}
+
 /* "3 files changed, 1 commit", or '' for a run that changed nothing or was not in a repository. */
 function changeSummary(result) {
   if (!result.changes) return '';

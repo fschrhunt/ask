@@ -180,7 +180,7 @@ test('--resume reruns a batch as recorded, refusing options that would change it
   const first = await ask(['batch', '-m', 'fake:small', '-'], { input: '[{"prompt": "a"}]' });
   const r = await ask(['batch', '--resume', runId(first.stderr), '-r']);
   assert.equal(r.code, 2);
-  assert.match(r.stderr, /takes only -j, not -r/);
+  assert.match(r.stderr, /takes only -j and --no-hooks, not -r/);
 });
 
 test('an agent inherits no contract variable from an ask further up', async () => {

@@ -2,7 +2,7 @@
 /*
  * A fake agent for the tests, keeping the agent contract (docs/agents.md). `fake models`
  * lists "small<TAB>Small One" and "big". A run appends {pid, stdin, cwd, access, model, effort,
- * schema, session} to $FAKE_LOG, reports its session at once (ASK_SESSION, or a new "s-<pid>"),
+ * schema, session, contract} to $FAKE_LOG, reports its session at once (ASK_SESSION, or a new "s-<pid>"),
  * answers $FAKE_ANSWER (default "fake: <last prompt line>") and reports name "Fake 1.0", 10 in,
  * 5 out, $0.01. A prompt containing $FAKE_FAIL fails with "fake boom", $FAKE_HANG never returns,
  * $FAKE_SLOW answers after 300 ms. $FAKE_IGNORE_TERM ignores SIGTERM, $FAKE_EXIT is the exit code
@@ -22,7 +22,7 @@ const schema = env.ASK_SCHEMA ? JSON.parse(readFileSync(env.ASK_SCHEMA, 'utf8'))
 if (env.FAKE_LOG)
   appendFileSync(
     env.FAKE_LOG,
-    JSON.stringify({ pid: process.pid, stdin, cwd: process.cwd(), access: env.ASK_ACCESS, model: env.ASK_MODEL, effort: env.ASK_EFFORT, schema, session: env.ASK_SESSION }) + '\n',
+    JSON.stringify({ pid: process.pid, stdin, cwd: process.cwd(), access: env.ASK_ACCESS, model: env.ASK_MODEL, effort: env.ASK_EFFORT, schema, session: env.ASK_SESSION, contract: env.ASK_CONTRACT }) + '\n',
   );
 const matches = (needle) => needle && stdin.includes(needle);
 const session = env.ASK_SESSION || `s-${process.pid}`;
