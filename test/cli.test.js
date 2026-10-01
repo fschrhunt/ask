@@ -93,7 +93,7 @@ test('stopping ask with SIGINT stops the models it started', async () => {
 test('a failing model exits 1 with its message', async () => {
   const r = await ask(['-m', 'fake:big', 'break'], { extra: { FAKE_FAIL: 'break' } });
   assert.equal(r.code, 1);
-  assert.match(r.stderr, /failed after .*fake boom/);
+  assert.match(r.stderr, / · failed · .*fake boom$/m);
   assert.equal(r.stdout, '');
 });
 
@@ -120,7 +120,7 @@ test('read runs start with the grounding preamble; write runs get the prompt as 
 test('the answer goes to stdout and a status line with usage to stderr', async () => {
   const r = await ask(['-m', 'fake:small', 'hi']);
   assert.equal(r.stdout, 'fake: hi\n');
-  assert.match(r.stderr, /^ask: Fake 1\.0 [\d.]+s 10 in 5 out \$0\.0100\n$/);
+  assert.match(r.stderr, /^ask (\w{6}) · fake:small · read · .+ · started\nask \1 · Fake 1\.0 · ok · [\d.]+s · 10 in · 5 out · \$0\.0100\n$/);
 });
 
 test('a run that reports no usage prints no usage', async () => {
@@ -132,7 +132,7 @@ test('a run that reports no usage prints no usage', async () => {
 test('an answer from a harness that exited nonzero fails', async () => {
   const r = await ask(['-m', 'fake:small', 'hi'], { extra: { FAKE_EXIT: '1' } });
   assert.equal(r.code, 1);
-  assert.match(r.stderr, /failed after .*exit 1/);
+  assert.match(r.stderr, / · failed · .*exit 1$/m);
   assert.equal(r.stdout, '');
 });
 
@@ -152,4 +152,37 @@ test('a relative -C is resolved once, against where ask runs', async () => {
   const r = await ask(['-m', 'fake:small', '-C', 'work', 'hi']);
   assert.equal(r.code, 0);
   assert.equal(calls()[0].cwd, join(tmp, 'work'));
+});
+
+test('numbers are checked: -t, -j and a task timeout must be above 0', async () => {
+  for (const args of [['-m', 'fake:small', '-t', 'abc', 'hi'], ['batch', '-j', '0', '-m', 'fake:small', '-']]) {
+    const r = await ask(args, { input: '[{"prompt": "a"}]' });
+    assert.equal(r.code, 2, args.join(' '));
+    assert.match(r.stderr, /needs a (whole )?number above 0/);
+  }
+  const task = await ask(['batch', '-m', 'fake:small', '-'], { input: '[{"prompt": "a", "timeout": "soon"}]' });
+  assert.match(task.stderr, /task 1: timeout must be a number of seconds above 0/);
+  assert.equal(calls().length, 0);
+});
+
+test('words after -- are the prompt, even ones that look like options', async () => {
+  const r = await ask(['-m', 'fake:small', '--', '-w', 'is a flag']);
+  assert.equal(r.stdout, 'fake: -w is a flag\n');
+  assert.equal(calls()[0].access, 'read');
+});
+
+test('schema checks use own properties and compare enums by value', async () => {
+  writeJson(join(tmp, 'req.json'), { type: 'object', required: ['constructor'] });
+  const missing = await ask(['-m', 'fake:small', '--schema', join(tmp, 'req.json'), 'go'], { extra: { FAKE_ANSWER: '{}' } });
+  assert.match(missing.stderr, /missing "constructor"/);
+  writeJson(join(tmp, 'enum.json'), { enum: [{ a: 1, b: 2 }] });
+  const reordered = await ask(['-m', 'fake:small', '--schema', join(tmp, 'enum.json'), 'go'], { extra: { FAKE_ANSWER: '{"b": 2, "a": 1}' } });
+  assert.equal(reordered.code, 0);
+});
+
+test('a report that is not an object is ignored, not fatal', async () => {
+  writeFileSync(join(env.ASK_HOME, 'harnesses', 'odd'), '#!/bin/sh\necho null > "$ASK_REPORT"; echo fine\n', { mode: 0o755 });
+  const r = await ask(['-m', 'odd:x', 'go']);
+  assert.equal(r.code, 0);
+  assert.equal(r.stdout, 'fine\n');
 });

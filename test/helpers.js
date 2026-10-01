@@ -13,7 +13,7 @@ import { afterEach, beforeEach } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const PATH = dirname(process.execPath);
+const PATH = `${dirname(process.execPath)}:/usr/bin:/bin`;
 export let tmp;
 export let env;
 

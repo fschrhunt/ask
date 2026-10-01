@@ -34,6 +34,7 @@ ask runs the harness with no arguments, in the directory the agent should work i
 | `ASK_EFFORT` | The effort from `#effort`, or empty. |
 | `ASK_ACCESS` | `read` or `write`. |
 | `ASK_SCHEMA` | Set only with `--schema`: a file holding the JSON Schema, for CLIs that enforce one. |
+| `ASK_SESSION` | Set only for a follow-up: the session to continue (see [Sessions](#sessions)). |
 | `ASK_REPORT` | A file path for the optional report. |
 
 | Output | |
@@ -41,15 +42,29 @@ ask runs the harness with no arguments, in the directory the agent should work i
 | stdout | The answer, and nothing else. |
 | exit code | 0 when the answer is good, anything else when the run failed. |
 | stderr | On failure, the reason as the last line. ask shows that line. |
-| `$ASK_REPORT` | Optional JSON: `{"name", "input", "output", "cached", "cost", "note"}`. |
+| `$ASK_REPORT` | Optional JSON: `{"session", "name", "input", "output", "cached", "cost", "note"}`. |
 
-In the report, `name` is the model that actually ran (`My Smart 2`), the counts are tokens, `cost`
-is in USD, and `note` is a short remark ask adds to the status line (`hit step cap; answer may be
-partial`). Every field is optional.
+In the report, `session` is the agent session the run used, `name` is the model that actually ran
+(`My Smart 2`), the counts are tokens, `cost` is in USD, and `note` is a short remark ask adds to
+the status line (`hit step cap; answer may be partial`). Every field is optional. ask reads the
+report even when the run fails or times out, so write it as early as you know something, above all
+the session, and rewrite it whole as you learn more.
 
-ask handles everything else: timeouts, stopping, batches, recording runs and checking JSON answers.
+ask handles everything else: timeouts, stopping, batches, recording runs, follow-ups, worktrees,
+reporting what changed and checking JSON answers.
 It runs each harness in its own process group, so stopping a run also stops the CLI your harness
 started. Don't detach the CLI from that group.
+
+## Sessions
+
+Follow-ups (`ask -c RUN`) continue the agent's own conversation, so they need the CLI's session
+id. A harness that supports them:
+
+1. reports the session in `$ASK_REPORT` as `"session"`, as soon as the CLI says what it is;
+2. when `ASK_SESSION` is set, resumes that session with the prompt instead of starting a new one.
+
+ask runs a follow-up in the same directory as the run it continues, which most CLIs need to find
+the session. A harness that reports no session simply can't be continued; ask says so.
 
 ## Read-only
 
@@ -88,14 +103,14 @@ ask models
 ask -m mycli:smart "What does this project do?"
 ```
 
-## Example: reporting usage
+## Example: sessions and usage
 
-If the CLI prints JSON with its answer and token counts, a harness in any language can split them.
-In Node:
+If the CLI prints JSON with its answer, session and token counts, a harness in any language can
+split them. In Node:
 
 ```js
 #!/usr/bin/env node
-// ~/.ask/harnesses/othercli: runs othercli for ask, with usage.
+// ~/.ask/harnesses/othercli: runs othercli for ask, with sessions and usage.
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -105,9 +120,10 @@ if (process.argv[2] === 'models') {
 }
 const args = ['run', '--json', '--model', process.env.ASK_MODEL];
 if (process.env.ASK_ACCESS === 'read') args.push('--sandbox', 'read-only');
+if (process.env.ASK_SESSION) args.push('--resume', process.env.ASK_SESSION);
 try {
   const out = JSON.parse(execFileSync('othercli', args, { input: readFileSync(0) }));
-  writeFileSync(process.env.ASK_REPORT, JSON.stringify({ input: out.tokens.in, output: out.tokens.out }));
+  writeFileSync(process.env.ASK_REPORT, JSON.stringify({ session: out.session, input: out.tokens.in, output: out.tokens.out }));
   console.log(out.answer);
 } catch (error) {
   console.error(error.stderr?.toString().trim().split('\n').pop() || error.message);

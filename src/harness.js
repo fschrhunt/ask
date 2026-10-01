@@ -48,34 +48,38 @@ const listed = new Map();
 
 /*
  * The models a harness offers, from `<harness> models` (one "id" or "id<TAB>name" per line) plus
- * its ids in models.json, as [{ id, name }]. Cached per harness; a harness that fails to list offers
- * only its models.json ids.
+ * its ids in models.json, as { models: [{ id, name }], error }. The harness's own list is cached;
+ * a harness that fails to list offers only its models.json ids, and error says why.
  */
 export async function harnessModels(harness, config = {}) {
   if (!listed.has(harness)) {
-    const r = await run(harnessPath(harness), ['models'], { timeoutMs: LIST_TIMEOUT_MS });
-    const own = r.code === 0 ? r.stdout.split('\n').filter((line) => line.trim()).map((line) => line.split('\t')) : [];
-    listed.set(harness, own.map(([id, name]) => ({ id: id.trim(), name: name?.trim() || undefined })));
+    const r = await run(harnessPath(harness), ['models'], { env: contractEnv({}), timeoutMs: LIST_TIMEOUT_MS });
+    const lines = r.code === 0 ? r.stdout.split('\n').filter((line) => line.trim()) : [];
+    const error = r.code === 0 ? '' : reason(r.stderr) || (r.timedOut ? 'timed out' : `exit ${r.code}`);
+    listed.set(harness, { own: lines.map((line) => line.split('\t')).map(([id, name]) => ({ id: id.trim(), name: name?.trim() || undefined })), error });
   }
-  const extra = (config[harness] || []).map((id) => ({ id }));
-  return [...listed.get(harness), ...extra];
+  const { own, error } = listed.get(harness);
+  return { models: [...own, ...(config[harness] || []).map((id) => ({ id }))], error };
 }
 
-/* Every "harness:id" offered here, in harness order. */
+/* Every "harness:id" offered here, in harness order, and the listing failures as "harness: reason". */
 export async function listModels(config) {
-  const all = await Promise.all(harnessNames().map(async (harness) => (await harnessModels(harness, config)).map((m) => `${harness}:${m.id}`)));
-  return all.flat();
+  const all = await Promise.all(harnessNames().map(async (harness) => ({ harness, ...(await harnessModels(harness, config)) })));
+  return {
+    ids: all.flatMap(({ harness, models }) => models.map((m) => `${harness}:${m.id}`)),
+    errors: all.filter((x) => x.error).map((x) => `${x.harness}: ${x.error}`),
+  };
 }
 
-/* An id in title case, for a harness that names neither the model it ran nor its models. */
-const titleCase = (id) => id.split('/').pop().split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
+/* An id in title case (provider/fast-one -> Fast One), for a harness that names no model. */
+const titleCase = (id) => id.split('/').filter(Boolean).pop()?.split('-').filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(' ') || id;
 
 /*
  * The model's own name for people reading status lines: what the harness reported it ran, else the
  * name it lists for the id, else the id in title case. Effort is appended, e.g. "GPT-6.1 Sol (high)".
  */
 export async function modelName(m, reported) {
-  const name = reported || (await harnessModels(m.harness)).find((x) => x.id === m.model)?.name || titleCase(m.model);
+  const name = reported || (await harnessModels(m.harness)).models.find((x) => x.id === m.model)?.name || titleCase(m.model);
   return m.effort ? `${name} (${m.effort})` : name;
 }
 
@@ -83,26 +87,52 @@ export async function modelName(m, reported) {
 const reason = (stderr) => stderr.trim().split('\n').filter((line) => line.trim()).pop()?.trim().slice(0, 300);
 
 /*
- * Runs one prompt through a harness. Resolves with { ok, text, note, usage, name }: text is the
- * harness's stdout, and note, usage and name come from the report it may write. Never rejects.
+ * ask's environment for a harness, with the contract's variables exactly as given: one inherited
+ * from an ask further up (an agent that itself runs ask) must not leak into this run.
  */
-export async function runHarness(m, prompt, { write, schema, dir, timeoutMs }) {
+function contractEnv(vars) {
+  const env = { ...process.env };
+  for (const key of ['ASK_MODEL', 'ASK_EFFORT', 'ASK_ACCESS', 'ASK_SCHEMA', 'ASK_SESSION', 'ASK_REPORT']) delete env[key];
+  return Object.assign(env, vars);
+}
+
+/* The report's fields ask uses, keeping only well-formed ones: strings for name, note and session, counts as numbers. */
+function readReport(path) {
+  let report;
+  try {
+    report = JSON.parse(readFileSync(path, 'utf8'));
+  } catch {
+    return {};
+  }
+  if (!report || typeof report !== 'object') return {};
+  const text = (key) => (typeof report[key] === 'string' && report[key].trim() ? report[key].trim() : undefined);
+  const counts = ['input', 'output', 'cached', 'cost'].filter((key) => Number.isFinite(report[key]) && report[key] >= 0);
+  return {
+    name: text('name'),
+    note: text('note') || '',
+    session: text('session'),
+    usage: counts.length ? Object.fromEntries(counts.map((key) => [key, report[key]])) : null,
+  };
+}
+
+/*
+ * Runs one prompt through a harness, continuing `session` when given. Resolves with { ok, text,
+ * note, usage, name, session }: text is the harness's stdout; the rest comes from its report, which
+ * is read even after a failure or timeout so the session can still be continued. Never rejects.
+ */
+export async function runHarness(m, prompt, { write, schema, session, dir, timeoutMs }) {
   const work = mkdtempSync(join(tmpdir(), 'ask-'));
   try {
-    const env = { ASK_MODEL: m.model, ASK_EFFORT: m.effort || '', ASK_ACCESS: write ? 'write' : 'read', ASK_REPORT: join(work, 'report.json') };
-    if (schema) writeFileSync((env.ASK_SCHEMA = join(work, 'schema.json')), JSON.stringify(schema));
-    const r = await run(harnessPath(m.harness), [], { input: prompt, cwd: dir, env, timeoutMs });
-    let report = {};
-    try {
-      report = JSON.parse(readFileSync(env.ASK_REPORT, 'utf8'));
-    } catch {}
-    const { name, note = '' } = report;
-    const counts = ['input', 'output', 'cached', 'cost'].filter((key) => typeof report[key] === 'number');
-    const usage = counts.length ? Object.fromEntries(counts.map((key) => [key, report[key]])) : null;
-    if (r.timedOut) return { ok: false, note: 'timed out', usage, name };
-    if (r.code !== 0) return { ok: false, note: reason(r.stderr) || `exit ${r.code}`, usage, name };
-    if (!r.stdout.trim()) return { ok: false, note: 'no answer', usage, name };
-    return { ok: true, text: r.stdout, note, usage, name };
+    const vars = { ASK_MODEL: m.model, ASK_EFFORT: m.effort || '', ASK_ACCESS: write ? 'write' : 'read', ASK_REPORT: join(work, 'report.json') };
+    if (schema) writeFileSync((vars.ASK_SCHEMA = join(work, 'schema.json')), JSON.stringify(schema));
+    if (session) vars.ASK_SESSION = session;
+    const r = await run(harnessPath(m.harness), [], { input: prompt, cwd: dir, env: contractEnv(vars), timeoutMs });
+    const report = readReport(vars.ASK_REPORT);
+    const meta = { usage: report.usage, name: report.name, session: report.session || session };
+    if (r.timedOut) return { ok: false, note: 'timed out', ...meta };
+    if (r.code !== 0) return { ok: false, note: reason(r.stderr) || `exit ${r.code}`, ...meta };
+    if (!r.stdout.trim()) return { ok: false, note: 'no answer', ...meta };
+    return { ok: true, text: r.stdout, note: report.note, ...meta };
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
