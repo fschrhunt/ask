@@ -1,0 +1,33 @@
+#!/usr/bin/env node
+/*
+ * Fake `opencode` for the tests: prints Opencode's `--format json` events. Every call is appended
+ * to $FAKE_LOG as one JSON line {pid, argv, stdin, cwd, config}, config being the injected
+ * OPENCODE_CONFIG_CONTENT. The answer is $FAKE_ANSWER (default: the last prompt line) after
+ * $FAKE_STEPS steps (default 1). A prompt containing $FAKE_FAIL fails, $FAKE_HANG never returns,
+ * $FAKE_SLOW answers after 300 ms. $FAKE_EXIT is the exit code after an answer.
+ */
+import { appendFileSync, readFileSync } from 'node:fs';
+
+const argv = process.argv.slice(2);
+const stdin = readFileSync(0, 'utf8');
+const { FAKE_LOG, FAKE_ANSWER, FAKE_FAIL, FAKE_HANG, FAKE_SLOW, FAKE_STEPS, FAKE_EXIT, OPENCODE_CONFIG_CONTENT } = process.env;
+if (FAKE_LOG) {
+  const config = OPENCODE_CONFIG_CONTENT ? JSON.parse(OPENCODE_CONFIG_CONTENT) : null;
+  appendFileSync(FAKE_LOG, JSON.stringify({ pid: process.pid, argv, stdin, cwd: process.cwd(), config }) + '\n');
+}
+const matches = (needle) => needle && stdin.includes(needle);
+const emit = (event) => console.log(JSON.stringify(event));
+
+if (matches(FAKE_HANG)) setInterval(() => {}, 1000);
+else {
+  if (matches(FAKE_SLOW)) await new Promise((resolve) => setTimeout(resolve, 300));
+  if (matches(FAKE_FAIL)) {
+    emit({ type: 'error', error: { message: 'opencode boom' } });
+    process.exitCode = 1;
+  } else {
+    for (let i = 0; i < Number(FAKE_STEPS || 1); i++) emit({ type: 'step_start' });
+    emit({ type: 'text', part: { text: FAKE_ANSWER ?? `opencode: ${stdin.trim().split('\n').pop()}` } });
+    emit({ type: 'step_finish', part: { cost: 0.002, tokens: { input: 50, output: 6, reasoning: 1, cache: { read: 10 } } } });
+    process.exitCode = Number(FAKE_EXIT || 0);
+  }
+}

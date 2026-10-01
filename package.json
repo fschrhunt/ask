@@ -1,0 +1,13 @@
+{
+  "name": "ask",
+  "version": "0.1.0",
+  "description": "Every coding agent, behind one command.",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "author": "Fischer Hunt",
+  "repository": "github:fschrhunt/ask",
+  "bin": { "ask": "ask" },
+  "scripts": { "test": "node --test" },
+  "engines": { "node": ">=20" }
+}

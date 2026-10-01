@@ -1,0 +1,567 @@
+#!/usr/bin/env node
+/*
+ * ask: hand tasks to Claude Code, Codex or Opencode, on any model they offer, and get the answers back.
+ *
+ * Contract: stdout carries only answers (JSON with --json/--schema, and always for `batch`);
+ * stderr carries one status line per run. Exit 0 on success, 1 when a run failed, 2 on usage
+ * errors. Runs are read-only (-r) unless -w allows writing. Model ids are harness:id[#effort]; `ask models`
+ * lists them, and every run names one: like a native subagent, ask does not choose for the caller.
+ * Everything ask keeps lives in ~/.ask (or $ASK_HOME): models.json, the optional list of Opencode
+ * models offered, and runs/, the recorded batches. Harnesses are the `claude`, `codex` and
+ * `opencode` commands found on PATH.
+ */
+import { spawn } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+
+const HELP = `ask: hand tasks to Claude Code, Codex and Opencode, and get their answers back.
+
+  ask -m MODEL [options] PROMPT   one prompt (use - or omit PROMPT to read stdin)
+  ask models                      list the model ids available here
+  ask batch [-j N] [-m MODEL] FILE|-
+                                  run tasks in parallel (default 4 at once); prints a JSON
+                                  array of results and records the run
+  ask batch --resume DIR          rerun only the tasks of a recorded run that did not finish
+  ask runs                        list recent recorded runs
+
+options
+  -m, --model ID     harness:id[#effort] from \`ask models\`, e.g. claude:sonnet#high
+  -r, --read         read only (the default)
+  -w, --write        read and write: may edit files and run commands
+  --json             answer must be JSON
+  --schema FILE      answer must match this JSON Schema (implies --json)
+  -C, --dir DIR      directory the model works in (default: current)
+  -t, --timeout S    seconds per run (default: 900)
+
+batch tasks: a JSON array or one JSON object per line, each
+  {"id": "...", "prompt": "...", "model": "...", "write": false, "schema": {...},
+   "json": false, "dir": "...", "timeout": 900}
+"prompt" is required, and "model" unless batch -m gives one. Results keep task order:
+  [{"id", "model", "name", "ok", "answer", "error", "seconds", "usage"}]
+name is the model's own name (Opus 5.5, GPT-6.1 Sol), for status lines and people.
+usage is {input, output, cached} tokens, plus cost in USD where the harness reports it.
+Status lines go to stderr; stopping ask stops every model it started.
+ask keeps models.json and recorded runs in ~/.ask, or $ASK_HOME.`;
+
+const HOME = process.env.ASK_HOME || join(homedir(), '.ask');
+const CONFIG = join(HOME, 'models.json');
+// Opencode agent iterations before it must answer in text: lookups measured 1-13, a runaway 107.
+const STEPS = { read: 25, write: 100 };
+// Delegated read runs answer from memory unless told otherwise; measured with codex at #low,
+// which named a nonexistent function in 3 s without reading anything.
+const GROUNDING =
+  'Answer from the files in your working directory: search and read them before answering. ' +
+  'Never guess file names, functions or facts; if you cannot find something, say so.\n\n';
+/*
+ * Claude Code and Opencode have no read-only shell, so their read runs may run only these
+ * inspection commands, written as plain words: a command containing an UNSAFE character (one that
+ * redirects, pipes, chains, substitutes, expands, quotes or escapes, any of which could also spell
+ * a refused option past a rule) or a WRITER option (one that writes files or runs another program)
+ * is refused. Rules match text, so commands that take abbreviated or bundled options, like git
+ * grep, are left out; both harnesses have their own grep tool. Codex gets none of this: its OS
+ * sandbox makes the whole run read-only. Tests and builds write files, so they need -w.
+ */
+const INSPECT = ['git diff', 'git log', 'git show', 'git status', 'git blame', 'git ls-files', 'rg', 'grep', 'ls', 'wc', 'cat', 'head', 'tail'];
+const UNSAFE = ['>', '|', ';', '&', '`', '$', '\\', "'", '"', '{'];
+const WRITERS = ['--output', '--ext-diff', '--textconv', '--pre', '--hostname-bin'];
+// Seconds a stopped harness gets to exit before it is killed.
+const GRACE_MS = 5000;
+
+class UsageError extends Error {}
+
+/*
+ * Every model process this ask started, so stopping ask stops them too: each gets SIGTERM, then
+ * SIGKILL if it is still running after GRACE_MS, and ask exits once all have ended. Once stopping,
+ * no new model starts.
+ */
+const children = new Set();
+let stopping = false;
+for (const signal of ['SIGINT', 'SIGTERM'])
+  process.on(signal, async () => {
+    if (stopping) return;
+    stopping = true;
+    const live = [...children];
+    for (const child of live) child.kill('SIGTERM');
+    const kill = setTimeout(() => live.forEach((child) => child.kill('SIGKILL')), GRACE_MS);
+    await Promise.all(live.map((child) => new Promise((done) => (children.has(child) ? child.once('exit', done) : done()))));
+    clearTimeout(kill);
+    process.exit(130);
+  });
+
+// Batch records: tasks.json and results.json per run, readable while the run is going.
+const RUNS = join(HOME, 'runs');
+
+/* Sums token counts and cost; a cost stays null when the harness does not report one. */
+function addUsage(total, part) {
+  for (const key of ['input', 'output', 'cached']) total[key] = (total[key] || 0) + (part[key] || 0);
+  if (typeof part.cost === 'number') total.cost = (total.cost || 0) + part.cost;
+  return total;
+}
+
+function formatUsage(usage) {
+  if (!usage) return '';
+  const k = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n || 0));
+  const cost = typeof usage.cost === 'number' ? ` $${usage.cost.toFixed(4)}` : '';
+  return ` ${k(usage.input)} in ${k(usage.output)} out${cost}`;
+}
+
+/* models.json is optional: without it there are no Opencode models. A file that exists must parse. */
+function readConfig() {
+  let text;
+  try {
+    text = readFileSync(CONFIG, 'utf8');
+  } catch (error) {
+    if (error.code === 'ENOENT') return {};
+    throw new UsageError(`cannot read ${CONFIG}: ${error.message}`);
+  }
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new UsageError(`cannot parse ${CONFIG}: ${error.message}`);
+  }
+}
+
+/* Every model id offered here: Claude aliases, Codex's own model cache ($CODEX_HOME or ~/.codex), configured Opencode ids. */
+function listModels(config) {
+  const ids = ['claude:fable', 'claude:opus', 'claude:sonnet', 'claude:haiku'];
+  try {
+    const cache = JSON.parse(readFileSync(join(process.env.CODEX_HOME || join(homedir(), '.codex'), 'models_cache.json'), 'utf8'));
+    for (const m of cache.models || []) if (m.slug && !/review|reserve/.test(m.slug)) ids.push(`codex:${m.slug}`);
+  } catch {}
+  for (const id of config.opencode || []) ids.push(`opencode:${id}`);
+  return ids;
+}
+
+/*
+ * The model's own name for people reading status lines: what Claude Code reports it ran (e.g.
+ * claude-opus-5-5 -> Opus 5.5), Codex's display name from its model cache (GPT-6.1 Sol), or the
+ * Opencode id in title case (DeepSeek-style ids become Deepseek V4.1 Flash). Effort is appended.
+ */
+function modelName(m, ran) {
+  let name;
+  const claude = /claude-([a-z]+)-(\d+)-(\d+)/.exec(ran || '');
+  if (claude) name = `${claude[1][0].toUpperCase()}${claude[1].slice(1)} ${claude[2]}.${claude[3]}`;
+  else if (m.harness === 'claude') name = m.model[0].toUpperCase() + m.model.slice(1);
+  else if (m.harness === 'codex') {
+    try {
+      const cache = JSON.parse(readFileSync(join(process.env.CODEX_HOME || join(homedir(), '.codex'), 'models_cache.json'), 'utf8'));
+      name = (cache.models || []).find((c) => c.slug === m.model)?.display_name?.replace(/-(?=[A-Z][a-z])/g, ' ');
+    } catch {}
+  }
+  name ??= m.model.split('/').pop().split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
+  return m.effort ? `${name} (${m.effort})` : name;
+}
+
+/* Splits "harness:id#effort"; an unknown harness is a usage error that lists the valid form. */
+function parseModel(spec) {
+  const match = /^(claude|codex|opencode):([^#\s]+)(?:#(\S+))?$/.exec(spec || '');
+  if (!match) throw new UsageError(`bad model "${spec}": expected harness:id[#effort]; see \`ask models\``);
+  return { spec, harness: match[1], model: match[2], effort: match[3] };
+}
+
+/* Runs a command with stdin input and a hard timeout; resolves with its output, never rejects. */
+function run(command, args, { input, cwd, timeoutMs, env }) {
+  return new Promise((resolve) => {
+    if (stopping) return resolve({ code: null, stdout: '', stderr: 'ask was stopped', timedOut: false });
+    const child = spawn(command, args, { cwd, env: { ...process.env, ...env }, stdio: ['pipe', 'pipe', 'pipe'] });
+    children.add(child);
+    child.on('exit', () => children.delete(child));
+    let stdout = '';
+    let stderr = '';
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGTERM');
+      setTimeout(() => child.kill('SIGKILL'), GRACE_MS).unref();
+    }, timeoutMs);
+    child.stdout.on('data', (d) => (stdout += d));
+    child.stderr.on('data', (d) => (stderr += d));
+    child.on('error', (error) => (stderr += String(error)));
+    child.stdin.on('error', () => {});
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      resolve({ code, stdout, stderr, timedOut });
+    });
+    child.stdin.end(input);
+  });
+}
+
+/*
+ * Opencode has no read-only flag, and a global allow-everything rule overrides its built-in plan
+ * agent, so read runs inject rules for plan: file tools plus INSPECT commands, with commands
+ * containing UNSAFE characters or WRITERS options denied. Injected config is applied last and the
+ * last matching rule wins. Write runs use build with the user's own permissions.
+ */
+function opencodeConfig(write) {
+  const rule = (action, resource, effect) => ({ action, resource, effect });
+  const readOnly = [
+    rule('*', '*', 'deny'),
+    ...['read', 'grep', 'glob'].map((action) => rule(action, '*', 'allow')),
+    ...INSPECT.flatMap((command) => [rule('shell', command, 'allow'), rule('shell', `${command} *`, 'allow')]),
+    ...[...UNSAFE, ...WRITERS].map((token) => rule('shell', `*${token}*`, 'deny')),
+  ];
+  return JSON.stringify({
+    agents: write ? { build: { steps: STEPS.write } } : { plan: { steps: STEPS.read, permissions: readOnly } },
+  });
+}
+
+/*
+ * OpenAI structured output accepts only strict schemas: every object closed with
+ * additionalProperties false and listing all its properties as required. Converts any schema to
+ * that form, so callers can write ordinary JSON Schema; optional fields become required. Only
+ * keywords that hold schemas are descended into, so a property named like a keyword stays a name.
+ */
+function strictSchema(schema) {
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return schema;
+  const each = (map) => Object.fromEntries(Object.entries(map).map(([key, value]) => [key, strictSchema(value)]));
+  const strict = { ...schema };
+  if (strict.type === 'object' || strict.properties) {
+    strict.properties = each(strict.properties || {});
+    strict.required = Object.keys(strict.properties);
+    strict.additionalProperties = false;
+  }
+  if (strict.items) strict.items = strictSchema(strict.items);
+  for (const key of ['anyOf', 'oneOf', 'allOf']) if (Array.isArray(strict[key])) strict[key] = strict[key].map(strictSchema);
+  for (const key of ['$defs', 'definitions']) if (strict[key]) strict[key] = each(strict[key]);
+  return strict;
+}
+
+/*
+ * Checks a parsed answer against the JSON Schema keywords ask relies on: type, enum, properties,
+ * required, additionalProperties false and items. Returns the first mismatch as "path: problem",
+ * or '' when the answer matches. Other keywords are not checked.
+ */
+function schemaMismatch(value, schema, path = '$') {
+  if (!schema || typeof schema !== 'object') return '';
+  const kind = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
+  const fits = (type) => type === kind || (type === 'integer' && Number.isInteger(value)) || (type === 'number' && kind === 'number');
+  const types = [schema.type].flat().filter(Boolean);
+  if (types.length && !types.some(fits)) return `${path}: expected ${types.join(' or ')}, got ${kind}`;
+  if (schema.enum && !schema.enum.some((option) => JSON.stringify(option) === JSON.stringify(value)))
+    return `${path}: not one of ${JSON.stringify(schema.enum)}`;
+  if (kind === 'object') {
+    for (const key of schema.required || []) if (!(key in value)) return `${path}: missing "${key}"`;
+    for (const [key, item] of Object.entries(value)) {
+      if (schema.properties && key in schema.properties) {
+        const problem = schemaMismatch(item, schema.properties[key], `${path}.${key}`);
+        if (problem) return problem;
+      } else if (schema.additionalProperties === false) return `${path}: unexpected "${key}"`;
+    }
+  }
+  if (kind === 'array' && schema.items)
+    for (const [index, item] of value.entries()) {
+      const problem = schemaMismatch(item, schema.items, `${path}[${index}]`);
+      if (problem) return problem;
+    }
+  return '';
+}
+
+/* One adapter per harness; each returns { ok, text, note }. Opencode runs --standalone so a timeout also ends its session. */
+const harnesses = {
+  async opencode(m, prompt, task) {
+    const model = m.effort ? `${m.model}#${m.effort}` : m.model;
+    const args = ['run', '--standalone', '--agent', task.write ? 'build' : 'plan', '-m', model, '--format', 'json'];
+    const env = { OPENCODE_CONFIG_CONTENT: opencodeConfig(task.write) };
+    const r = await run('opencode', args, { input: prompt, cwd: task.dir, timeoutMs: task.timeoutMs, env });
+    if (r.timedOut) return { ok: false, note: 'timed out' };
+    let text = '';
+    let steps = 0;
+    const usage = {};
+    for (const line of r.stdout.split('\n')) {
+      let event;
+      try {
+        event = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      if (event.type === 'error') return { ok: false, note: event.error?.message || 'error', usage };
+      if (event.type === 'step_start') steps++;
+      if (event.type === 'step_finish') {
+        const t = event.part?.tokens || {};
+        addUsage(usage, { input: t.input, output: (t.output || 0) + (t.reasoning || 0), cached: t.cache?.read, cost: event.part?.cost });
+      }
+      if (event.type === 'text' && typeof event.part?.text === 'string' && !event.part.synthetic) text = event.part.text;
+    }
+    if (r.code !== 0 || !text) return { ok: false, note: text ? `exit ${r.code}` : `no answer (exit ${r.code})`, usage };
+    const cap = STEPS[task.write ? 'write' : 'read'];
+    return { ok: true, text, note: steps >= cap ? 'hit step cap; answer may be partial' : '', usage };
+  },
+
+  async codex(m, prompt, task) {
+    const work = mkdtempSync(join(tmpdir(), 'ask-'));
+    try {
+      const out = join(work, 'answer');
+      const args = ['exec', '-m', m.model, '--skip-git-repo-check', '-C', task.dir, '-o', out, '--ephemeral', '--json'];
+      args.push('--sandbox', task.write ? 'workspace-write' : 'read-only', '-c', 'approval_policy="never"');
+      // Write runs may run commands, and installing dependencies or running tests needs the network,
+      // which Codex's write sandbox blocks unless asked.
+      if (task.write) args.push('-c', 'sandbox_workspace_write.network_access=true');
+      if (m.effort) args.push('-c', `model_reasoning_effort="${m.effort}"`);
+      if (task.schema) {
+        writeFileSync(join(work, 'schema.json'), JSON.stringify(strictSchema(task.schema)));
+        args.push('--output-schema', join(work, 'schema.json'));
+      }
+      args.push('-');
+      const r = await run('codex', args, { input: prompt, cwd: task.dir, timeoutMs: task.timeoutMs });
+      if (r.timedOut) return { ok: false, note: 'timed out' };
+      // --json streams events on stdout; each finished turn reports its tokens (Codex reports no cost).
+      const usage = {};
+      for (const line of r.stdout.split('\n')) {
+        if (!line.includes('"turn.completed"')) continue;
+        try {
+          const u = JSON.parse(line).usage || {};
+          addUsage(usage, { input: u.input_tokens, output: (u.output_tokens || 0) + (u.reasoning_output_tokens || 0), cached: u.cached_input_tokens });
+        } catch {}
+      }
+      let text = '';
+      try {
+        text = readFileSync(out, 'utf8');
+      } catch {}
+      if (r.code === 0 && text.trim()) return { ok: true, text, note: '', usage };
+      // Codex reports API errors as JSON on either stream; give its message, not a closing brace.
+      const both = r.stderr + '\n' + r.stdout;
+      const messages = [...both.matchAll(/"message":\s*"((?:[^"\\]|\\.)*)"/g)].map((match) => match[1]);
+      const lines = r.stderr.trim().split('\n').filter((line) => /\w/.test(line));
+      const reason = messages.pop() || lines.pop() || `exit ${r.code}`;
+      return { ok: false, note: reason.slice(0, 300), usage };
+    } finally {
+      rmSync(work, { recursive: true, force: true });
+    }
+  },
+
+  async claude(m, prompt, task) {
+    const args = ['-p', '--model', m.model, '--output-format', 'json', '--no-session-persistence'];
+    if (m.effort) args.push('--effort', m.effort);
+    if (task.schema) args.push('--json-schema', JSON.stringify(task.schema));
+    // Explicit modes, so the user's default permission mode cannot widen a read run. In default
+    // mode a print run refuses any tool use that is not allowed below. Claude Code matches rules
+    // against the command text, and only a pattern with four backslashes matches one.
+    if (task.write) args.push('--permission-mode', 'bypassPermissions');
+    else
+      args.push(
+        '--permission-mode', 'default',
+        '--allowedTools', ['Read', 'Grep', 'Glob', ...INSPECT.map((command) => `Bash(${command}:*)`)].join(','),
+        '--disallowedTools',
+        ['Edit', 'Write', 'NotebookEdit', ...[...UNSAFE, ...WRITERS].map((token) => `Bash(*${token.replaceAll('\\', '\\\\\\\\')}*)`)].join(','),
+      );
+    const r = await run('claude', args, { input: prompt, cwd: task.dir, timeoutMs: task.timeoutMs });
+    if (r.timedOut) return { ok: false, note: 'timed out' };
+    let result;
+    try {
+      result = JSON.parse(r.stdout);
+    } catch {
+      return { ok: false, note: `unreadable output (exit ${r.code})` };
+    }
+    const u = result.usage || {};
+    const usage = {
+      input: (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0),
+      output: u.output_tokens || 0,
+      cached: u.cache_read_input_tokens || 0,
+      cost: typeof result.total_cost_usd === 'number' ? result.total_cost_usd : undefined,
+    };
+    // The model that did most of the work, so an alias like opus shows as the version it resolved to.
+    const ran = Object.entries(result.modelUsage || {}).sort((a, b) => (b[1].outputTokens || 0) - (a[1].outputTokens || 0))[0]?.[0];
+    if (result.is_error || r.code !== 0) return { ok: false, note: result.is_error ? result.result || result.subtype || 'error' : `exit ${r.code}`, usage, ran };
+    const text = result.structured_output !== undefined ? JSON.stringify(result.structured_output) : result.result;
+    return text ? { ok: true, text, note: '', usage, ran } : { ok: false, note: 'no answer', usage, ran };
+  },
+};
+
+/* Removes a Markdown code fence around a whole answer, which some models add despite instructions. */
+function unfence(text) {
+  const match = /^\s*```[a-z]*\s*\n([\s\S]*?)\n\s*```\s*$/i.exec(text);
+  return (match ? match[1] : text).trim();
+}
+
+/* Runs one task on its model; a --json/--schema answer must parse, and match the schema. Resolves with { id, model, name, ok, answer, error, seconds, usage, note }; never rejects. */
+async function runTask(task) {
+  const m = parseModel(task.model);
+  const json = task.json || Boolean(task.schema);
+  const native = task.schema && m.harness !== 'opencode';
+  let prompt = task.write ? task.prompt : GROUNDING + task.prompt;
+  if (json && !native)
+    prompt += task.schema
+      ? `\n\nAnswer ONLY with JSON matching this JSON Schema, no prose and no code fences:\n${JSON.stringify(task.schema)}`
+      : '\n\nAnswer ONLY with JSON, no prose and no code fences.';
+  const started = Date.now();
+  const r = await harnesses[m.harness](m, prompt, { ...task, timeoutMs: 1000 * (task.timeout || 900) });
+  let answer = r.text;
+  if (r.ok && json) {
+    try {
+      answer = JSON.parse(unfence(r.text));
+    } catch {
+      r.ok = false;
+      r.note = 'answer was not valid JSON';
+    }
+    const problem = r.ok && schemaMismatch(answer, task.schema);
+    if (problem) {
+      r.ok = false;
+      r.note = `answer does not match the schema: ${problem}`;
+    }
+  }
+  const seconds = Number(((Date.now() - started) / 1000).toFixed(1));
+  const usage = r.usage || null;
+  const name = modelName(m, r.ran);
+  return r.ok
+    ? { id: task.id, model: m.spec, name, ok: true, answer, seconds, usage, note: r.note }
+    : { id: task.id, model: m.spec, name, ok: false, error: r.note, seconds, usage };
+}
+
+/* A missing model is a usage error that lists the choices, so the caller can pick one and retry. */
+function requireModel(model, config, where) {
+  if (model) return parseModel(model);
+  throw new UsageError(`${where} needs a model (-m); available:\n  ${listModels(config).join('\n  ')}`);
+}
+
+/* Parses flags shared by the single-prompt form; leftovers are the prompt. */
+function parseFlags(argv) {
+  const task = { dir: process.cwd(), write: false, json: false };
+  const access = new Set();
+  const words = [];
+  const value = (i) => {
+    if (argv[i + 1] === undefined) throw new UsageError(`missing value for ${argv[i]}`);
+    return argv[i + 1];
+  };
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === '-m' || arg === '--model') task.model = value(i++);
+    else if (arg === '-r' || arg === '--read') access.add('read');
+    else if (arg === '-w' || arg === '--write') access.add('write');
+    else if (arg === '--json') task.json = true;
+    else if (arg === '--schema') task.schema = JSON.parse(readFileSync(value(i++), 'utf8'));
+    else if (arg === '-C' || arg === '--dir') task.dir = resolve(value(i++));
+    else if (arg === '-t' || arg === '--timeout') task.timeout = Number(value(i++));
+    else if (arg === '-j') task.jobs = Number(value(i++));
+    else if (arg === '--resume') task.resume = value(i++);
+    else if (arg === '-h' || arg === '--help') task.help = true;
+    else if (arg.startsWith('-') && arg !== '-') throw new UsageError(`unknown option ${arg}`);
+    else words.push(arg);
+  }
+  if (access.size > 1) throw new UsageError('choose one of -r (read) or -w (read and write)');
+  task.write = access.has('write');
+  return { task, words };
+}
+
+/*
+ * Reads batch tasks from a JSON array or JSON lines. A task's write must be a boolean and defaults
+ * to the batch's -w; its dir is made absolute, so a recorded run means the same when resumed.
+ */
+function parseTasks(text, defaults, config) {
+  const trimmed = text.trim();
+  if (!trimmed) throw new UsageError('no tasks: pass a JSON array or JSON lines in FILE or on stdin');
+  const items = trimmed.startsWith('[') ? JSON.parse(trimmed) : trimmed.split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l));
+  if (!items.length) throw new UsageError('no tasks: the batch is empty');
+  return items.map((item, index) => {
+    if (typeof item?.prompt !== 'string' || !item.prompt.trim()) throw new UsageError(`task ${index + 1} has no "prompt"`);
+    requireModel(item.model || defaults.model, config, `task ${index + 1}`);
+    if (item.write !== undefined && typeof item.write !== 'boolean') throw new UsageError(`task ${index + 1}: "write" must be true or false`);
+    return { ...defaults, ...item, id: item.id ?? String(index + 1), dir: resolve(item.dir ?? defaults.dir) };
+  });
+}
+
+/*
+ * Runs tasks with at most `jobs` at once and returns results in task order. The run is recorded in
+ * `dir` (tasks.json, then results.json after every task), and results already ok there are kept
+ * for the task at the same position, which is how --resume skips finished work.
+ */
+async function runBatch(tasks, jobs, dir) {
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'tasks.json'), JSON.stringify(tasks, null, 2));
+  let saved = [];
+  try {
+    saved = JSON.parse(readFileSync(join(dir, 'results.json'), 'utf8'));
+  } catch {}
+  const results = tasks.map((_, index) => (saved[index]?.ok ? saved[index] : null));
+  const todo = tasks.map((_, index) => index).filter((index) => !results[index]);
+  if (todo.length < tasks.length) console.error(`ask: resuming ${dir}: ${tasks.length - todo.length} done, ${todo.length} to run`);
+  else console.error(`ask: run ${dir}`);
+  let next = 0;
+  const worker = async () => {
+    while (next < todo.length) {
+      const index = todo[next++];
+      console.error(`ask: [${tasks[index].id}] ${modelName(parseModel(tasks[index].model))} started`);
+      const r = (results[index] = await runTask(tasks[index]));
+      writeFileSync(join(dir, 'results.json'), JSON.stringify(results, null, 2));
+      console.error(`ask: [${r.id}] ${r.name} ${r.ok ? 'ok' : 'failed'} ${r.seconds}s${formatUsage(r.usage)}${r.ok ? '' : `: ${r.error}`}`);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(jobs, todo.length)) }, worker));
+  const total = results.reduce((sum, r) => (r?.usage ? addUsage(sum, r.usage) : sum), {});
+  console.error(`ask: ${results.filter((r) => r?.ok).length}/${tasks.length} ok,${formatUsage(total)} (${dir})`);
+  return results;
+}
+
+/* Lists recent batch runs, newest first, with how many tasks finished. */
+function listRuns() {
+  let names = [];
+  try {
+    names = readdirSync(RUNS).sort().reverse().slice(0, 20);
+  } catch {}
+  for (const name of names) {
+    let tasks = [];
+    let results = [];
+    try {
+      tasks = JSON.parse(readFileSync(join(RUNS, name, 'tasks.json'), 'utf8'));
+      results = JSON.parse(readFileSync(join(RUNS, name, 'results.json'), 'utf8'));
+    } catch {}
+    const ok = results.filter((r) => r?.ok).length;
+    const failed = results.filter((r) => r && !r.ok).length;
+    console.log(`${join(RUNS, name)}\t${ok} ok\t${failed} failed\t${tasks.length - ok - failed} pending`);
+  }
+}
+
+async function main() {
+  const argv = process.argv.slice(2);
+  const sub = ['models', 'batch', 'runs'].includes(argv[0]) ? argv[0] : null;
+  const { task, words } = parseFlags(sub ? argv.slice(1) : argv);
+  if (task.help || argv.length === 0) return console.log(HELP);
+  const config = readConfig();
+
+  if (sub === 'models') {
+    for (const id of listModels(config)) console.log(id);
+    return;
+  }
+
+  if (sub === 'runs') return listRuns();
+
+  if (sub === 'batch') {
+    const { jobs = 4, resume, ...defaults } = task;
+    let tasks;
+    let dir;
+    if (resume) {
+      dir = resume;
+      try {
+        tasks = JSON.parse(readFileSync(join(dir, 'tasks.json'), 'utf8'));
+      } catch {
+        throw new UsageError(`no run to resume at ${dir}; see \`ask runs\``);
+      }
+    } else {
+      const source = words[0] && words[0] !== '-' ? readFileSync(words[0], 'utf8') : readFileSync(0, 'utf8');
+      tasks = parseTasks(source, defaults, config);
+      dir = join(RUNS, `${new Date().toISOString().replace(/[-:]/g, '').replace(/\..*/, '')}-${process.pid}`);
+    }
+    const results = await runBatch(tasks, jobs, dir);
+    process.stdout.write(JSON.stringify(results, null, 2) + '\n');
+    if (results.some((r) => !r.ok)) process.exitCode = 1;
+    return;
+  }
+
+  let prompt = words.join(' ');
+  if (!prompt || prompt === '-') prompt = readFileSync(0, 'utf8');
+  if (!prompt.trim()) throw new UsageError('empty prompt');
+  requireModel(task.model, config, 'ask');
+  const r = await runTask({ ...task, prompt });
+  if (!r.ok) {
+    console.error(`ask: ${r.name} failed after ${r.seconds}s${formatUsage(r.usage)}: ${r.error}`);
+    process.exitCode = 1;
+    return;
+  }
+  console.error(`ask: ${r.name} ${r.seconds}s${formatUsage(r.usage)}${r.note ? `; ${r.note}` : ''}`);
+  process.stdout.write((task.json || task.schema ? JSON.stringify(r.answer) : r.answer.trimEnd()) + '\n');
+}
+
+main().catch((error) => {
+  console.error(`ask: ${error.message}${error instanceof UsageError ? '\nrun `ask --help`' : ''}`);
+  process.exitCode = 2;
+});
