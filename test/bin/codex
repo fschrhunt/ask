@@ -1,0 +1,37 @@
+#!/usr/bin/env node
+/*
+ * Fake `codex` for the tests: streams Codex's `--json` events on stdout and writes the answer to
+ * the `-o` file. Every call is appended to $FAKE_LOG as one JSON line {pid, argv, stdin, cwd,
+ * schema}, schema being the --output-schema file's content. The answer is $FAKE_ANSWER (default:
+ * the last prompt line). A prompt containing $FAKE_FAIL fails, $FAKE_HANG never returns,
+ * $FAKE_SLOW answers after 300 ms. $FAKE_EXIT is the exit code after an answer; $FAKE_IGNORE_TERM
+ * makes it ignore SIGTERM.
+ */
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+
+const argv = process.argv.slice(2);
+const stdin = readFileSync(0, 'utf8');
+const { FAKE_LOG, FAKE_ANSWER, FAKE_FAIL, FAKE_HANG, FAKE_SLOW, FAKE_EXIT, FAKE_IGNORE_TERM } = process.env;
+if (FAKE_IGNORE_TERM) process.on('SIGTERM', () => {});
+const after = (flag) => argv[argv.indexOf(flag) + 1];
+const schemaFile = argv.includes('--output-schema') ? after('--output-schema') : null;
+if (FAKE_LOG) {
+  const schema = schemaFile ? JSON.parse(readFileSync(schemaFile, 'utf8')) : null;
+  appendFileSync(FAKE_LOG, JSON.stringify({ pid: process.pid, argv, stdin, cwd: process.cwd(), schema }) + '\n');
+}
+const matches = (needle) => needle && stdin.includes(needle);
+
+if (matches(FAKE_HANG)) setInterval(() => {}, 1000);
+else {
+  if (matches(FAKE_SLOW)) await new Promise((resolve) => setTimeout(resolve, 300));
+  console.log(JSON.stringify({ type: 'thread.started', thread_id: 'fake' }));
+  if (matches(FAKE_FAIL)) {
+    console.log(JSON.stringify({ type: 'error', message: 'codex boom' }));
+    process.exitCode = 1;
+  } else {
+    writeFileSync(after('-o'), FAKE_ANSWER ?? `codex: ${stdin.trim().split('\n').pop()}`);
+    const usage = { input_tokens: 100, cached_input_tokens: 40, output_tokens: 8, reasoning_output_tokens: 2 };
+    console.log(JSON.stringify({ type: 'turn.completed', usage }));
+    process.exitCode = Number(FAKE_EXIT || 0);
+  }
+}
