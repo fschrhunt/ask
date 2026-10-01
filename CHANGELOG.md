@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Brand assets: the ask logo, wordmark and lockup in black and white under `assets/`, and a
+  rewritten README with the lockup header.
 - `ask runs` shows an unfinished run whose ask process is gone as stopped, with the command that
   resumes it.
 - A run that reports no usage (Opencode, for an answer that needed no steps) prints none instead of

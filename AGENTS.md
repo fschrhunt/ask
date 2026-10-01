@@ -17,6 +17,7 @@ One Node file, no dependencies.
 - `test/bin/`: fake `claude`, `codex` and `opencode` printing canned output in each harness's real
   format. `FAKE_LOG` records calls; `FAKE_FAIL`, `FAKE_HANG` and `FAKE_SLOW` match the prompt.
 - `models.json`: a sample of `~/.ask/models.json`.
+- `assets/`: the logo, wordmark and lockup SVGs in black and white; see `assets/README.md`.
 
 ## Conventions
 
