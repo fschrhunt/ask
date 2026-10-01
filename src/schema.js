@@ -1,5 +1,5 @@
 /*
- * The JSON Schema check ask applies to --schema answers, whatever the harness. It covers the
+ * The JSON Schema check ask applies to --schema answers, whatever the agent. It covers the
  * keywords answers rely on: type, enum, const, properties, required, additionalProperties false and
  * items. Other keywords are not checked.
  */

@@ -36,8 +36,8 @@ ask -m mycli:atlas-2.1 -w "Add tests for parseFlags, then run them" # write
 ```
 
 Read runs start with a short instruction to search and read the files before answering, so the
-agent answers from the code rather than from memory. The harness enforces read-only in its CLI's
-own way; see [Harnesses](harnesses.md#read-only).
+agent answers from the code rather than from memory. The agent enforces read-only in its CLI's
+own way; see [Agents](agents.md#read-only).
 
 Running tests or builds writes files, so it needs `-w`.
 
@@ -108,7 +108,7 @@ ask -m othercli:nova-4 -w -t 3600 "Upgrade the project to Node 24 and fix what b
 
 `--json` requires the answer to be JSON. `--schema FILE` requires JSON that matches a JSON Schema.
 ask tells the agent the format, strips a code fence if the agent adds one, and checks the answer
-itself, whatever the harness. A harness whose CLI supports schemas natively can also enforce it
+itself, whatever the agent. An agent whose CLI supports schemas natively can also enforce it
 there, from `ASK_SCHEMA`.
 
 ```sh

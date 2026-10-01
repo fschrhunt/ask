@@ -38,20 +38,20 @@ test('-c continues the agent session where it ran, with the same model', async (
   assert.match(second.stderr, new RegExp(`continues ${runId(first.stderr)}`));
 });
 
-test('a follow-up keeps write access unless it says -r, and may change the model within the harness', async () => {
+test('a follow-up keeps write access unless it says -r, and may change the model within the agent', async () => {
   const first = await ask(['-m', 'fake:big', '-w', 'change it']);
   await ask(['-c', runId(first.stderr), 'more']);
   await ask(['-c', runId(first.stderr), '-r', '-m', 'fake:small', 'look']);
   assert.deepEqual(calls().map((c) => [c.access, c.model]), [['write', 'big'], ['write', 'big'], ['read', 'small']]);
 });
 
-test('a follow-up to another harness, or to a run with no session, is refused', async () => {
-  writeFileSync(join(env.ASK_HOME, 'harnesses', 'other'), '#!/bin/sh\necho hi\n', { mode: 0o755 });
+test('a follow-up to another agent, or to a run with no session, is refused', async () => {
+  writeFileSync(join(env.ASK_HOME, 'agents', 'other'), '#!/bin/sh\necho hi\n', { mode: 0o755 });
   const fake = await ask(['-m', 'fake:small', 'hi']);
   const other = await ask(['-m', 'other:x', 'hi']);
   const switched = await ask(['-c', runId(fake.stderr), '-m', 'other:x', 'more']);
   assert.equal(switched.code, 2);
-  assert.match(switched.stderr, /must use the same harness/);
+  assert.match(switched.stderr, /must use the same agent/);
   const sessionless = await ask(['-c', runId(other.stderr), 'more']);
   assert.equal(sessionless.code, 2);
   assert.match(sessionless.stderr, /reported no session/);
@@ -183,7 +183,7 @@ test('--resume reruns a batch as recorded, refusing options that would change it
   assert.match(r.stderr, /takes only -j, not -r/);
 });
 
-test('a harness inherits no contract variable from an ask further up', async () => {
+test('an agent inherits no contract variable from an ask further up', async () => {
   writeJson(join(tmp, 's.json'), { type: 'object' });
   await ask(['-m', 'fake:small', 'hi'], { extra: { ASK_SCHEMA: join(tmp, 's.json'), ASK_SESSION: 'leaked' } });
   assert.equal(calls()[0].schema, undefined);

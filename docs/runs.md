@@ -25,13 +25,13 @@ A follow-up:
 
 - runs where the first run ran: the same directory, or the same worktree;
 - keeps the model and access (`-r`/`-w`) unless you give new ones. The model may change within
-  the same harness (`-c k3f9a2 -m mycli:atlas-2.1-mini`), but not to another harness;
+  the same agent (`-c k3f9a2 -m mycli:atlas-2.1-mini`), but not to another agent;
 - can continue a run that failed or timed out, so the agent can finish what it started;
 - gets your prompt as it is, without the read-run preamble, since the agent already has its bearings.
 
 A batch task can be a follow-up too, with `"continue": "RUN"` (see [Batches](batches.md)).
 
-Continuing needs a harness that reports sessions (see [Harnesses](harnesses.md#sessions)); ask says
+Continuing needs an agent that reports sessions (see [Agents](agents.md#sessions)); ask says
 so when one doesn't.
 
 ## Listing

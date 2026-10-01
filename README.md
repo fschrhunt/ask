@@ -23,7 +23,7 @@ mkdir -p ~/.local/bin
 ln -s ~/.local/share/ask/bin/ask ~/.local/bin/ask
 ```
 
-Requires Node 22+, `~/.local/bin` on your `PATH`, and a harness for each agent you use (below).
+Requires Node 22+, `~/.local/bin` on your `PATH`, and an agent for each coding agent you use (below).
 
 ### Use
 
@@ -48,14 +48,14 @@ stops one.
 
 ### Any agent
 
-ask reaches each agent through a harness: a small executable in `~/.ask/harnesses/` with a
-[simple contract](docs/harnesses.md). Harnesses are yours and stay local; a minimal one is a few
+Each coding agent is reached through an agent: a small executable in `~/.ask/agents/` with a
+[simple contract](docs/agents.md). Agents are yours and stay local; a minimal one is a few
 lines of shell.
 
 ### Docs
 
 [Install](docs/install.md) · [Usage](docs/usage.md) · [Runs](docs/runs.md) ·
-[Batches](docs/batches.md) · [Models](docs/models.md) · [Harnesses](docs/harnesses.md)
+[Batches](docs/batches.md) · [Models](docs/models.md) · [Agents](docs/agents.md)
 
 ### License
 

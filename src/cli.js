@@ -4,11 +4,11 @@
  * Contract: stdout carries only answers (JSON with --json/--schema, and always for `batch`);
  * stderr carries status lines, each starting "ask REF ·" where REF names the run for show, -c and
  * stop. Exit 0 on success, 1 when a run failed, 2 on usage errors. Runs are read-only (-r) unless -w
- * allows writing. Every run names its model as harness:id[#effort]; like a native subagent, ask
+ * allows writing. Every run names its model as agent:id[#effort]; like a native subagent, ask
  * does not choose one for the caller.
  */
-import { listModels } from './harness.js';
-import { LOCAL_HARNESSES, readInput, readModels, UsageError } from './home.js';
+import { listModels } from './agent.js';
+import { AGENTS, readInput, readModels, UsageError } from './home.js';
 import { createRun, executeRun, newRunId, openRun, prepareTasks, recentRuns, stopRun } from './runs.js';
 import { batchEnd, batchStart, doneLine, runsTable, startLine } from './status.js';
 
@@ -24,7 +24,7 @@ const HELP = `ask: hand tasks to coding agents and get their answers back.
   ask models                       list the model ids available here
 
 options
-  -m, --model ID      harness:id[#effort] from \`ask models\`, e.g. mycli:atlas-2.1#high
+  -m, --model ID      agent:id[#effort] from \`ask models\`, e.g. mycli:atlas-2.1#high
   -r, --read          read only (the default)
   -w, --write         read and write: may edit files and run commands
   --worktree          with -w: work in a new git worktree and branch, kept only if changed
@@ -42,7 +42,7 @@ with "prompt" required, and "model" unless batch -m gives one or the task contin
 Results: {"run", "id", "model", "name", "ok", "answer" | "error", "seconds", "usage", "session",
 "dir", "changes", "commits", "worktree"}; changes are the files a write run changed.
 
-ask reaches each agent through a harness, an executable in ~/.ask/harnesses, and keeps its runs
+Each agent is an executable in ~/.ask/agents that runs one coding agent's CLI. ask keeps its runs
 in ~/.ask/runs ($ASK_HOME moves both). Docs: https://github.com/fschrhunt/ask/tree/main/docs`;
 
 // The options each command takes; anything else is a usage error.
@@ -128,7 +128,7 @@ async function prepare(items, defaults, id, single) {
   const lacking = items.some((item) => !(item?.model || defaults.model || item?.continue));
   const { ids } = lacking ? await listModels(readModels()) : { ids: [] };
   return prepareTasks(items, defaults, id, single, (where) => {
-    throw new UsageError(`${where} needs a model (-m); available:\n  ${ids.join('\n  ') || `none; add a harness to ${LOCAL_HARNESSES}`}`);
+    throw new UsageError(`${where} needs a model (-m); available:\n  ${ids.join('\n  ') || `none; add an agent to ${AGENTS}`}`);
   });
 }
 
@@ -202,7 +202,7 @@ function runs({ opts }) {
 async function models() {
   const { ids, errors } = await listModels(readModels());
   for (const error of errors) console.error(`ask: could not list the models of ${error}`);
-  if (!ids.length) console.error(`ask: no models; add a harness to ${LOCAL_HARNESSES} (see docs/harnesses.md)`);
+  if (!ids.length) console.error(`ask: no models; add an agent to ${AGENTS} (see docs/agents.md)`);
   for (const id of ids) console.log(id);
 }
 

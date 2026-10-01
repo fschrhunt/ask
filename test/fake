@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * A fake harness for the tests, keeping the harness contract (docs/harnesses.md). `fake models`
+ * A fake agent for the tests, keeping the agent contract (docs/agents.md). `fake models`
  * lists "small<TAB>Small One" and "big". A run appends {pid, stdin, cwd, access, model, effort,
  * schema, session} to $FAKE_LOG, reports its session at once (ASK_SESSION, or a new "s-<pid>"),
  * answers $FAKE_ANSWER (default "fake: <last prompt line>") and reports name "Fake 1.0", 10 in,

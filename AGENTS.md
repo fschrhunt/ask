@@ -1,7 +1,8 @@
 # ask
 
-Hands tasks to coding agents through local harnesses, one task or a batch in parallel. Node, no
-dependencies. ask ships no harness and knows no particular agent.
+Hands tasks to coding agents, one task or a batch in parallel. Each coding agent is reached through
+an agent: a local executable in `~/.ask/agents`. ask ships none and knows nothing about any of them.
+Node, no dependencies.
 
 ## Commands
 
@@ -16,8 +17,8 @@ dependencies. ask ships no harness and knows no particular agent.
   - `cli.js`: help text, options per command, the commands, exit codes.
   - `runs.js`: runs on disk (ids, `RUN/TASK` references, lock, results), preparing tasks
     (validation, follow-ups), running them in parallel, stopping.
-  - `task.js`: one task: worktree, prompt, harness run, what changed, JSON checks.
-  - `harness.js`: finding harnesses in `~/.ask/harnesses`, listing their models, running one under
+  - `task.js`: one task: worktree, prompt, agent run, what changed, JSON checks.
+  - `agent.js`: finding agents in `~/.ask/agents`, listing their models, running one under
     the contract, model names.
   - `git.js`: what a write run changed, and worktrees.
   - `process.js`: spawning in a process group, timeouts, stopping everything on SIGINT/SIGTERM.
@@ -25,7 +26,7 @@ dependencies. ask ships no harness and knows no particular agent.
   - `schema.js`: the `--schema` check.
   - `home.js`: `~/.ask` paths, `models.json`, atomic JSON writes, `UsageError`.
 - `test/`: `cli`, `batch`, `subagent` (follow-ups, changes, worktrees, show, stop) and `local`
-  (the harness contract, with shell harnesses) tests, `helpers.js`, and `fake`, the fake harness
+  (the agent contract, with shell agents) tests, `helpers.js`, and `fake`, the fake agent
   every test installs. `FAKE_LOG` records runs; `FAKE_FAIL`, `FAKE_HANG` and `FAKE_SLOW` match the
   prompt; `FAKE_WRITE` and `FAKE_COMMIT` change the repository.
 - `docs/`: user docs with examples. Update them with any user-visible change.
@@ -34,8 +35,8 @@ dependencies. ask ships no harness and knows no particular agent.
 ## Conventions
 
 - Fewest moving parts. No dependencies, no configuration beyond what a change needs.
-- Nothing about a particular agent goes in this repository; it belongs in a user's harness. The
-  harness contract in `docs/harnesses.md` changes only with care: every harness depends on it.
+- Nothing about a particular agent goes in this repository; it belongs in a user's agent. The
+  agent contract in `docs/agents.md` changes only with care: every agent depends on it.
 - Comments state purpose and contract, on modules and functions; none line by line. Update the
   comments and docs a change touches.
 - One test per behavior change. Never call a network or a real model in a test.

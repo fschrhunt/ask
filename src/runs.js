@@ -7,7 +7,7 @@
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
-import { parseModel } from './harness.js';
+import { parseModel } from './agent.js';
 import { RUNS, UsageError, writeJson } from './home.js';
 import { runTask } from './task.js';
 
@@ -102,7 +102,7 @@ function lock(run) {
  * Turns task input (from flags or a batch file) into recorded tasks. Each needs a prompt, and a model
  * unless it continues a run. A task with "continue": REF resumes that task's agent session: it runs
  * where that task ran, in its worktree if it had one, and keeps its model and access unless the task
- * sets them; a different harness is refused. `single` is true for a one-prompt run, false for a batch.
+ * sets them; a different agent is refused. `single` is true for a one-prompt run, false for a batch.
  * `missingModel(where)` raises the error for a task without a model.
  */
 export function prepareTasks(items, defaults, runId, single, missingModel) {
@@ -125,9 +125,9 @@ export function prepareTasks(items, defaults, runId, single, missingModel) {
       const { run, index: at } = openRun(t.continue);
       if (at === null) throw new UsageError(`run ${run.id} has ${run.tasks.length} tasks; continue one of them, like ${run.id}/${run.tasks[0].id}`);
       const [prev, result] = [run.tasks[at], run.results[at]];
-      if (!result?.session) throw new UsageError(`${t.continue} cannot be continued: its harness reported no session`);
+      if (!result?.session) throw new UsageError(`${t.continue} cannot be continued: its agent reported no session`);
       task.model ??= prev.model;
-      if (parseModel(task.model).harness !== parseModel(prev.model).harness) throw new UsageError(`${t.continue} ran on ${prev.model}; a follow-up must use the same harness`);
+      if (parseModel(task.model).agent !== parseModel(prev.model).agent) throw new UsageError(`${t.continue} ran on ${prev.model}; a follow-up must use the same agent`);
       Object.assign(task, { write: task.write ?? prev.write, dir: prev.dir, worktree: prev.worktree, session: result.session, continues: taskRef(run, at) });
     } else if (t.worktree) task.worktree = one ? runId : `${runId}-${task.id.replace(/[^\w.-]/g, '_')}`;
     if (!task.model) missingModel(where);
