@@ -1,0 +1,5 @@
+#!/usr/bin/env node
+/* ask: hand tasks to coding agents and get their answers back. See src/cli.js and `ask --help`. */
+import { cli } from '../src/cli.js';
+
+cli(process.argv.slice(2));

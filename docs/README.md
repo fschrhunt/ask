@@ -1,0 +1,14 @@
+# ask docs
+
+ask hands a task to a coding agent you already use and gives you its answer. These pages cover
+everything it does, with examples you can copy.
+
+| Page | What it covers |
+| --- | --- |
+| [Install](install.md) | Getting ask, and checking it works |
+| [Usage](usage.md) | One task: models, read and write access, directories, JSON answers, output |
+| [Batches](batches.md) | Many tasks in parallel, recorded runs, resuming |
+| [Models](models.md) | Model ids, effort, and adding model ids |
+| [Harnesses](harnesses.md) | The shipped harnesses, what read-only means for each, and writing your own |
+
+Quick reference: `ask --help`.
