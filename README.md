@@ -5,7 +5,7 @@
     <img src="assets/black/lockup.svg" alt="ask" height="48">
   </picture>
 </p>
-<p align="center">Every coding agent, behind one command.</p>
+<p align="center">Every model, as a subagent.</p>
 <p align="center"><a href="https://github.com/fschrhunt/ask/actions/workflows/ci.yml"><img src="https://github.com/fschrhunt/ask/actions/workflows/ci.yml/badge.svg" alt="CI"></a></p>
 
 ---
