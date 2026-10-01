@@ -14,7 +14,8 @@ ask -m othercli:pro#high "Review the last commit for bugs."
 
 ## The prompt
 
-Give it as arguments, or on stdin with `-` or no prompt at all:
+Give it as arguments, or on stdin with `-` or no prompt at all. Words after `--` are always the
+prompt, even ones that look like options:
 
 ```sh
 ask -m mycli:smart "Summarize src/"
@@ -39,6 +40,52 @@ agent answers from the code rather than from memory. The harness enforces read-o
 own way; see [Harnesses](harnesses.md#read-only).
 
 Running tests or builds writes files, so it needs `-w`.
+
+## What a write run changed
+
+When a write run's directory is in a git repository, ask compares the repository before and after
+and reports what the run changed: in the status line, and in full with `ask show RUN --json`.
+
+```text
+ask k3f9a2 · My Smart 2 · ok · 41.2s · 3 files changed, 1 commit · 52.1k in · 2.0k out · $0.3100
+```
+
+```json
+"changes": [
+  { "path": "src/parser.js", "change": "modified" },
+  { "path": "test/parser.test.js", "change": "added" }
+],
+"commits": 1
+```
+
+Files that were already modified before the run are reported only if the run changed them again,
+so your own uncommitted work never shows up as the agent's.
+
+## Working in a worktree
+
+`--worktree` (with `-w`) gives the run its own git worktree and branch, so it can't touch your
+checkout and several write runs can go in parallel:
+
+```sh
+ask -m mycli:smart -w --worktree -C ~/code/app "Add rate limiting to the login route."
+```
+
+```text
+ask k3f9a2 · mycli:smart · write · worktree ~/.ask/worktrees/k3f9a2 · started
+ask k3f9a2 · My Smart 2 · ok · 3m 05s · 4 files changed · branch ask/k3f9a2 · 120.4k in · 6.2k out
+```
+
+The worktree starts from the repository's `HEAD`, at `~/.ask/worktrees/RUN`, on branch `ask/RUN`.
+If the run changed something, both are kept for you to review and merge:
+
+```sh
+git -C ~/code/app diff main...ask/k3f9a2
+git -C ~/code/app merge ask/k3f9a2
+git -C ~/code/app worktree remove ~/.ask/worktrees/k3f9a2 && git -C ~/code/app branch -d ask/k3f9a2
+```
+
+If it changed nothing, ask removes them. Uncommitted changes in your checkout are not in the
+worktree; ask says so when it starts.
 
 ## Where the agent works
 
@@ -92,16 +139,28 @@ ask checks `type`, `enum`, `properties`, `required`, `additionalProperties: fals
 answer that is not JSON, or does not match, fails the run with the reason:
 
 ```text
-ask: My Smart 2 failed after 12.3s: answer does not match the schema: $.bugs[0]: missing "file"
+ask k3f9a2 · My Smart 2 · failed · 12.3s · answer does not match the schema: $.bugs[0]: missing "file"
+```
+
+## Follow-ups
+
+Every run gets an id. Continue the same agent conversation with `-c`; see [Runs](runs.md).
+
+```sh
+ask -m mycli:smart "Why does the login test fail?"
+ask -c k3f9a2 -w "Fix it."
 ```
 
 ## Output
 
 - **stdout** has only the answer: text, or JSON under `--json`/`--schema`. It is safe to pipe.
-- **stderr** has one status line: the model that ran, the time, and usage when the agent reports it.
+- **stderr** has a status line when the run starts and one when it ends. Each begins with the run's
+  id. The first names what you asked for, the second the model that ran, with the outcome, time,
+  what changed and usage when the agent reports it.
 
 ```text
-ask: My Smart 2 14.2s 31.0k in 812 out $0.0874
+ask k3f9a2 · mycli:smart · read · ~/code/app · started
+ask k3f9a2 · My Smart 2 · ok · 14.2s · 31.0k in · 812 out · $0.0874
 ```
 
 - **Exit code**: 0 on success, 1 when the run failed, 2 when ask was called wrong (the message says

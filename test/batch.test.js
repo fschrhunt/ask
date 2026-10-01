@@ -86,21 +86,22 @@ test('batch --resume reruns a failed task even when a finished one shares its id
 test('batch --resume of an unknown run is a usage error', async () => {
   const r = await ask(['batch', '--resume', join(tmp, 'nope')]);
   assert.equal(r.code, 2);
-  assert.match(r.stderr, /no run to resume/);
+  assert.match(r.stderr, /no run at/);
 });
 
-test('runs lists recorded runs with their counts', async () => {
-  const tasks = [{ prompt: 'fine' }, { prompt: 'break' }];
-  await ask(['batch', '-m', 'fake:small'], { input: JSON.stringify(tasks), extra: { FAKE_FAIL: 'break' } });
-  const r = await ask(['runs']);
-  assert.equal(r.stdout.trim().split('\t').slice(1).join(','), '1 ok,1 failed,0 pending');
-  assert.ok(r.stdout.startsWith(join(env.ASK_HOME, 'runs')));
+test('runs lists recorded runs, newest first, with their outcome and model', async () => {
+  await ask(['-m', 'fake:small', 'first question']);
+  await ask(['batch', '-m', 'fake:small'], { input: JSON.stringify([{ prompt: 'fine' }, { prompt: 'break' }]), extra: { FAKE_FAIL: 'break' } });
+  const [head, batch, single] = (await ask(['runs'])).stdout.trim().split('\n');
+  assert.match(head, /^RUN +STARTED +STATUS +MODEL +TIME +TASK$/);
+  assert.match(batch, /^\w{6} .* 1\/2 ok +2 tasks +fine$/);
+  assert.match(single, /^\w{6} .* ok +Fake 1\.0 +[\d.]+s +first question$/);
 });
 
 test('runs shows an unfinished run whose ask is gone as stopped, with how to resume', async () => {
-  const dir = join(env.ASK_HOME, 'runs', '20260101T000000-999999999');
+  const dir = join(env.ASK_HOME, 'runs', '20260101T000000-zzzzzz');
   writeJson(join(dir, 'tasks.json'), [{ id: '1', model: 'fake:small', prompt: 'p' }, { id: '2', model: 'fake:small', prompt: 'p' }]);
   writeJson(join(dir, 'results.json'), [{ id: '1', ok: true }, null]);
   const r = await ask(['runs']);
-  assert.match(r.stdout, /1 ok\t0 failed\t1 stopped \(ask batch --resume .*999999999\)/);
+  assert.match(r.stdout, /^zzzzzz .* stopped .* resume: ask batch --resume zzzzzz$/m);
 });

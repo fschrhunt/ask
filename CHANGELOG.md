@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+- Runs are subagents you can come back to. Every run gets a short id, shown at the start of its
+  status lines and recorded in `~/.ask/runs`; batch tasks are `RUN/TASK`.
+  - `ask -c RUN PROMPT` continues the agent's own conversation, where it ran, keeping its model
+    and access unless given new ones. Batch tasks can continue runs with `"continue"`.
+  - `--worktree` runs a write task in its own git worktree and branch, kept only if it changed
+    something.
+  - Write runs in a git repository report the files they changed and the commits they made.
+  - `ask show RUN [--json]`, `ask stop RUN`, and an `ask runs` table with status, model and task.
+- Harness contract: `ASK_SESSION` in, `"session"` in the report out. ask reads the report even
+  after a failure or timeout. Contract variables inherited from an outer ask are cleared.
+- Status lines start when a run starts, and read `ask RUN · model · outcome · time · changes ·
+  usage`.
+- Records survive interruptions: results are written atomically, a damaged `results.json` is
+  reported instead of rerunning finished tasks, and a lock keeps two asks off one run.
+- `--resume` takes a run id and refuses options that would change the recorded tasks.
+- Options are checked per command; `-t`, `-j` and task fields are validated; `--` ends options;
+  a missing file or a prompt-less run in a terminal gives a clear error.
+- Schema checks use own properties and compare `enum` and `const` by value.
+- Stopping a run also stops whatever its harness left running, and output is decoded as UTF-8
+  across chunk boundaries.
 - Harnesses are local only: ask ships none and finds them in `~/.ask/harnesses`. The `claude`,
   `codex` and `opencode` harnesses left the repository; keep your own copies there. The docs show
   how to write one.

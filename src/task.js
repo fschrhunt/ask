@@ -1,8 +1,12 @@
 /*
- * One task, start to finish: the prompt ask sends, the harness run, and the checks on the answer.
- * A task is { id, prompt, model, write, json, schema, dir, timeout }.
+ * One task, start to finish: where it runs (its directory, or a worktree), the prompt ask sends,
+ * the harness run, what it changed, and the checks on the answer. A task is { id, prompt, model,
+ * write, json, schema, dir, timeout, worktree, session }; worktree is a worktree name and session the
+ * agent session a follow-up continues (see runs.js).
  */
+import { addWorktree, changes, removeWorktree, snapshot } from './git.js';
 import { modelName, parseModel, runHarness } from './harness.js';
+import { schemaMismatch } from './schema.js';
 
 // Delegated read runs answer from memory unless told otherwise; measured with one at low effort,
 // which named a nonexistent function in 3 s without reading anything.
@@ -16,69 +20,69 @@ function unfence(text) {
   return (match ? match[1] : text).trim();
 }
 
-/*
- * Checks a parsed answer against the JSON Schema keywords ask relies on: type, enum, properties,
- * required, additionalProperties false and items. Returns the first mismatch as "path: problem",
- * or '' when the answer matches. Other keywords are not checked.
- */
-export function schemaMismatch(value, schema, path = '$') {
-  if (!schema || typeof schema !== 'object') return '';
-  const kind = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
-  const fits = (type) => type === kind || (type === 'integer' && Number.isInteger(value)) || (type === 'number' && kind === 'number');
-  const types = [schema.type].flat().filter(Boolean);
-  if (types.length && !types.some(fits)) return `${path}: expected ${types.join(' or ')}, got ${kind}`;
-  if (schema.enum && !schema.enum.some((option) => JSON.stringify(option) === JSON.stringify(value)))
-    return `${path}: not one of ${JSON.stringify(schema.enum)}`;
-  if (kind === 'object') {
-    for (const key of schema.required || []) if (!(key in value)) return `${path}: missing "${key}"`;
-    for (const [key, item] of Object.entries(value)) {
-      if (schema.properties && key in schema.properties) {
-        const problem = schemaMismatch(item, schema.properties[key], `${path}.${key}`);
-        if (problem) return problem;
-      } else if (schema.additionalProperties === false) return `${path}: unexpected "${key}"`;
-    }
+/* The prompt ask sends: a fresh read run is told to ground its answer, a JSON run the answer format. */
+function fullPrompt(task) {
+  let prompt = task.write || task.session ? task.prompt : GROUNDING + task.prompt;
+  if (task.schema) prompt += `\n\nAnswer ONLY with JSON matching this JSON Schema, no prose and no code fences:\n${JSON.stringify(task.schema)}`;
+  else if (task.json) prompt += '\n\nAnswer ONLY with JSON, no prose and no code fences.';
+  return prompt;
+}
+
+/* Parses and checks a JSON answer; returns { answer } or { problem }. */
+function checkJson(text, schema) {
+  let answer;
+  try {
+    answer = JSON.parse(unfence(text));
+  } catch {
+    return { problem: 'answer was not valid JSON' };
   }
-  if (kind === 'array' && schema.items)
-    for (const [index, item] of value.entries()) {
-      const problem = schemaMismatch(item, schema.items, `${path}[${index}]`);
-      if (problem) return problem;
-    }
-  return '';
+  const mismatch = schemaMismatch(answer, schema);
+  return mismatch ? { problem: `answer does not match the schema: ${mismatch}` } : { answer };
 }
 
 /*
- * Runs one task on its model. Read runs get the grounding preamble; --json and --schema runs are told
- * the answer format in the prompt (a harness may also enforce ASK_SCHEMA natively), and the answer
- * must parse and match. Resolves with { id, model, name, ok, answer | error, seconds, usage, note };
- * never rejects.
+ * Runs one task. `started({ dir, worktree })` is called just before the agent starts. Resolves with
+ * the result { id, model, name, ok, answer | error, note, seconds, usage, session, dir, changes,
+ * commits, worktree }; never rejects: anything that goes wrong becomes the task's error.
  */
-export async function runTask(task) {
-  const m = parseModel(task.model);
-  const json = task.json || Boolean(task.schema);
-  let prompt = task.write ? task.prompt : GROUNDING + task.prompt;
-  if (json)
-    prompt += task.schema
-      ? `\n\nAnswer ONLY with JSON matching this JSON Schema, no prose and no code fences:\n${JSON.stringify(task.schema)}`
-      : '\n\nAnswer ONLY with JSON, no prose and no code fences.';
-  const started = Date.now();
-  const r = await runHarness(m, prompt, { write: task.write, schema: task.schema, dir: task.dir, timeoutMs: 1000 * (task.timeout || 900) });
-  let answer = r.ok ? r.text.trimEnd() : undefined;
-  if (r.ok && json) {
-    try {
-      answer = JSON.parse(unfence(r.text));
-    } catch {
-      r.ok = false;
-      r.note = 'answer was not valid JSON';
+export async function runTask(task, started = () => {}) {
+  const begin = Date.now();
+  let m = { spec: task.model, model: task.model };
+  let dir = task.dir;
+  let worktree = null;
+  let diff = null;
+  let r = {};
+  try {
+    m = parseModel(task.model);
+    if (task.worktree) {
+      worktree = addWorktree(task.dir, task.worktree);
+      dir = worktree.dir;
     }
-    const problem = r.ok && schemaMismatch(answer, task.schema);
-    if (problem) {
-      r.ok = false;
-      r.note = `answer does not match the schema: ${problem}`;
-    }
+    started({ dir, worktree });
+    const before = task.write ? snapshot(dir) : null;
+    r = await runHarness(m, fullPrompt(task), { write: task.write, schema: task.schema, session: task.session, dir, timeoutMs: 1000 * (task.timeout || 900) });
+    if (before) diff = changes(before);
+    if (r.ok && (task.json || task.schema)) {
+      const { answer, problem } = checkJson(r.text, task.schema);
+      Object.assign(r, problem ? { ok: false, note: problem } : { answer });
+    } else if (r.ok) r.answer = r.text.trimEnd();
+    if (worktree && !diff?.files.length && !diff?.commits) removeWorktree(worktree);
+  } catch (error) {
+    r = { ...r, ok: false, note: error.message };
   }
-  const seconds = Number(((Date.now() - started) / 1000).toFixed(1));
-  const name = await modelName(m, r.name);
-  return r.ok
-    ? { id: task.id, model: m.spec, name, ok: true, answer, seconds, usage: r.usage, note: r.note }
-    : { id: task.id, model: m.spec, name, ok: false, error: r.note, seconds, usage: r.usage };
+  const changed = diff && (diff.files.length || diff.commits);
+  return {
+    id: task.id,
+    model: m.spec,
+    name: m.harness ? await modelName(m, r.name).catch(() => m.spec) : m.spec,
+    ok: r.ok,
+    ...(r.ok ? { answer: r.answer } : { error: r.note }),
+    ...(r.ok && r.note ? { note: r.note } : {}),
+    seconds: Number(((Date.now() - begin) / 1000).toFixed(1)),
+    usage: r.usage || null,
+    session: r.session || null,
+    dir,
+    ...(diff && { changes: diff.files, commits: diff.commits }),
+    ...(worktree && changed && { worktree: { path: worktree.path, branch: worktree.branch } }),
+  };
 }

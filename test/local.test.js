@@ -26,7 +26,7 @@ test('a harness gets the prompt on stdin, the run in its env and the directory a
   assert.equal(r.stdout, 'answer\n');
   assert.equal(readFileSync(join(tmp, 'prompt'), 'utf8'), 'do it');
   assert.equal(readFileSync(join(tmp, 'env'), 'utf8').trim(), `small high write ${tmp}`);
-  assert.match(r.stderr, /^ask: Small One \(high\) /);
+  assert.match(r.stderr, / · Small One \(high\) · ok · /);
 });
 
 test('a harness gets --schema as a file in ASK_SCHEMA', async () => {
@@ -40,12 +40,12 @@ test('a harness gets --schema as a file in ASK_SCHEMA', async () => {
 test('a report names the model and gives usage and a note', async () => {
   harness('echo', `echo '{"name": "Echo 2", "input": 1200, "output": 30, "cost": 0.5, "note": "partial"}' > "$ASK_REPORT"; echo ok`);
   const r = await ask(['-m', 'echo:big', 'go']);
-  assert.match(r.stderr, /^ask: Echo 2 [\d.]+s 1\.2k in 30 out \$0\.5000; partial$/m);
+  assert.match(r.stderr, / · Echo 2 · ok · [\d.]+s · 1\.2k in · 30 out · \$0\.5000 · partial$/m);
 });
 
 test("a failed harness's last stderr line is the error", async () => {
   harness('echo', 'echo noise >&2; echo "quota exceeded" >&2; exit 3');
   const r = await ask(['-m', 'echo:big', 'go']);
   assert.equal(r.code, 1);
-  assert.match(r.stderr, /failed after .*: quota exceeded$/m);
+  assert.match(r.stderr, / · failed · .* · quota exceeded$/m);
 });

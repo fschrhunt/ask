@@ -10,8 +10,10 @@
 
 ---
 
-ask hands a task to a coding agent you already use and gives you its answer. Run one task or many at once, read-only or with
-write access, on any model those agents offer. Each agent keeps its own login, tools and sandbox.
+ask hands a task to a coding agent you already use and gives you its answer, like a native
+subagent: follow it up in the same conversation, run many at once, or give one its own git
+worktree. Read-only or with write access, on any model those agents offer. Each agent keeps its
+own login, tools and sandbox.
 
 ### Install
 
@@ -26,17 +28,23 @@ Requires Node 22+, `~/.local/bin` on your `PATH`, and a harness for each agent y
 ### Use
 
 ```sh
-ask models                                         # what you can run here
-ask -m mycli:smart "Where is the retry logic?"     # read-only, the default
-ask -m mycli:smart#high -w "Fix the failing test."
-ask batch -j 4 -m mycli:fast tasks.json            # many tasks in parallel
+ask models                                          # what you can run here
+ask -m mycli:smart "Why does the login test fail?"  # read-only, the default
+ask -c k3f9a2 -w "Fix it, then run the test."       # follow up: same agent, same conversation
+ask -m mycli:smart -w --worktree "Add rate limits." # its own git worktree and branch
+ask batch -j 4 -m mycli:fast tasks.json             # many tasks in parallel
 ```
 
-The answer goes to stdout; a status line naming the model that ran goes to stderr:
+The answer goes to stdout. Status lines on stderr name the run, the model that ran, and what it
+changed and cost:
 
 ```text
-ask: My Smart 2 14.2s 31.0k in 812 out $0.0874
+ask k3f9a2 · mycli:smart · read · ~/code/app · started
+ask k3f9a2 · My Smart 2 · ok · 48.0s · 31.0k in · 812 out · $0.0874
 ```
+
+Every run is recorded: `ask runs` lists them, `ask show RUN` prints one again, and `ask stop RUN`
+stops one.
 
 ### Any agent
 
@@ -46,8 +54,8 @@ lines of shell.
 
 ### Docs
 
-[Install](docs/install.md) · [Usage](docs/usage.md) · [Batches](docs/batches.md) ·
-[Models](docs/models.md) · [Harnesses](docs/harnesses.md)
+[Install](docs/install.md) · [Usage](docs/usage.md) · [Runs](docs/runs.md) ·
+[Batches](docs/batches.md) · [Models](docs/models.md) · [Harnesses](docs/harnesses.md)
 
 ### License
 
