@@ -27,7 +27,7 @@ else {
   } else {
     for (let i = 0; i < Number(FAKE_STEPS || 1); i++) emit({ type: 'step_start' });
     emit({ type: 'text', part: { text: FAKE_ANSWER ?? `opencode: ${stdin.trim().split('\n').pop()}` } });
-    emit({ type: 'step_finish', part: { cost: 0.002, tokens: { input: 50, output: 6, reasoning: 1, cache: { read: 10 } } } });
+    if (!process.env.FAKE_NO_USAGE) emit({ type: 'step_finish', part: { cost: 0.002, tokens: { input: 50, output: 6, reasoning: 1, cache: { read: 10 } } } });
     process.exitCode = Number(FAKE_EXIT || 0);
   }
 }
