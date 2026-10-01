@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Rewritten in Go: ask is one binary, with no Node requirement. Install a release binary,
+  use `go install github.com/fschrhunt/ask/cmd/ask@latest`, or build from source. Agents, hooks
+  and commands may still be written in any language. Existing contracts and run records are
+  unchanged. `ask --version` prints the release tag, or `dev` for a source build.
 - Make ask yours. Hooks in `~/.ask/hooks` change tasks before they run and check results after:
   refuse, fail, leave a note, or ask the same agent for a follow-up (up to three). They fail open,
   and `--no-hooks` skips them. Commands in `~/.ask/commands` run as `ask NAME`. Packages share all
@@ -41,9 +45,8 @@
   stdin, `ASK_MODEL`, `ASK_EFFORT`, `ASK_ACCESS`, `ASK_SCHEMA`, answer on stdout, an optional
   report). See `docs/harnesses.md`.
 - `models.json` adds model ids to any harness, keyed by harness name.
-- The entry point moved to `bin/ask`; repoint your link:
-  `ln -sf ~/.local/share/ask/bin/ask ~/.local/bin/ask`.
-- Node 22 or newer is required (Node 20 has reached end of life).
+- Earlier source installations used a Node entry point; replace that link with the Go binary
+  (see `docs/install.md`).
 - `--json` and `--schema` runs always tell the agent the answer format in the prompt.
 - Docs with examples in `docs/`.
 - Brand assets: the ask logo, wordmark and lockup in black and white under `assets/`, and a

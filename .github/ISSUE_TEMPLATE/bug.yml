@@ -21,6 +21,6 @@ body:
     validations:
       required: true
   - type: input
-    id: node
+    id: version
     attributes:
-      label: Node version and operating system
+      label: Output of `ask --version` and operating system
