@@ -1,6 +1,6 @@
 /*
- * Where ask keeps its local state: ~/.ask, or $ASK_HOME. It holds harnesses/ (local adapters, which
- * win over the shipped ones), models.json (extra model ids per harness) and runs/ (recorded batches).
+ * Where ask keeps its local state: ~/.ask, or $ASK_HOME. It holds harnesses/ (the executables that
+ * reach each agent), models.json (extra model ids per harness) and runs/ (recorded batches).
  */
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';

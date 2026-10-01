@@ -1,7 +1,6 @@
 # Install
 
-ask needs Node 20 or newer and at least one agent CLI, installed and logged in: `claude`
-(Claude Code), `codex` (Codex) or `opencode` (Opencode). It has no dependencies of its own.
+ask needs Node 22 or newer. It has no dependencies.
 
 ```sh
 git clone https://github.com/fschrhunt/ask ~/.local/share/ask
@@ -9,26 +8,29 @@ mkdir -p ~/.local/bin
 ln -s ~/.local/share/ask/bin/ask ~/.local/bin/ask
 ```
 
-Make sure `~/.local/bin` is on your `PATH`, then check what ask can reach:
+Make sure `~/.local/bin` is on your `PATH`.
+
+## Add a harness
+
+ask reaches each agent through a harness, an executable you keep in `~/.ask/harnesses/`. ask ships
+none: write one for each agent CLI you use, installed and logged in. [Harnesses](harnesses.md) has
+the contract and examples; a minimal one is a few lines of shell.
+
+Then check what ask can reach:
 
 ```sh
 ask models
 ```
 
 ```text
-claude:fable
-claude:opus
-claude:sonnet
-claude:haiku
-codex:gpt-6.1-sol
-...
+mycli:fast
+mycli:smart
 ```
 
-A harness whose CLI is not installed still lists its models; running one fails with the CLI's
-error. Try a first run:
+And try a first run:
 
 ```sh
-ask -m claude:haiku "What is in this directory?"
+ask -m mycli:fast "What is in this directory?"
 ```
 
 ## Update
@@ -39,13 +41,13 @@ git -C ~/.local/share/ask pull
 
 ## Where ask keeps things
 
-Everything ask stores is in `~/.ask` (set `ASK_HOME` to move it):
+Everything ask uses is in `~/.ask` (set `ASK_HOME` to move it):
 
 ```text
 ~/.ask/
-├── harnesses/    your own harnesses (see harnesses.md)
+├── harnesses/    one executable per agent (see harnesses.md)
 ├── models.json   extra model ids per harness (see models.md)
 └── runs/         recorded batches (see batches.md)
 ```
 
-None of it is required; ask creates `runs/` on the first batch.
+ask creates `runs/` on the first batch.

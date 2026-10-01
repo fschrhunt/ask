@@ -1,0 +1,40 @@
+#!/usr/bin/env node
+/*
+ * A fake harness for the tests, keeping the harness contract (docs/harnesses.md). `fake models`
+ * lists "small<TAB>Small One" and "big". A run appends {pid, stdin, cwd, access, model, effort,
+ * schema} to $FAKE_LOG, answers $FAKE_ANSWER (default "fake: <last prompt line>") and reports
+ * name "Fake 1.0", 10 in, 5 out, $0.01. A prompt containing $FAKE_FAIL fails with "fake boom",
+ * $FAKE_HANG never returns, $FAKE_SLOW answers after 300 ms. $FAKE_IGNORE_TERM ignores SIGTERM,
+ * $FAKE_EXIT is the exit code after an answer, $FAKE_NOTE is reported as the note, and
+ * $FAKE_NO_USAGE reports no usage.
+ */
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+
+const env = process.env;
+if (process.argv[2] === 'models') {
+  console.log('small\tSmall One\nbig');
+  process.exit(0);
+}
+const stdin = readFileSync(0, 'utf8');
+const schema = env.ASK_SCHEMA ? JSON.parse(readFileSync(env.ASK_SCHEMA, 'utf8')) : undefined;
+if (env.FAKE_LOG)
+  appendFileSync(
+    env.FAKE_LOG,
+    JSON.stringify({ pid: process.pid, stdin, cwd: process.cwd(), access: env.ASK_ACCESS, model: env.ASK_MODEL, effort: env.ASK_EFFORT, schema }) + '\n',
+  );
+const matches = (needle) => needle && stdin.includes(needle);
+
+if (env.FAKE_IGNORE_TERM) process.on('SIGTERM', () => {});
+if (matches(env.FAKE_HANG)) setInterval(() => {}, 1000);
+else {
+  if (matches(env.FAKE_SLOW)) await new Promise((resolve) => setTimeout(resolve, 300));
+  const usage = env.FAKE_NO_USAGE ? {} : { input: 10, output: 5, cached: 2, cost: 0.01 };
+  writeFileSync(env.ASK_REPORT, JSON.stringify({ name: 'Fake 1.0', note: env.FAKE_NOTE, ...usage }));
+  if (matches(env.FAKE_FAIL)) {
+    console.error('fake boom');
+    process.exitCode = 1;
+  } else {
+    console.log(env.FAKE_ANSWER ?? `fake: ${stdin.trim().split('\n').pop()}`);
+    process.exitCode = Number(env.FAKE_EXIT || 0);
+  }
+}

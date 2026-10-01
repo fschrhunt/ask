@@ -2,10 +2,13 @@
 
 ## Unreleased
 
+- Harnesses are local only: ask ships none and finds them in `~/.ask/harnesses`. The `claude`,
+  `codex` and `opencode` harnesses left the repository; keep your own copies there. The docs show
+  how to write one.
+- `ask models` says where to add a harness when there is none.
 - Any agent: each is reached through a harness, an executable with a small contract (prompt on
   stdin, `ASK_MODEL`, `ASK_EFFORT`, `ASK_ACCESS`, `ASK_SCHEMA`, answer on stdout, an optional
-  report). `claude`, `codex` and `opencode` ship with ask; harnesses in `~/.ask/harnesses` add
-  agents or replace a shipped one. See `docs/harnesses.md`.
+  report). See `docs/harnesses.md`.
 - `models.json` adds model ids to any harness, keyed by harness name.
 - The entry point moved to `bin/ask`; repoint your link:
   `ln -sf ~/.local/share/ask/bin/ask ~/.local/bin/ask`.

@@ -1,17 +1,14 @@
 /*
  * Harnesses are executables that ask runs to reach an agent CLI; see docs/harnesses.md for the
- * contract. A harness named NAME is ~/.ask/harnesses/NAME if that exists, else the one shipped in
- * this package's harnesses/ folder. ask knows nothing about any particular agent; everything
- * specific to one lives in its harness.
+ * contract. A harness named NAME is ~/.ask/harnesses/NAME. They are local only: ask ships none and
+ * knows nothing about any particular agent; everything specific to one lives in its harness.
  */
 import { accessSync, constants, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { LOCAL_HARNESSES, UsageError } from './home.js';
 import { run } from './process.js';
 
-const SHIPPED = join(dirname(fileURLToPath(import.meta.url)), '..', 'harnesses');
 const NAME = /^[a-z0-9][a-z0-9_-]*$/;
 // Seconds a harness gets to list its models.
 const LIST_TIMEOUT_MS = 10_000;
@@ -24,30 +21,26 @@ const executable = (path) => {
     return false;
   }
 };
-const names = (dir) => {
+/* Every harness installed here, sorted by name. */
+export function harnessNames() {
   try {
-    return readdirSync(dir).filter((name) => NAME.test(name) && executable(join(dir, name)));
+    return readdirSync(LOCAL_HARNESSES).filter((name) => NAME.test(name) && executable(join(LOCAL_HARNESSES, name))).sort();
   } catch {
     return [];
   }
-};
-
-/* Every harness available here, sorted by name. */
-export function harnessNames() {
-  return [...new Set([...names(LOCAL_HARNESSES), ...names(SHIPPED)])].sort();
 }
 
-/* The executable for a harness: the local one when present, else the shipped one, else null. */
+/* The executable for a harness, or null when it is not installed. */
 export function harnessPath(name) {
-  for (const dir of [LOCAL_HARNESSES, SHIPPED]) if (NAME.test(name) && executable(join(dir, name))) return join(dir, name);
-  return null;
+  return NAME.test(name) && executable(join(LOCAL_HARNESSES, name)) ? join(LOCAL_HARNESSES, name) : null;
 }
 
 /* Splits "harness:id#effort". A malformed spec or a harness that is not installed is a usage error. */
 export function parseModel(spec) {
   const match = /^([a-z0-9][a-z0-9_-]*):([^#\s]+)(?:#(\S+))?$/.exec(spec || '');
   if (!match) throw new UsageError(`bad model "${spec}": expected harness:id[#effort]; see \`ask models\``);
-  if (!harnessPath(match[1])) throw new UsageError(`no harness "${match[1]}"; installed: ${harnessNames().join(', ')}`);
+  if (!harnessPath(match[1]))
+    throw new UsageError(`no harness "${match[1]}" in ${LOCAL_HARNESSES}; installed: ${harnessNames().join(', ') || 'none'}; see docs/harnesses.md`);
   return { spec, harness: match[1], model: match[2], effort: match[3] };
 }
 

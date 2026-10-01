@@ -10,12 +10,11 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { listRuns, newRunDir, parseTasks, recordedTasks, runBatch } from './batch.js';
 import { listModels, parseModel } from './harness.js';
-import { readModels, UsageError } from './home.js';
+import { LOCAL_HARNESSES, readModels, UsageError } from './home.js';
 import { runTask } from './task.js';
 import { formatUsage } from './usage.js';
 
-const HELP = `ask: hand tasks to coding agents (Claude Code, Codex, Opencode, or any harness you add)
-and get their answers back.
+const HELP = `ask: hand tasks to coding agents and get their answers back.
 
   ask -m MODEL [options] PROMPT   one prompt (use - or omit PROMPT to read stdin)
   ask models                      list the model ids available here
@@ -26,7 +25,7 @@ and get their answers back.
   ask runs                        list recent recorded runs
 
 options
-  -m, --model ID     harness:id[#effort] from \`ask models\`, e.g. claude:sonnet#high
+  -m, --model ID     harness:id[#effort] from \`ask models\`, e.g. mycli:smart#high
   -r, --read         read only (the default)
   -w, --write        read and write: may edit files and run commands
   --json             answer must be JSON
@@ -43,8 +42,9 @@ name is the model's own name (Opus 5.5, GPT-6.1 Sol), for status lines and peopl
 usage is {input, output, cached} tokens, plus cost in USD where the harness reports it.
 Status lines go to stderr; stopping ask stops every agent it started.
 
-ask keeps its state in ~/.ask, or $ASK_HOME: harnesses/ (your own harnesses, which win over the
-shipped ones), models.json (extra model ids per harness) and runs/ (recorded batches).
+ask reaches each agent through a harness: an executable in ~/.ask/harnesses (see the docs).
+ask keeps its state in ~/.ask, or $ASK_HOME: harnesses/, models.json (extra model ids per
+harness) and runs/ (recorded batches).
 Docs: https://github.com/fschrhunt/ask/tree/main/docs`;
 
 /* Parses the flags every command shares; leftovers are the prompt or the batch file. */
@@ -92,7 +92,9 @@ export async function main(argv) {
   const config = readModels();
 
   if (sub === 'models') {
-    for (const id of await listModels(config)) console.log(id);
+    const ids = await listModels(config);
+    if (!ids.length) console.error(`ask: no models; add a harness to ${LOCAL_HARNESSES} (see docs/harnesses.md)`);
+    for (const id of ids) console.log(id);
     return;
   }
 

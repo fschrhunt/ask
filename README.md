@@ -10,39 +10,39 @@
 
 ---
 
-ask hands a task to a coding agent you already use — Claude Code, Codex, Opencode, or any other
-you add a harness for — and gives you its answer. Run one task or many at once, read-only or with
+ask hands a task to a coding agent you already use and gives you its answer. Run one task or many at once, read-only or with
 write access, on any model those agents offer. Each agent keeps its own login, tools and sandbox.
 
 ### Install
 
 ```sh
 git clone https://github.com/fschrhunt/ask ~/.local/share/ask
+mkdir -p ~/.local/bin
 ln -s ~/.local/share/ask/bin/ask ~/.local/bin/ask
 ```
 
-Requires Node 22+ and at least one of `claude`, `codex` or `opencode`, installed and logged in.
+Requires Node 22+, `~/.local/bin` on your `PATH`, and a harness for each agent you use (below).
 
 ### Use
 
 ```sh
 ask models                                         # what you can run here
-ask -m claude:sonnet "Where is the retry logic?"   # read-only, the default
-ask -m codex:gpt-6.1-sol#high -w "Fix the failing test."
-ask batch -j 4 -m claude:sonnet tasks.json         # many tasks in parallel
+ask -m mycli:smart "Where is the retry logic?"     # read-only, the default
+ask -m mycli:smart#high -w "Fix the failing test."
+ask batch -j 4 -m mycli:fast tasks.json            # many tasks in parallel
 ```
 
 The answer goes to stdout; a status line naming the model that ran goes to stderr:
 
 ```text
-ask: Sonnet 5.5 14.2s 31.0k in 812 out $0.0874
+ask: My Smart 2 14.2s 31.0k in 812 out $0.0874
 ```
 
 ### Any agent
 
-Each agent is reached through a harness, a small program with a [simple contract](docs/harnesses.md).
-`claude`, `codex` and `opencode` ship with ask; put your own in `~/.ask/harnesses/` to add an agent
-or change how one runs.
+ask reaches each agent through a harness: a small executable in `~/.ask/harnesses/` with a
+[simple contract](docs/harnesses.md). Harnesses are yours and stay local; a minimal one is a few
+lines of shell.
 
 ### Docs
 

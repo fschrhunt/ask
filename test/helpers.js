@@ -1,25 +1,27 @@
 /*
- * Shared setup for the tests: each test runs the real `bin/ask`, with the shipped harnesses driving
- * the fake claude, codex and opencode in test/bin, and ASK_HOME, HOME and CODEX_HOME inside a fresh
- * temp dir. No network, no real models. A fake records each call in $FAKE_LOG; see the fakes for the
- * env vars that make them fail or hang. `tmp` and `env` are the current test's.
+ * Shared setup for the tests: each test runs the real `bin/ask` with ASK_HOME and HOME inside a
+ * fresh temp dir, and test/fake installed as the harness `fake`. No network, no real models. The
+ * fake records each run in $FAKE_LOG; see it for the env vars that make it fail or hang. `tmp` and
+ * `env` are the current test's.
  */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const PATH = `${join(ROOT, 'test/bin')}:${dirname(process.execPath)}`;
+const PATH = dirname(process.execPath);
 export let tmp;
 export let env;
 
 beforeEach(() => {
   tmp = realpathSync(mkdtempSync(join(tmpdir(), 'ask-test-')));
-  env = { PATH, HOME: tmp, ASK_HOME: join(tmp, 'home'), CODEX_HOME: join(tmp, 'codex'), FAKE_LOG: join(tmp, 'calls.jsonl') };
+  env = { PATH, HOME: tmp, ASK_HOME: join(tmp, 'home'), FAKE_LOG: join(tmp, 'calls.jsonl') };
+  mkdirSync(join(env.ASK_HOME, 'harnesses'), { recursive: true });
+  symlinkSync(join(ROOT, 'test/fake'), join(env.ASK_HOME, 'harnesses', 'fake'));
 });
 afterEach(() => rmSync(tmp, { recursive: true, force: true }));
 
