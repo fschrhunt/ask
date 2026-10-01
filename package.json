@@ -7,7 +7,7 @@
   "license": "MIT",
   "author": "Fischer Hunt",
   "repository": "github:fschrhunt/ask",
-  "bin": { "ask": "ask" },
-  "scripts": { "test": "node --test" },
-  "engines": { "node": ">=20" }
+  "bin": { "ask": "bin/ask" },
+  "scripts": { "test": "node --test test/*.test.js" },
+  "engines": { "node": ">=22" }
 }
