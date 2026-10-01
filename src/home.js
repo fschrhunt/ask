@@ -54,6 +54,6 @@ export function readModels() {
   }
   const lists = models && typeof models === 'object' && !Array.isArray(models) ? Object.values(models) : null;
   if (!lists?.every((ids) => Array.isArray(ids) && ids.every((id) => typeof id === 'string')))
-    throw new UsageError(`${MODELS} must map harness names to lists of model ids, like {"mycli": ["fast"]}`);
+    throw new UsageError(`${MODELS} must map harness names to lists of model ids, like {"mycli": ["atlas-2.1"]}`);
   return models;
 }

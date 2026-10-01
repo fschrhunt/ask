@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Docs: a model naming convention for harnesses (lowercase family-version-variant, no aliases or
+  provider prefixes), and every example follows it.
 - Runs are subagents you can come back to. Every run gets a short id, shown at the start of its
   status lines and recorded in `~/.ask/runs`; batch tasks are `RUN/TASK`.
   - `ask -c RUN PROMPT` continues the agent's own conversation, where it ran, keeping its model

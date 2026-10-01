@@ -23,14 +23,14 @@ ask models
 ```
 
 ```text
-mycli:fast
-mycli:smart
+mycli:atlas-2.1-mini
+mycli:atlas-2.1
 ```
 
 And try a first run:
 
 ```sh
-ask -m mycli:fast "What is in this directory?"
+ask -m mycli:atlas-2.1-mini "What is in this directory?"
 ```
 
 ## Update

@@ -16,12 +16,28 @@ A harness is any executable: a shell script, Node, Python, a binary.
 Print one model per line, as `id` or `id<TAB>name`. The name is what status lines show.
 
 ```text
-fast	My Fast
-smart	My Smart
+atlas-2.1	Atlas 2.1
+atlas-2.1-mini	Atlas 2.1 Mini
 ```
 
 Print nothing if the CLI has too many models to list; users add the ones they use to
 `~/.ask/models.json` (see [Models](models.md)).
+
+### Naming models
+
+Name each model by what it is, the same way in every harness, so `ask models` reads as one list:
+
+- **Lowercase family, version, then variant, joined by hyphens:** `gpt-6.1-sol`, `sonnet-5.5`,
+  `deepseek-4.1-flash`, `qwen-3.8-flash`.
+- **No CLI aliases** like `opus` or `latest`. They change meaning when a new model ships, so a
+  run's record would no longer say which model answered. Refuse them with the exact name to use.
+- **No provider prefixes or vendor quirks** the user doesn't need. Translate in the harness: a
+  clean `sonnet-5.5` can become the CLI's `claude-sonnet-5-5`, and `qwen-3.8-flash` a provider's
+  `opencode-go/qwen3.8-flash`. Accept the CLI's own id too, as is.
+- **Match without regard to case,** so `GPT-6.1-Sol` finds `gpt-6.1-sol`.
+
+ask doesn't enforce this; a model id is whatever your harness accepts. It is the convention for
+harnesses you share.
 
 ### Running: `NAME`
 
@@ -30,7 +46,7 @@ ask runs the harness with no arguments, in the directory the agent should work i
 | Input | |
 | --- | --- |
 | stdin | The prompt, complete. ask has already added any read-run or JSON instructions. |
-| `ASK_MODEL` | The model id, without the harness or effort: `smart`. |
+| `ASK_MODEL` | The model id, without the harness or effort: `atlas-2.1`. |
 | `ASK_EFFORT` | The effort from `#effort`, or empty. |
 | `ASK_ACCESS` | `read` or `write`. |
 | `ASK_SCHEMA` | Set only with `--schema`: a file holding the JSON Schema, for CLIs that enforce one. |
@@ -45,7 +61,7 @@ ask runs the harness with no arguments, in the directory the agent should work i
 | `$ASK_REPORT` | Optional JSON: `{"session", "name", "input", "output", "cached", "cost", "note"}`. |
 
 In the report, `session` is the agent session the run used, `name` is the model that actually ran
-(`My Smart 2`), the counts are tokens, `cost` is in USD, and `note` is a short remark ask adds to
+(`Atlas 2.1`), the counts are tokens, `cost` is in USD, and `note` is a short remark ask adds to
 the status line (`hit step cap; answer may be partial`). Every field is optional. ask reads the
 report even when the run fails or times out, so write it as early as you know something, above all
 the session, and rewrite it whole as you learn more.
@@ -86,7 +102,7 @@ has a `--readonly` flag:
 #!/bin/sh
 # ~/.ask/harnesses/mycli: runs mycli for ask.
 if [ "$1" = models ]; then
-  printf 'fast\tMy Fast\nsmart\tMy Smart\n'
+  printf 'atlas-2.1\tAtlas 2.1\natlas-2.1-mini\tAtlas 2.1 Mini\n'
   exit 0
 fi
 
@@ -100,7 +116,7 @@ exec mycli "$@" -p "$(cat)"
 ```sh
 chmod +x ~/.ask/harnesses/mycli
 ask models
-ask -m mycli:smart "What does this project do?"
+ask -m mycli:atlas-2.1 "What does this project do?"
 ```
 
 ## Example: sessions and usage
@@ -115,7 +131,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 if (process.argv[2] === 'models') {
-  console.log('pro\tOther Pro');
+  console.log('nova-4\tNova 4');
   process.exit(0);
 }
 const args = ['run', '--json', '--model', process.env.ASK_MODEL];
@@ -137,6 +153,6 @@ try {
 to every machine. Test a harness by running it the way ask does:
 
 ```sh
-echo "say hi" | ASK_MODEL=fast ASK_ACCESS=read ASK_REPORT=/tmp/r.json ~/.ask/harnesses/mycli
+echo "say hi" | ASK_MODEL=atlas-2.1-mini ASK_ACCESS=read ASK_REPORT=/tmp/r.json ~/.ask/harnesses/mycli
 cat /tmp/r.json
 ```

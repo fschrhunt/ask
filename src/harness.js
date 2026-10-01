@@ -71,7 +71,7 @@ export async function listModels(config) {
   };
 }
 
-/* An id in title case (provider/fast-one -> Fast One), for a harness that names no model. */
+/* An id in title case (provider/atlas-2.1-mini -> Atlas 2.1 Mini), for a harness that names no model. */
 const titleCase = (id) => id.split('/').filter(Boolean).pop()?.split('-').filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(' ') || id;
 
 /*
