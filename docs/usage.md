@@ -8,8 +8,8 @@ Every run names its model. ask never picks one for you, the same way you name a 
 start a subagent.
 
 ```sh
-ask -m mycli:smart "Where is the retry logic, and what are its limits?"
-ask -m othercli:pro#high "Review the last commit for bugs."
+ask -m mycli:atlas-2.1 "Where is the retry logic, and what are its limits?"
+ask -m othercli:nova-4#high "Review the last commit for bugs."
 ```
 
 ## The prompt
@@ -18,9 +18,9 @@ Give it as arguments, or on stdin with `-` or no prompt at all. Words after `--`
 prompt, even ones that look like options:
 
 ```sh
-ask -m mycli:smart "Summarize src/"
-git diff | ask -m othercli:pro -
-ask -m mycli:smart < task.md
+ask -m mycli:atlas-2.1 "Summarize src/"
+git diff | ask -m othercli:nova-4 -
+ask -m mycli:atlas-2.1 < task.md
 ```
 
 ## Read or write
@@ -31,8 +31,8 @@ ask -m mycli:smart < task.md
 | `-w`, `--write` | Read and write: the agent may edit files and run commands, as you. |
 
 ```sh
-ask -m mycli:smart "Which functions have no tests?"           # read
-ask -m mycli:smart -w "Add tests for parseFlags, then run them" # write
+ask -m mycli:atlas-2.1 "Which functions have no tests?"           # read
+ask -m mycli:atlas-2.1 -w "Add tests for parseFlags, then run them" # write
 ```
 
 Read runs start with a short instruction to search and read the files before answering, so the
@@ -47,7 +47,7 @@ When a write run's directory is in a git repository, ask compares the repository
 and reports what the run changed: in the status line, and in full with `ask show RUN --json`.
 
 ```text
-ask k3f9a2 · My Smart 2 · ok · 41.2s · 3 files changed, 1 commit · 52.1k in · 2.0k out · $0.3100
+ask k3f9a2 · Atlas 2.1 · ok · 41.2s · 3 files changed, 1 commit · 52.1k in · 2.0k out · $0.3100
 ```
 
 ```json
@@ -67,12 +67,12 @@ so your own uncommitted work never shows up as the agent's.
 checkout and several write runs can go in parallel:
 
 ```sh
-ask -m mycli:smart -w --worktree -C ~/code/app "Add rate limiting to the login route."
+ask -m mycli:atlas-2.1 -w --worktree -C ~/code/app "Add rate limiting to the login route."
 ```
 
 ```text
-ask k3f9a2 · mycli:smart · write · worktree ~/.ask/worktrees/k3f9a2 · started
-ask k3f9a2 · My Smart 2 · ok · 3m 05s · 4 files changed · branch ask/k3f9a2 · 120.4k in · 6.2k out
+ask k3f9a2 · mycli:atlas-2.1 · write · worktree ~/.ask/worktrees/k3f9a2 · started
+ask k3f9a2 · Atlas 2.1 · ok · 3m 05s · 4 files changed · branch ask/k3f9a2 · 120.4k in · 6.2k out
 ```
 
 The worktree starts from the repository's `HEAD`, at `~/.ask/worktrees/RUN`, on branch `ask/RUN`.
@@ -92,7 +92,7 @@ worktree; ask says so when it starts.
 `-C DIR` sets the directory the agent works in (default: where you run ask):
 
 ```sh
-ask -m mycli:smart -C ~/code/app "How does login work?"
+ask -m mycli:atlas-2.1 -C ~/code/app "How does login work?"
 ```
 
 ## Time limit
@@ -101,7 +101,7 @@ ask -m mycli:smart -C ~/code/app "How does login work?"
 everything the agent started is stopped.
 
 ```sh
-ask -m othercli:pro -w -t 3600 "Upgrade the project to Node 24 and fix what breaks."
+ask -m othercli:nova-4 -w -t 3600 "Upgrade the project to Node 24 and fix what breaks."
 ```
 
 ## JSON answers
@@ -132,14 +132,14 @@ cat > findings.json <<'EOF'
   "required": ["bugs"]
 }
 EOF
-ask -m mycli:smart --schema findings.json "Find bugs in src/parser.js" | jq '.bugs[].file'
+ask -m mycli:atlas-2.1 --schema findings.json "Find bugs in src/parser.js" | jq '.bugs[].file'
 ```
 
 ask checks `type`, `enum`, `properties`, `required`, `additionalProperties: false` and `items`. An
 answer that is not JSON, or does not match, fails the run with the reason:
 
 ```text
-ask k3f9a2 · My Smart 2 · failed · 12.3s · answer does not match the schema: $.bugs[0]: missing "file"
+ask k3f9a2 · Atlas 2.1 · failed · 12.3s · answer does not match the schema: $.bugs[0]: missing "file"
 ```
 
 ## Follow-ups
@@ -147,7 +147,7 @@ ask k3f9a2 · My Smart 2 · failed · 12.3s · answer does not match the schema:
 Every run gets an id. Continue the same agent conversation with `-c`; see [Runs](runs.md).
 
 ```sh
-ask -m mycli:smart "Why does the login test fail?"
+ask -m mycli:atlas-2.1 "Why does the login test fail?"
 ask -c k3f9a2 -w "Fix it."
 ```
 
@@ -159,8 +159,8 @@ ask -c k3f9a2 -w "Fix it."
   what changed and usage when the agent reports it.
 
 ```text
-ask k3f9a2 · mycli:smart · read · ~/code/app · started
-ask k3f9a2 · My Smart 2 · ok · 14.2s · 31.0k in · 812 out · $0.0874
+ask k3f9a2 · mycli:atlas-2.1 · read · ~/code/app · started
+ask k3f9a2 · Atlas 2.1 · ok · 14.2s · 31.0k in · 812 out · $0.0874
 ```
 
 - **Exit code**: 0 on success, 1 when the run failed, 2 when ask was called wrong (the message says

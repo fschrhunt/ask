@@ -29,18 +29,18 @@ Requires Node 22+, `~/.local/bin` on your `PATH`, and a harness for each agent y
 
 ```sh
 ask models                                          # what you can run here
-ask -m mycli:smart "Why does the login test fail?"  # read-only, the default
+ask -m mycli:atlas-2.1 "Why does the login test fail?"  # read-only, the default
 ask -c k3f9a2 -w "Fix it, then run the test."       # follow up: same agent, same conversation
-ask -m mycli:smart -w --worktree "Add rate limits." # its own git worktree and branch
-ask batch -j 4 -m mycli:fast tasks.json             # many tasks in parallel
+ask -m mycli:atlas-2.1 -w --worktree "Add rate limits." # its own git worktree and branch
+ask batch -j 4 -m mycli:atlas-2.1-mini tasks.json             # many tasks in parallel
 ```
 
 The answer goes to stdout. Status lines on stderr name the run, the model that ran, and what it
 changed and cost:
 
 ```text
-ask k3f9a2 · mycli:smart · read · ~/code/app · started
-ask k3f9a2 · My Smart 2 · ok · 48.0s · 31.0k in · 812 out · $0.0874
+ask k3f9a2 · mycli:atlas-2.1 · read · ~/code/app · started
+ask k3f9a2 · Atlas 2.1 · ok · 48.0s · 31.0k in · 812 out · $0.0874
 ```
 
 Every run is recorded: `ask runs` lists them, `ask show RUN` prints one again, and `ask stop RUN`

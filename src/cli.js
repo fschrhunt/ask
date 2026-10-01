@@ -24,7 +24,7 @@ const HELP = `ask: hand tasks to coding agents and get their answers back.
   ask models                       list the model ids available here
 
 options
-  -m, --model ID      harness:id[#effort] from \`ask models\`, e.g. mycli:smart#high
+  -m, --model ID      harness:id[#effort] from \`ask models\`, e.g. mycli:atlas-2.1#high
   -r, --read          read only (the default)
   -w, --write         read and write: may edit files and run commands
   --worktree          with -w: work in a new git worktree and branch, kept only if changed
