@@ -29,7 +29,8 @@ brew tap fschrhunt/ask https://github.com/fschrhunt/ask
 brew install ask
 ```
 
-Each release updates the formula, [`ask.rb`](../ask.rb), so
+If Homebrew refuses the tap as untrusted, run `brew trust fschrhunt/ask` and install
+again. Each release updates the formula, [`ask.rb`](../ask.rb), so
 `brew upgrade ask` brings the latest.
 
 ## With Go
