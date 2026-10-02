@@ -1,6 +1,7 @@
 # Contributing
 
-Smallness is the point: no dependencies, and nothing about any particular agent.
+Smallness is the point: dependencies stay in terminal presentation, and the core knows nothing
+about any particular agent.
 A change that makes ask simpler is welcome; one that adds a moving part needs a strong reason.
 
 You need Go 1.26 or newer, git, a POSIX shell, Node.js 18+ for the official agents' tests and

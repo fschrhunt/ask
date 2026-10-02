@@ -3,7 +3,8 @@
 Hands tasks to coding agents, one task or a batch in parallel. Each coding agent is reached through
 an agent: an executable in `~/.ask/agents` or a package. ask's core (`internal/`) knows nothing about
 any of them; the official agents live in `packages/` and are built into the binary. Go 1.26 or
-newer, standard library only; the official agents use Node.js 18+, built-ins only.
+newer; terminal presentation uses Bubble Tea and Lip Gloss, while execution uses the standard
+library only. The official agents use Node.js 18+, built-ins only.
 
 ## Commands
 
@@ -32,7 +33,8 @@ newer, standard library only; the official agents use Node.js 18+, built-ins onl
 
 ## Conventions
 
-- Fewest moving parts. No dependencies, no configuration beyond what a change needs.
+- Fewest moving parts. Terminal dependencies belong in `tui` and `status`; no configuration
+  beyond what a change needs.
 - Nothing about a particular agent goes in `internal/`; it belongs in an agent, official ones in
   `packages/`. An official agent uses only the contract any agent could. The agent, hook and
   command contracts change only as `docs/compatibility.md` says: additions are free, a breaking

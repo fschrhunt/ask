@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Migrate terminal prompts and live status to Bubble Tea, with monochrome prompt styling,
+  resize-aware choices, cursor editing and bracketed paste. Updates show transient progress;
+  review diffs measure wide text correctly. Machine output stays unchanged.
+
 - `ask bench` compares models on the same tasks: every task on every `-m` model, `-n` times, each
   passing when the agent finishes and the task's own `check` command exits 0. Write attempts get
   fresh worktrees from the same commit. It prints passes, median time, tokens and cost per model,

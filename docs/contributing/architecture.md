@@ -1,6 +1,8 @@
 # Architecture
 
-ask is one Go binary, standard library only. It turns a command line into tasks, runs each task by
+ask is one Go binary. Bubble Tea owns interactive terminal rendering and input; Lip Gloss and
+Charm's ANSI helpers measure and clip terminal text. Execution uses the standard library only.
+It turns a command line into tasks, runs each task by
 starting an agent (a separate executable) under a small contract, and records the result. ask
 itself knows no particular coding agent: Claude Code, Codex and Opencode are reached through
 agents in [`packages/`](../../packages/), which use the same contract as anyone's.
@@ -47,7 +49,7 @@ Each folder in `internal/` is one Go package with a `// Package` comment saying 
 | `setup` | What `ask setup` offers: the official agents, the ask skill per app, the title hook |
 | `schema` | The `--schema` check |
 | `home` | `~/.ask` paths, the contract environment, `settings.json` and `models.json`, atomic JSON records |
-| `tui` | Terminal prompts and the review diff |
+| `tui` | Inline Bubble Tea prompts and the review diff; owns prompt input and terminal cleanup |
 | `update` | Finding the latest release and replacing a directly installed ask |
 
 ## Rules the layout keeps
@@ -58,8 +60,9 @@ Each folder in `internal/` is one Go package with a `// Package` comment saying 
   them.
 - **No particular agent.** Only `setup`, which offers the official agents on a first run, names
   them as values. Anything specific to a coding agent belongs in its agent, in `packages/`.
-- **Standard library only.** `go.mod` requires nothing; the official agents import only Node.js
-  built-ins.
+- **Presentation-only dependencies.** External Go imports stay in `tui` and `status`. Bubble Tea
+  renders prompts and live status inline, without taking over stdin for live status. Core
+  execution uses the standard library; official agents import only Node.js built-ins.
 - **Every package says what it is for.**
 
 Two more are kept by tests and review, not grep:

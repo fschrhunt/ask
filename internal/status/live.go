@@ -8,6 +8,8 @@ import (
 	"time"
 	"unicode"
 
+	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/fschrhunt/ask/internal/home"
 	"github.com/fschrhunt/ask/internal/runs"
 )
@@ -188,9 +190,10 @@ func Frame(s LiveState, now time.Time, tick, width, height int, color, utf8 bool
 type Live struct {
 	mu                  sync.Mutex
 	state               LiveState
-	lines, tick         int
 	color, utf8, closed bool
-	stop                chan struct{}
+	program             *tea.Program
+	done                chan struct{}
+	err                 error // read only after done closes
 }
 
 // NewLive returns nil for pipes or dumb terminals, preserving the plain status contract.
@@ -198,7 +201,7 @@ func NewLive(r *runs.Run, header string, batch bool) *Live {
 	if !IsTerminal(os.Stderr) {
 		return nil
 	}
-	l := &Live{state: LiveState{Header: header, Batch: batch, Started: time.Now()}, color: CanStyle(os.Stderr), utf8: localeUTF8(), stop: make(chan struct{})}
+	l := &Live{state: LiveState{Header: header, Batch: batch, Started: time.Now()}, color: CanStyle(os.Stderr), utf8: localeUTF8(), done: make(chan struct{})}
 	for i, t := range r.Tasks {
 		row := LiveRow{Ref: runs.Ref(r, i), Name: t.S("model"), State: "queued"}
 		if result := r.Results[i]; result.B("ok") {
@@ -209,50 +212,64 @@ func NewLive(r *runs.Run, header string, batch bool) *Live {
 		}
 		l.state.Rows = append(l.state.Rows, row)
 	}
-	fmt.Fprint(os.Stderr, "\x1b[?25l")
-	l.draw()
+	width, height, _ := terminalSize(os.Stderr)
+	m := &liveModel{state: l.state, width: width, height: height, color: l.color, utf8: l.utf8}
+	m.state.Rows = append([]LiveRow(nil), l.state.Rows...)
+	l.program = tea.NewProgram(m, tea.WithInput(nil), tea.WithOutput(os.Stderr), tea.WithoutSignalHandler())
 	go func() {
-		ticker := time.NewTicker(100 * time.Millisecond)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				l.mu.Lock()
-				if !l.closed {
-					l.tick++
-					l.draw()
-				}
-				l.mu.Unlock()
-			case <-l.stop:
-				return
-			}
-		}
+		defer close(l.done)
+		_, l.err = l.program.Run()
 	}()
 	return l
 }
 
-// erase returns to the start of the previous bounded frame and clears it.
-func (l *Live) erase() {
-	if l.lines > 0 {
-		fmt.Fprintf(os.Stderr, "\x1b[%dA\r\x1b[J", l.lines)
-		l.lines = 0
+// draw sends an immutable snapshot to Bubble Tea's render loop.
+func (l *Live) draw() {
+	s := l.state
+	s.Rows = append([]LiveRow(nil), s.Rows...)
+	for i := range s.Rows {
+		s.Rows[i].Notes = append([]string(nil), s.Rows[i].Notes...)
 	}
+	l.program.Send(s)
 }
 
-// draw emits complete clipped rows with wrapping disabled during the redraw.
-func (l *Live) draw() {
-	l.erase()
-	width, height, _ := terminalSize(os.Stderr)
-	if width < 2 {
-		width = 2
+// liveTick advances the status animation without reading terminal input.
+type liveTick time.Time
+
+// liveFinish ends rendering after the last snapshot has been displayed.
+type liveFinish struct{}
+
+// liveModel owns frame timing and dimensions on Bubble Tea's event loop.
+type liveModel struct {
+	state               LiveState
+	width, height, tick int
+	color, utf8         bool
+}
+
+// Init schedules the first animation frame.
+func (m *liveModel) Init() tea.Cmd {
+	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg { return liveTick(t) })
+}
+
+// Update accepts snapshots and resize events; completion leaves the final frame in scrollback.
+func (m *liveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case LiveState:
+		m.state = msg
+	case tea.WindowSizeMsg:
+		m.width, m.height = msg.Width, msg.Height
+	case liveTick:
+		m.tick++
+		return m, m.Init()
+	case liveFinish:
+		return m, tea.Quit
 	}
-	frame := Frame(l.state, time.Now(), l.tick, width, height, l.color, l.utf8)
-	fmt.Fprint(os.Stderr, "\x1b[?7l")
-	for _, line := range frame {
-		fmt.Fprint(os.Stderr, "\r\x1b[2K", line, "\r\n")
-	}
-	fmt.Fprint(os.Stderr, "\x1b[?7h")
-	l.lines = len(frame)
+	return m, nil
+}
+
+// View renders bounded status rows using the shared frame formatter.
+func (m *liveModel) View() string {
+	return strings.Join(Frame(m.state, time.Now(), m.tick, max(2, m.width), m.height, m.color, m.utf8), "\n") + "\n"
 }
 
 // Update replaces a task's state or prints a hook note above the live frame.
@@ -306,7 +323,6 @@ func (l *Live) Finish(summary string, stopped bool) {
 		return
 	}
 	l.closed = true
-	close(l.stop)
 	if stopped {
 		for i := range l.state.Rows {
 			row := &l.state.Rows[i]
@@ -318,8 +334,9 @@ func (l *Live) Finish(summary string, stopped bool) {
 		}
 	}
 	l.draw()
-	fmt.Fprint(os.Stderr, "\x1b[?25h")
-	if summary != "" && (stopped || l.state.Batch) {
+	l.program.Send(liveFinish{})
+	<-l.done
+	if summary != "" && (stopped || l.state.Batch || l.err != nil) {
 		fmt.Fprintln(os.Stderr, summary)
 	}
 }

@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/fschrhunt/ask/internal/home"
+	"github.com/fschrhunt/ask/internal/process"
 	"github.com/fschrhunt/ask/internal/status"
+	"github.com/fschrhunt/ask/internal/tui"
 	"github.com/fschrhunt/ask/internal/update"
 )
 
@@ -19,7 +21,12 @@ func updateCommand(p home.Paths, version string, check bool) (int, error) {
 		fmt.Fprintf(os.Stderr, "ask: this is a development build (%s); update it from source\n", version)
 		return 1, nil
 	}
-	latest, e := update.Latest(15 * time.Second)
+	var latest string
+	e := updateProgress("Checking for updates", func() error {
+		var err error
+		latest, err = update.Latest(15 * time.Second)
+		return err
+	})
 	if e != nil {
 		return 0, e
 	}
@@ -37,11 +44,19 @@ func updateCommand(p home.Paths, version string, check bool) (int, error) {
 		return 0, nil
 	}
 	fmt.Fprintf(os.Stderr, "ask: updating %s to %s\n", version, latest)
-	if e := update.Apply(latest); e != nil {
+	if e := updateProgress("Installing "+latest, func() error { return update.Apply(latest) }); e != nil {
 		return 0, e
 	}
 	fmt.Fprintf(os.Stderr, "ask: updated to %s; see what's new: https://github.com/fschrhunt/ask/releases/tag/%s\n", latest, latest)
 	return 0, nil
+}
+
+// updateProgress adds transient terminal feedback without changing piped output.
+func updateProgress(label string, work func() error) error {
+	if status.IsTerminal(os.Stderr) {
+		return tui.Activity(os.Stderr, label, status.UTF8(), process.OnStop, work)
+	}
+	return work()
 }
 
 // checked is the once-a-day record of the latest release, in ask's home.
