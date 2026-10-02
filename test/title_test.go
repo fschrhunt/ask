@@ -26,6 +26,10 @@ second line'`, "", "Small One · First line\n"},
 	path := filepath.Join(s.tmp, "tasks.json")
 	s.json(path, []object{{"prompt": "check the API"}, {"prompt": "check tests", "model": "fake:big"}, {"prompt": "review"}})
 	eq(t, s.ask("title", "--command", "ask batch -m fake:small "+path).stdout, "Batch of 3 · Small One, Big · Check the API\n")
+	written := "cd " + s.tmp + " && cat > new.json <<'EOF'\n[{\"prompt\": \"audit runs\"}, {\"prompt\": \"audit hooks\"}]\nEOF\nask batch -m fake:big new.json"
+	eq(t, s.ask("title", "--command", written, "--description", "Run audits").stdout, "Batch of 2 · Big · Run audits\n")
+	piped := "ask batch -m fake:small - <<'EOF'\n{\"prompt\": \"one\"}\nEOF"
+	eq(t, s.ask("title", "--command", piped).stdout, "Batch of 1 · Small One · One\n")
 	first := s.ask("-m", "fake:small#high", "-w", "remember")
 	id := runID(t, first.stderr)
 	eq(t, s.ask("title", "--command", "ask -c "+id+" 'go again'").stdout, "Small One (high) · Go again · write\n")
