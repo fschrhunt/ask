@@ -180,7 +180,7 @@ func BatchStart(r *runs.Run, jobs, todo int) string {
 	if jobs > todo {
 		jobs = todo
 	}
-	return line(r.ID, "started", fmt.Sprintf("batch of %d", len(r.Tasks)), resume, fmt.Sprintf("%d at a time", jobs))
+	return line(r.Label(), "started", fmt.Sprintf("batch of %d", len(r.Tasks)), resume, fmt.Sprintf("%d at a time", jobs))
 }
 
 // BatchEnd prints outcome counts, elapsed time and summed usage.
@@ -200,7 +200,7 @@ func BatchEnd(r *runs.Run, seconds float64) string {
 			}
 		}
 	}
-	return line(r.ID, fmt.Sprintf("%d/%d ok", ok, len(r.Tasks)), Duration(seconds), Usage(total))
+	return line(r.Label(), fmt.Sprintf("%d/%d ok", ok, len(r.Tasks)), Duration(seconds), Usage(total))
 }
 
 // BatchSaved reports a recorded batch's result count without inventing elapsed wall time.
@@ -211,7 +211,7 @@ func BatchSaved(r *runs.Run) string {
 			ok++
 		}
 	}
-	return line(r.ID, fmt.Sprintf("%d/%d ok", ok, len(r.Tasks)))
+	return line(r.Label(), fmt.Sprintf("%d/%d ok", ok, len(r.Tasks)))
 }
 
 // when renders a saved UTC timestamp relative to the caller's local clock.
@@ -246,7 +246,7 @@ func when(stamp string, now time.Time) string {
 
 // Table prints recent runs with relative dates, omitting columns with no values.
 func Table(list []*runs.Run, now time.Time, color bool) string {
-	headers := []string{"RUN", "STARTED", "STATUS", "MODEL", "TIME", "TASK"}
+	headers := []string{"RUN", "ID", "STARTED", "STATUS", "MODEL", "TIME", "TASK"}
 	rows := [][]string{}
 	for _, r := range list {
 		done := []home.Object{}
@@ -291,13 +291,17 @@ func Table(list []*runs.Run, now time.Time, color bool) string {
 			about = "↪ " + first.S("continues") + " " + about
 		}
 		if state == "stopped" {
-			about = "resume: ask batch --resume " + r.ID
+			about = "resume: ask batch --resume " + r.Label()
 		}
-		rows = append(rows, []string{r.ID, when(r.Created, now), state, model, elapsed, about})
+		id := "" // a named run's ID reaches it after a follow-up takes over the name
+		if r.Name != "" {
+			id = r.ID
+		}
+		rows = append(rows, []string{r.Label(), id, when(r.Created, now), state, model, elapsed, about})
 	}
 	keep := []int{}
 	for col := range headers {
-		visible := col == 0 || col == 2 || col == 5
+		visible := col == 0 || col == 3 || col == 6
 		for _, row := range rows {
 			if row[col] != "" {
 				visible = true
@@ -328,13 +332,13 @@ func Table(list []*runs.Run, now time.Time, color bool) string {
 		parts := []string{}
 		for _, col := range keep {
 			value := SafeText(row[col])
-			if col == 5 && length(value) > room {
+			if col == 6 && length(value) > room {
 				value = clip(value, room-1) + "…"
 			}
-			if col != 5 {
+			if col != 6 {
 				value += strings.Repeat(" ", widths[col]-length(value))
 			}
-			if color && !header && col == 2 {
+			if color && !header && col == 3 {
 				value = ColorStatus(value, row[col])
 			}
 			parts = append(parts, value)

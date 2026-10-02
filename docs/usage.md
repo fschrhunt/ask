@@ -50,7 +50,7 @@ When a write run's directory is in a git repository, ask compares the repository
 and reports what the run changed: in the status line, and in full with `ask show RUN --json`.
 
 ```text
-ask k3f9a2 · ok · Sonnet 5.5 · 41.2s · 3 files changed, 1 commit · 52.1k in · 2.0k out · $0.31
+ask fix-parser-bugs · ok · Sonnet 5.5 · 41.2s · 3 files changed, 1 commit · 52.1k in · 2.0k out · $0.31
 ```
 
 ```json
@@ -74,17 +74,18 @@ ask -m claude:sonnet-5.5 -w --worktree -C ~/code/app "Add rate limiting to the l
 ```
 
 ```text
-ask k3f9a2 · started · Sonnet 5.5 · write · worktree ~/.ask/worktrees/k3f9a2
-ask k3f9a2 · ok · Sonnet 5.5 · 3:05 · 4 files changed · branch ask/k3f9a2 · 120.4k in · 6.2k out
+ask add-rate-limiting-login · started · Sonnet 5.5 · write · worktree ~/.ask/worktrees/add-rate-limiting-login
+ask add-rate-limiting-login · ok · Sonnet 5.5 · 3:05 · 4 files changed · branch ask/add-rate-limiting-login · 120.4k in · 6.2k out
 ```
 
 The worktree starts from the repository's `HEAD`, at `~/.ask/worktrees/RUN`, on branch `ask/RUN`.
 If the run changed something, both are kept for you to review and merge:
 
 ```sh
-git -C ~/code/app diff main...ask/k3f9a2
-git -C ~/code/app merge ask/k3f9a2
-git -C ~/code/app worktree remove ~/.ask/worktrees/k3f9a2 && git -C ~/code/app branch -d ask/k3f9a2
+git -C ~/code/app diff main...ask/add-rate-limiting-login
+git -C ~/code/app merge ask/add-rate-limiting-login
+git -C ~/code/app worktree remove ~/.ask/worktrees/add-rate-limiting-login
+git -C ~/code/app branch -d ask/add-rate-limiting-login
 ```
 
 After all hook follow-ups, ask removes a worktree only when git reports it clean and its HEAD
@@ -144,28 +145,29 @@ ask honors boolean schemas (`false` rejects every answer) and checks `type`, `en
 answer that is not JSON, or does not match, fails the run with the reason:
 
 ```text
-ask k3f9a2 · failed · Sonnet 5.5 · 12.3s · answer does not match the schema: $.bugs[0]: missing "file"
+ask find-bugs-src-parser · failed · Sonnet 5.5 · 12.3s · answer does not match the schema: $.bugs[0]: missing "file"
 ```
 
 ## Follow-ups
 
-Every run gets an id. Continue the same agent conversation with `-c`; see [Runs](runs.md).
+Every run gets a name from its prompt. Continue the same agent conversation with `-c`; see
+[Runs](runs.md).
 
 ```sh
 ask -m claude:sonnet-5.5 "Why does the login test fail?"
-ask -c k3f9a2 -w "Fix it."
+ask -c login-test-fail -w "Fix it."
 ```
 
 ## Output
 
 - **stdout** has only the answer: text, or JSON under `--json`/`--schema`. It is safe to pipe.
 - **stderr** in a pipe has a status line when the run starts and one when it ends. Each begins
-  with the run's id. The first names the task after hooks, the second the model that ran, with the outcome, time,
+  with the run's name. The first names the task after hooks, the second the model that ran, with the outcome, time,
   what changed and usage when the agent reports it.
 
 ```text
-ask k3f9a2 · started · Sonnet 5.5 · read · ~/code/app
-ask k3f9a2 · ok · Sonnet 5.5 · 14.2s · 31.0k in · 812 out · $0.09
+ask login-test-fail · started · Sonnet 5.5 · read · ~/code/app
+ask login-test-fail · ok · Sonnet 5.5 · 14.2s · 31.0k in · 812 out · $0.09
 ```
 
 - **Exit code**: 0 on success, 1 when the run failed, 2 when ask was called wrong (the message says

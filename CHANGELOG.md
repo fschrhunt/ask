@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Runs are named after their prompt, like `login-test-fail`, and the name works wherever a run id
+  does: `ask -c login-test-fail`, `ask show`, `ask stop`, `--resume`, and worktree branches
+  (`ask/login-test-fail`). Every run keeps its fixed id too. A follow-up takes over its
+  conversation's name, so the name reaches the latest turn. A new `name` hook event lets a hook
+  choose names, for example with a fast model; the hooks page has one. `ask runs` adds an ID
+  column. Runs from before names keep their ids.
 - Docs examples are real and tested: a `verify` hook that runs any project's tests and has the
   agent fix failures, a `context` hook that tells agents where you are in git, a batch built from
   GitHub issues, the Claude Code title hook, and real sample output from runs and follow-ups.

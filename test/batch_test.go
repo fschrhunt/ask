@@ -89,9 +89,9 @@ func TestBatch(t *testing.T) {
 		s.run([]string{"batch", "-m", "fake:small"}, `[{"prompt":"fine"},{"prompt":"break"}]`, map[string]string{"FAKE_FAIL": "break"})
 		rows := strings.Split(strings.TrimSpace(s.ask("runs").stdout), "\n")
 		eq(t, len(rows), 3)
-		match(t, rows[0], `^RUN +STARTED +STATUS +MODEL +TIME +TASK$`)
-		match(t, rows[1], `^\w{6} .* 1/2 ok +2 tasks +fine$`)
-		match(t, rows[2], `^\w{6} .* ok +Fake 1\.0 +[\d.]+s +first question$`)
+		match(t, rows[0], `^RUN +ID +STARTED +STATUS +MODEL +TIME +TASK$`)
+		match(t, rows[1], `^fine +\w{6} .* 1/2 ok +2 tasks +fine$`)
+		match(t, rows[2], `^first-question +\w{6} .* ok +Fake 1\.0 +[\d.]+s +first question$`)
 	})
 	t.Run("runs shows an unfinished run whose ask is gone as stopped, with how to resume", func(t *testing.T) {
 		s := fresh(t)

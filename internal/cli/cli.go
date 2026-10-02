@@ -2,6 +2,7 @@
 package cli
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"github.com/fschrhunt/ask/internal/agent"
 	"github.com/fschrhunt/ask/internal/find"
 	"github.com/fschrhunt/ask/internal/home"
+	"github.com/fschrhunt/ask/internal/hooks"
 	"github.com/fschrhunt/ask/internal/packages"
 	"github.com/fschrhunt/ask/internal/process"
 	"github.com/fschrhunt/ask/internal/runs"
@@ -220,8 +222,38 @@ func readTasks(text string) ([]any, error) {
 }
 
 // prepare validates task fields and resolves follow-ups without starting model processes.
-func prepare(a *agent.Registry, items []any, defaults home.Object, id string, single bool) ([]home.Object, error) {
-	return runs.Prepare(a.Paths, items, defaults, id, single, func(where string) error { return home.Usage("%s needs a model (-m)", where) })
+func prepare(a *agent.Registry, items []any, defaults home.Object, label string, single bool) ([]home.Object, error) {
+	return runs.Prepare(a.Paths, items, defaults, label, single, func(where string) error { return home.Usage("%s needs a model (-m)", where) })
+}
+
+// runName names a new run before its tasks are prepared, so worktrees and branches carry it:
+// a single follow-up takes over its conversation's name; otherwise name hooks may rename the
+// first prompt's slug, and a number keeps it apart from earlier runs.
+func runName(a *agent.Registry, items []any, hooksOn bool) (string, []hooks.Note) {
+	prompts := []string{}
+	for _, item := range items {
+		t, _ := item.(home.Object)
+		prompts = append(prompts, home.String(t.Get("prompt")))
+	}
+	if len(items) == 1 {
+		t, _ := items[0].(home.Object)
+		if ref, ok := t.Get("continue").(string); ok {
+			if name := runs.Inherit(a.Paths, ref); name != "" {
+				return name, nil
+			}
+		}
+	}
+	name := runs.Slug(prompts[0])
+	var notes []hooks.Note
+	if hooksOn {
+		dir, _ := os.Getwd()
+		var chosen string
+		chosen, notes = hooks.New(a.Paths).Name(name, prompts, dir)
+		if clean := runs.Clean(chosen); clean != "" && chosen != name {
+			name = clean
+		}
+	}
+	return runs.Unique(a.Paths, name), notes
 }
 
 // reporter serializes complete status lines from parallel tasks to stderr.
@@ -271,7 +303,6 @@ func runOne(a *agent.Registry, opts home.Object, words []string) (int, error) {
 			return 0, e
 		}
 	}
-	id := runs.NewID()
 	t, e := taskOptions(opts)
 	if e != nil {
 		return 0, e
@@ -280,18 +311,24 @@ func runOne(a *agent.Registry, opts home.Object, words []string) (int, error) {
 	if opts.Has("-c") {
 		t.Set("continue", opts.Get("-c"))
 	}
-	tasks, e := prepare(a, []any{t}, nil, id, true)
+	id := runs.NewID()
+	name, notes := runName(a, []any{t}, !opts.B("--no-hooks"))
+	tasks, e := prepare(a, []any{t}, nil, cmp.Or(name, id), true)
 	if e != nil {
 		return 0, e
 	}
-	r, e := runs.Create(a.Paths, id, tasks)
+	r, e := runs.Create(a.Paths, id, name, tasks)
 	if e != nil {
 		return 0, e
 	}
 	live := status.NewLive(r, "", false)
-	process.OnStop(func() { live.Finish("ask "+r.ID+" · stopped", true) })
+	process.OnStop(func() { live.Finish("ask "+r.Label()+" · stopped", true) })
 	defer process.OnStop(nil)
-	results, e := runs.Execute(a, r, 1, !opts.B("--no-hooks"), reporter(a, r, live))
+	report := reporter(a, r, live)
+	for _, n := range notes {
+		report(runs.Event{Kind: "note", Note: n})
+	}
+	results, e := runs.Execute(a, r, 1, !opts.B("--no-hooks"), report)
 	final := ""
 	if e == nil {
 		final = status.Done(results[0])
@@ -319,6 +356,7 @@ func batch(a *agent.Registry, opts home.Object, words []string) (int, error) {
 	}
 	var r *runs.Run
 	var e error
+	var notes []hooks.Note
 	if opts.B("--resume") {
 		extra := []string{}
 		for key := range opts {
@@ -355,11 +393,13 @@ func batch(a *agent.Registry, opts home.Object, words []string) (int, error) {
 			return 0, e
 		}
 		id := runs.NewID()
-		tasks, e := prepare(a, items, defaults, id, false)
+		var name string
+		name, notes = runName(a, items, !opts.B("--no-hooks"))
+		tasks, e := prepare(a, items, defaults, cmp.Or(name, id), false)
 		if e != nil {
 			return 0, e
 		}
-		r, e = runs.Create(a.Paths, id, tasks)
+		r, e = runs.Create(a.Paths, id, name, tasks)
 		if e != nil {
 			return 0, e
 		}
@@ -376,9 +416,13 @@ func batch(a *agent.Registry, opts home.Object, words []string) (int, error) {
 	if live == nil {
 		fmt.Fprintln(os.Stderr, status.StyledLine(header, os.Stderr))
 	}
-	process.OnStop(func() { live.Finish("ask "+r.ID+" · stopped", true) })
+	process.OnStop(func() { live.Finish("ask "+r.Label()+" · stopped", true) })
 	defer process.OnStop(nil)
-	results, e := runs.Execute(a, r, jobs, !opts.B("--no-hooks"), reporter(a, r, live))
+	report := reporter(a, r, live)
+	for _, n := range notes {
+		report(runs.Event{Kind: "note", Note: n})
+	}
+	results, e := runs.Execute(a, r, jobs, !opts.B("--no-hooks"), report)
 	summary := status.BatchEnd(r, float64(time.Since(begin).Milliseconds())/1000)
 	live.Finish(summary, false)
 	if e != nil {
@@ -399,7 +443,7 @@ func batch(a *agent.Registry, opts home.Object, words []string) (int, error) {
 // show prints a saved answer or complete result without running its agent again.
 func show(p home.Paths, opts home.Object, words []string) (int, error) {
 	if len(words) != 1 {
-		return 0, home.Usage("ask show takes one run, like ask show k3f9a2")
+		return 0, home.Usage("ask show takes one run, like ask show login-checked")
 	}
 	r, i, e := runs.Open(p, words[0])
 	if e != nil {
@@ -434,7 +478,7 @@ func show(p home.Paths, opts home.Object, words []string) (int, error) {
 // stop resolves a run and reports whether its owner was stopped.
 func stop(p home.Paths, words []string) (int, error) {
 	if len(words) != 1 {
-		return 0, home.Usage("ask stop takes one run, like ask stop k3f9a2")
+		return 0, home.Usage("ask stop takes one run, like ask stop login-checked")
 	}
 	r, _, e := runs.Open(p, words[0])
 	if e != nil {
@@ -445,10 +489,10 @@ func stop(p home.Paths, words []string) (int, error) {
 		return 0, e
 	}
 	if stopped {
-		fmt.Fprintf(os.Stderr, "ask %s · stopped\n", r.ID)
+		fmt.Fprintf(os.Stderr, "ask %s · stopped\n", r.Label())
 		return 0, nil
 	}
-	fmt.Fprintf(os.Stderr, "ask %s · not running\n", r.ID)
+	fmt.Fprintf(os.Stderr, "ask %s · not running\n", r.Label())
 	return 1, nil
 }
 

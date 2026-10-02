@@ -178,11 +178,11 @@ Run inside ask's own repository:
 
 ```text
 $ ask -m claude:haiku-4.5 "Which file decides how ask formats its status lines? One sentence."
-ask m5y6qq · ok · Haiku 4.5 · 8.5s · 94.7k in · 439 out · $0.08
+ask file-decides-ask-formats · ok · Haiku 4.5 · 8.5s · 94.7k in · 439 out · $0.08
 The file `internal/status/status.go` formats ask's status lines, including event lines, completion
 status, and batch summaries.
-$ ask -c m5y6qq "Which function in it formats the usage part, like '31.0k in · 812 out'?"
-ask htt4g7 · ok · Haiku 4.5 · 6.0s · 34.9k in · 362 out · $0.08
+$ ask -c file-decides-ask-formats "Which function in it formats the usage part, like '31.0k in · 812 out'?"
+ask file-decides-ask-formats · ok · Haiku 4.5 · 6.0s · 34.9k in · 362 out · $0.08
 The `Usage` function formats token usage and optional cost in the pattern "input in · output out".
 ```
 

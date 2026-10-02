@@ -259,7 +259,7 @@ func jsonEqual(t *testing.T, got any, want any) {
 }
 func runID(t *testing.T, stderr string) string {
 	t.Helper()
-	m := regexp.MustCompile(`(?m)^ask (\w{6}) `).FindStringSubmatch(stderr)
+	m := regexp.MustCompile(`(?m)^ask ([\w-]+) `).FindStringSubmatch(stderr)
 	if m == nil {
 		t.Fatalf("no run id: %s", stderr)
 	}

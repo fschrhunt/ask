@@ -1,4 +1,4 @@
-// Package hooks implements ordered task/result hooks with fail-open errors and cached declarations.
+// Package hooks implements ordered task, result, title and name hooks with fail-open errors and cached declarations.
 package hooks
 
 import (
@@ -194,4 +194,20 @@ func (h *Hooks) Title(title string, command []string, description, dir string) (
 		}
 	}
 	return title, all
+}
+
+// Name lets declared hooks rename a new run from its prompts; failures keep the name and return notes.
+func (h *Hooks) Name(name string, prompts []string, dir string) (string, []Note) {
+	all := []Note{}
+	for _, x := range h.forEvent("name") {
+		answer := h.call(x.Path, "name", struct {
+			Name    string   `json:"name"`
+			Prompts []string `json:"prompts"`
+		}{name, prompts}, dir, "")
+		all = notes(answer, x.Name, all)
+		if next := strings.TrimSpace(answer.S("name")); next != "" && !answer.B("error") {
+			name = next
+		}
+	}
+	return name, all
 }

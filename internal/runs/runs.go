@@ -26,9 +26,30 @@ import (
 )
 
 // Run is a saved run with immutable tasks and position-matched results (nil means unfinished).
+// ID never changes; Name is the run's readable handle, shared by its follow-ups, and may be empty.
 type Run struct {
-	ID, Dir, Created string
-	Tasks, Results   []home.Object
+	ID, Name, Dir, Created string
+	Tasks, Results         []home.Object
+}
+
+// Label is the name people and agents use for a run: its Name, or its ID when it has none.
+func (r *Run) Label() string {
+	if r.Name != "" {
+		return r.Name
+	}
+	return r.ID
+}
+
+// folder splits a run folder STAMP-ID[-NAME]; folders from before names have no NAME.
+func folder(n string) (created, id, name string) {
+	parts := strings.SplitN(n, "-", 3)
+	if len(parts) < 2 {
+		return "", n, ""
+	}
+	if len(parts) == 3 {
+		name = parts[2]
+	}
+	return parts[0], parts[1], name
 }
 
 // NewID returns six lowercase letters and digits.
@@ -48,12 +69,12 @@ func NewID() string {
 	return string(b)
 }
 
-// Ref names a single task as RUN, or a batch task as RUN/TASK.
+// Ref names a single task by its run's label, or a batch task as LABEL/TASK.
 func Ref(r *Run, index int) string {
 	if len(r.Tasks) == 1 {
-		return r.ID
+		return r.Label()
 	}
-	return r.ID + "/" + r.Tasks[index].S("id")
+	return r.Label() + "/" + r.Tasks[index].S("id")
 }
 
 // load reads task-position results and refuses damaged results instead of silently rerunning them.
@@ -83,21 +104,19 @@ func load(dir string) (*Run, error) {
 		return nil, err
 	}
 
-	name := filepath.Base(dir)
-	at := strings.LastIndex(name, "-")
-	id, created := name, ""
-	if at >= 0 {
-		id = name[at+1:]
-		created = name[:at]
-	}
-	return &Run{id, dir, created, tasks, results}, nil
+	created, id, name := folder(filepath.Base(dir))
+	return &Run{id, name, dir, created, tasks, results}, nil
 }
 
-// Create writes prepared tasks once and returns their run folder.
-func Create(p home.Paths, id string, tasks []home.Object) (*Run, error) {
+// Create writes prepared tasks once and returns their run folder; name may be empty.
+func Create(p home.Paths, id, name string, tasks []home.Object) (*Run, error) {
 	stamp := time.Now().UTC().Format("20060102T150405.000")
 	stamp = strings.ReplaceAll(stamp, ".", "")
-	dir := filepath.Join(p.Runs, stamp+"-"+id)
+	base := stamp + "-" + id
+	if name != "" {
+		base += "-" + name
+	}
+	dir := filepath.Join(p.Runs, base)
 	if e := os.MkdirAll(dir, 0700); e != nil {
 		return nil, e
 	}
@@ -121,9 +140,13 @@ func Open(p home.Paths, ref string) (*Run, int, error) {
 	id, part, has := strings.Cut(ref, "/")
 	name := ""
 	for _, n := range find.List(p.Runs) {
-		if n == id || strings.HasSuffix(n, "-"+id) {
+		_, runID, runName := folder(n)
+		if n == id || runID == id {
 			name = n
 			break
+		}
+		if runName == id {
+			name = n // folders sort oldest first, so the newest run with this name wins
 		}
 	}
 	if id == "" || name == "" {
@@ -215,7 +238,7 @@ func lock(r *Run) (*os.File, error) {
 	}
 	if err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		f.Close()
-		return nil, home.Usage("run %s is running (pid %d); stop it with `ask stop %s`", r.ID, Owner(r), r.ID)
+		return nil, home.Usage("run %s is running (pid %d); stop it with `ask stop %s`", r.Label(), Owner(r), r.Label())
 	}
 	if err = f.Chmod(0600); err != nil {
 		f.Close()
@@ -232,7 +255,8 @@ func lock(r *Run) (*os.File, error) {
 }
 
 // Prepare validates task fields and inherits a followed-up task's agent, access and location.
-func Prepare(p home.Paths, items []any, defaults home.Object, id string, single bool, missing func(string) error) ([]home.Object, error) {
+// New worktrees are named after label, the run's name or ID.
+func Prepare(p home.Paths, items []any, defaults home.Object, label string, single bool, missing func(string) error) ([]home.Object, error) {
 	out := []home.Object{}
 	for i, item := range items {
 		where := fmt.Sprintf("task %d", i+1)
@@ -299,7 +323,7 @@ func Prepare(p home.Paths, items []any, defaults home.Object, id string, single 
 				return nil, e
 			}
 			if at < 0 {
-				return nil, home.Usage("run %s has %d tasks; continue one of them, like %s/%s", prev.ID, len(prev.Tasks), prev.ID, prev.Tasks[0].S("id"))
+				return nil, home.Usage("run %s has %d tasks; continue one of them, like %s/%s", prev.Label(), len(prev.Tasks), prev.Label(), prev.Tasks[0].S("id"))
 			}
 			old, result := prev.Tasks[at], prev.Results[at]
 			if !result.B("session") {
@@ -333,7 +357,7 @@ func Prepare(p home.Paths, items []any, defaults home.Object, id string, single 
 			x.Set("session", result.Get("session"))
 			x.Set("continues", Ref(prev, at))
 		} else if t.B("worktree") {
-			name := id
+			name := label
 			if !single {
 				name += "-" + strconv.Itoa(i+1) + "-" + safeWorktreeID(taskID)
 			}

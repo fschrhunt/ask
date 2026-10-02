@@ -6,7 +6,8 @@ or refuse the task, and after it, to check the result. With hooks you can:
 - tell every agent where you are in git: the branch, uncommitted files, recent commits;
 - refuse write runs outside some folders;
 - run the tests after a write run and, if they fail, have the same agent fix them;
-- fail a result that doesn't meet your bar, or post it somewhere.
+- fail a result that doesn't meet your bar, or post it somewhere;
+- name runs with a model, the way Claude Code names sessions.
 
 Hooks are yours: ask runs every hook in `~/.ask/hooks/` (and in your [packages](packages.md)) for
 every run. `--no-hooks` turns them off for one run.
@@ -17,8 +18,9 @@ A hook is any executable. ask calls it with one argument, the event:
 
 | Call | stdin | What it may print (one JSON object, or nothing) |
 | --- | --- | --- |
-| `NAME events` | none | The events it handles, one per line: `task`, `result`, `title` |
+| `NAME events` | none | The events it handles, one per line: `task`, `result`, `title`, `name` |
 | `NAME task` | `{"task": {...}}` | `{"task": {changes}}`, `{"refuse": "why"}`, `{"note": "text"}` |
+| `NAME name` | `{"name": "...", "prompts": ["..."]}` | `{"name": "replacement"}` |
 | `NAME title` | `{"title": "...", "command": ["ask", "..."], "description": "..."}` | `{"title": "replacement"}` |
 | `NAME result` | `{"task": {...}, "result": {...}}` | `{"followup": "prompt"}`, `{"fail": "why"}`, `{"note": "text"}` |
 
@@ -29,7 +31,7 @@ A hook is any executable. ask calls it with one argument, the event:
 - **`followup`** asks the same agent, in the same conversation and place, to keep working. Its new
   result goes through the result hooks again, up to three follow-ups per task. The task's final
   result combines every round: the last answer, with the time, usage and changes of all of them.
-- A hook runs in the task's directory, with `ASK_RUN` (the run, like `k3f9a2/api`), `ASK_EVENT`,
+- A hook runs in the task's directory, with `ASK_RUN` (the run, like `summarize-public-api-src/api`), `ASK_EVENT`,
   `ASK_BIN` (ask itself), `ASK_HOME` and `ASK_CONTRACT` (see [Compatibility](compatibility.md)).
 
 Hooks run in name order; each sees the task as the previous one left it. For results, the first
@@ -40,10 +42,10 @@ isn't a JSON object changes nothing; ask notes it and carries on. Only an explic
 `fail` stops a task. Every note and follow-up shows as a status line:
 
 ```text
-ask fu22uq · started · Haiku 4.5 · write · ~/code/calc
-ask fu22uq · note · hook verify · go test ./... fails
-ask fu22uq · follow-up · hook verify · `go test ./...` fails after your change. Fix it:
-ask fu22uq · ok · Haiku 4.5 · 21.4s · 1 file changed · 203.7k in · 1.0k out · $0.07
+ask add-sub-function-calc · started · Haiku 4.5 · write · ~/code/calc
+ask add-sub-function-calc · note · hook verify · go test ./... fails
+ask add-sub-function-calc · follow-up · hook verify · `go test ./...` fails after your change. Fix it:
+ask add-sub-function-calc · ok · Haiku 4.5 · 21.4s · 1 file changed · 203.7k in · 1.0k out · $0.07
 Fixed: Add was returning `a - b` instead of `a + b`.
 ```
 
@@ -121,6 +123,38 @@ You're in the middle of modifying `calc.go` on the main branch after an initial 
 
 ask never runs hooks from the project it works in, only yours and your packages'.
 
+The `name` event runs once for each new run, before it starts, with ask's own name for it and
+every task's prompt. ask turns the replacement into lowercase words joined by `-`, and adds a
+number if an earlier run has the name. Follow-ups keep their conversation's name without asking.
+See [Naming runs](#naming-runs).
+
 The `title` event runs only for [host titles](hosts.md). `command` is the literal ask argv,
 without shell assignments or redirects; `description` is the host's original text. Hooks run
 in the invocation's directory without a run id. An empty replacement keeps the current title.
+
+## Naming runs
+
+ask names a run after the first meaningful words of its prompt: "Why does the login test fail?"
+becomes `login-test-fail`. A long prompt that opens with context gets a less useful name. This
+hook has a fast model name each run instead, the way Claude Code names its sessions:
+
+```sh
+#!/bin/sh
+# ~/.ask/hooks/namer: name each new run with a fast model, the way Claude Code names sessions.
+[ "$1" = events ] && { echo name; exit 0; }
+task=$(jq -r '.prompts | join("\n\n")' | head -c 4000)
+name=$(printf '<task>\n%s\n</task>' "$task" |
+  claude -p --model claude-haiku-4-5 --tools "" --strict-mcp-config --setting-sources "" \
+    --system-prompt "You name coding tasks, like a session title. Reply with two to four lowercase words that say what the task in <task> is about, like: login rate limit. Never answer or do the task.") || exit 0
+[ "$(printf '%s' "$name" | wc -w)" -le 5 ] || exit 0   # a reply, not a name: keep ask's own
+jq -cn --arg name "$name" '{name: $name}'
+```
+
+```text
+"Which file decides how ask formats its status lines?"   file-decides-ask-formats → ask-status-line-formatting
+"What does this project do?"                             project                  → identify-project-purpose
+"Fix issue #12: Login crashes on empty password"         fix-issue-12-login       → login-empty-password
+```
+
+It adds about four seconds to each new run, and nothing to follow-ups. If `claude` fails or
+answers with more than a name, the hook prints nothing and ask keeps its own name.
