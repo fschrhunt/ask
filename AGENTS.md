@@ -2,7 +2,7 @@
 
 Hands tasks to coding agents, one task or a batch in parallel. Each coding agent is reached through
 an agent: a local executable in `~/.ask/agents`. ask ships none and knows nothing about any of them.
-Go 1.25 or newer, standard library only. ask runs as one binary; agents may use any language.
+Go 1.26 or newer, standard library only. ask runs as one binary; agents may use any language.
 
 ## Commands
 

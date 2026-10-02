@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Built with Go 1.27; building from source needs Go 1.26 or newer.
 - Preserve caller stdin for argument prompts; keep worktrees whenever git sees changes or a
   moved HEAD, and report mode, symlink and newline-named file changes. Worktrees preserve the
   caller's subdirectory through symlinked paths, and batch tasks always get distinct branches.

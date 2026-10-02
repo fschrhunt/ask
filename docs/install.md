@@ -20,7 +20,7 @@ Make sure `~/.local/bin` is on your `PATH`.
 
 ## With Go
 
-Go 1.25 or newer can build and install ask:
+Go 1.26 or newer can build and install ask:
 
 ```sh
 go install github.com/fschrhunt/ask/cmd/ask@latest
