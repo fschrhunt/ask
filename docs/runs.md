@@ -27,12 +27,13 @@ ask -c login-test-fail "Now add a test for the expired-token case."
 ```
 
 A follow-up is a new run that takes over the conversation's name, so the name always reaches the
-latest turn. An earlier turn is still reachable by its id. A follow-up to a batch task is named
-`RUN-TASK`.
+latest turn. An earlier turn is still reachable by its id. A follow-up to a batch task starts its
+own line of turns, named `RUN-TASK` (or `RUN-TASK-2` and so on when another run has that name).
 
 A follow-up:
 
-- runs where the first run ran: the same directory, or the same worktree if it is still present;
+- runs where the first run ran: the same directory, or the same worktree if it is still present.
+  `--worktree` can't move a follow-up of a run in your checkout into a worktree; ask refuses it;
 - keeps the model and access (`-r`/`-w`) unless you give new ones. The model may change within
   the same agent (`-c login-test-fail -m claude:haiku-4.5`), but not to another agent;
 - can continue a run that failed or timed out, so the agent can finish what it started;
@@ -40,8 +41,8 @@ A follow-up:
 
 A batch task can be a follow-up too, with `"continue": "RUN"` (see [Batches](batches.md)).
 
-Continuing needs an agent that reports sessions (see [Agents](agents.md#sessions)); ask says
-so when one doesn't.
+Continuing needs an agent that reports sessions (see [Agents](agents.md#sessions)) and a run that
+has finished; ask says so when either is missing.
 
 ## Listing
 
@@ -76,7 +77,7 @@ Showing a whole batch prints its outcome count on stderr and exits 1 if any task
 ## Stopping a run
 
 `ask stop RUN` stops a run going in another terminal or in the background, and every agent it
-started. It waits up to 10 seconds for them to exit.
+started. It waits up to 10 seconds for them to exit, and fails if ask is still running then.
 
 ```sh
 ask stop login-test-fail
@@ -94,7 +95,7 @@ name (runs from before names have none):
 ~/.ask/runs/20261001T140912345-k3f9a2-login-test-fail/
 ├── tasks.json     the tasks, as they were given
 ├── results.json   the results so far, rewritten whole after each task
-└── lock           the ask pid, valid only while ask holds its operating system lock
+└── lock           held with an operating system lock while ask runs the run; the kernel names its pid
 ```
 
 ask creates new run directories with mode 0700 and records with mode 0600. Delete old folders

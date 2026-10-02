@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -126,7 +125,7 @@ func Create(p home.Paths, id, name string, tasks []home.Object) (*Run, error) {
 	return load(dir)
 }
 
-// Open resolves RUN[/TASK] or a directory; index -1 selects all results.
+// Open resolves RUN[/TASK] or a directory; index -1 selects all results of a batch.
 func Open(p home.Paths, ref string) (*Run, int, error) {
 	if strings.HasPrefix(ref, ".") || strings.HasPrefix(ref, "/") || strings.HasPrefix(ref, "~") {
 		info, e := os.Stat(ref)
@@ -135,7 +134,13 @@ func Open(p home.Paths, ref string) (*Run, int, error) {
 		}
 		dir, _ := filepath.Abs(ref)
 		r, e := load(dir)
-		return r, -1, e
+		if e != nil {
+			return nil, -1, e
+		}
+		if len(r.Tasks) == 1 {
+			return r, 0, nil
+		}
+		return r, -1, nil
 	}
 	id, part, has := strings.Cut(ref, "/")
 	name := ""
@@ -185,10 +190,11 @@ func Open(p home.Paths, ref string) (*Run, int, error) {
 
 var digits = regexp.MustCompile(`^\d+$`)
 
-// safeWorktreeID replaces characters unsafe in branch names and filesystem paths.
+// safeWorktreeID replaces characters unsafe in branch names and filesystem paths, dots included,
+// since git refuses names like v1..v2, api.lock and 1.0.
 func safeWorktreeID(id string) string {
 	return strings.Map(func(r rune) rune {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || strings.ContainsRune("_.-", r) {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || strings.ContainsRune("_-", r) {
 			return r
 		}
 		return '_'
@@ -204,50 +210,33 @@ func Alive(pid int) bool {
 	return e == nil || e == syscall.EPERM
 }
 
-// Owner reports a run owner only while the operating system lock is held.
+// Owner returns the pid holding a run's lock, asking the kernel without taking the lock,
+// or 0 when no other process holds it.
 func Owner(r *Run) int {
-	f, err := os.OpenFile(filepath.Join(r.Dir, "lock"), os.O_RDONLY, 0)
+	f, err := os.Open(filepath.Join(r.Dir, "lock"))
 	if err != nil {
 		return 0
 	}
 	defer f.Close()
-	err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
-	if err == nil {
-		syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+	held := syscall.Flock_t{Type: syscall.F_WRLCK}
+	if syscall.FcntlFlock(f.Fd(), syscall.F_GETLK, &held) != nil || held.Type == syscall.F_UNLCK {
 		return 0
 	}
-	if err != syscall.EWOULDBLOCK && err != syscall.EAGAIN {
-		return 0
-	}
-	b, err := io.ReadAll(f)
-	if err != nil {
-		return 0
-	}
-	pid, err := strconv.Atoi(strings.TrimSpace(string(b)))
-	if err != nil || pid <= 0 {
-		return 0
-	}
-	return pid
+	return int(held.Pid)
 }
 
-// lock takes an exclusive kernel lock for the complete execution of a run.
+// lock takes an exclusive kernel record lock for the complete execution of a run.
+// The lock belongs to this process: closing any other descriptor of the file here would drop it.
 func lock(r *Run) (*os.File, error) {
 	f, err := os.OpenFile(filepath.Join(r.Dir, "lock"), os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
 		return nil, err
 	}
-	if err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+	if err = syscall.FcntlFlock(f.Fd(), syscall.F_SETLK, &syscall.Flock_t{Type: syscall.F_WRLCK}); err != nil {
 		f.Close()
 		return nil, home.Usage("run %s is running (pid %d); stop it with `ask stop %s`", r.Label(), Owner(r), r.Label())
 	}
 	if err = f.Chmod(0600); err != nil {
-		f.Close()
-		return nil, err
-	}
-	if err = f.Truncate(0); err == nil {
-		_, err = f.WriteString(strconv.Itoa(os.Getpid()))
-	}
-	if err != nil {
 		f.Close()
 		return nil, err
 	}
@@ -297,7 +286,7 @@ func Prepare(p home.Paths, items []any, defaults home.Object, label string, sing
 		if t.Has("timeout") {
 			n, ok := t.Get("timeout").(float64)
 			if !ok || !(n > 0 && n <= 2000000) {
-				return nil, home.Usage("%s: timeout must be a number of seconds above 0", where)
+				return nil, home.Usage("%s: timeout must be a number of seconds above 0, at most 2000000", where)
 			}
 			timeout = n
 		}
@@ -326,6 +315,9 @@ func Prepare(p home.Paths, items []any, defaults home.Object, label string, sing
 				return nil, home.Usage("run %s has %d tasks; continue one of them, like %s/%s", prev.Label(), len(prev.Tasks), prev.Label(), prev.Tasks[0].S("id"))
 			}
 			old, result := prev.Tasks[at], prev.Results[at]
+			if result == nil {
+				return nil, home.Usage("%s cannot be continued: it has not finished", t.S("continue"))
+			}
 			if !result.B("session") {
 				return nil, home.Usage("%s cannot be continued: its agent reported no session", t.S("continue"))
 			}
@@ -353,6 +345,12 @@ func Prepare(p home.Paths, items []any, defaults home.Object, label string, sing
 			x.Set("dir", old.Get("dir"))
 			if old.Has("worktree") {
 				x.Set("worktree", old.Get("worktree"))
+			}
+			if kept, ok := result.Get("worktree").(home.Object); ok {
+				x.Set("worktree", filepath.Base(kept.S("path")))
+			}
+			if t.B("worktree") && !x.B("worktree") {
+				return nil, home.Usage("%s: a follow-up runs where %s ran, which is not a worktree; drop --worktree", where, t.S("continue"))
 			}
 			x.Set("session", result.Get("session"))
 			x.Set("continues", Ref(prev, at))
@@ -401,7 +399,7 @@ func chain(first, second string) string {
 	return second
 }
 
-// AddUsage sums usage objects, keeping cost only when one reports it; nil when none has usage.
+// AddUsage sums usage objects, keeping each count and cost only when one reports it; nil when none has usage.
 func AddUsage(list ...any) any {
 	var sum home.Object
 	for _, v := range list {
@@ -412,11 +410,10 @@ func AddUsage(list ...any) any {
 		if sum == nil {
 			sum = home.Object{}
 		}
-		for _, key := range []string{"input", "output", "cached"} {
-			sum.Set(key, sum.N(key)+part.N(key))
-		}
-		if part.Has("cost") {
-			sum.Set("cost", sum.N("cost")+part.N("cost"))
+		for _, key := range []string{"input", "output", "cached", "cost"} {
+			if part.Has(key) {
+				sum.Set(key, sum.N(key)+part.N(key))
+			}
 		}
 	}
 	if sum == nil {
@@ -549,6 +546,9 @@ func withHooks(a *agent.Registry, h *hooks.Hooks, t home.Object, ref string, rep
 		}
 		report(Event{Kind: "followup", Note: *followup})
 		next := t.Clone()
+		if worktree != nil {
+			next.Set("worktree", filepath.Base(worktree.Path))
+		}
 		next.Set("prompt", followup.Text)
 		next.Set("session", result.Get("session"))
 		earlier = result.Get("usage")
@@ -667,7 +667,8 @@ func Recent(p home.Paths, limit int) []*Run {
 	return out
 }
 
-// Stop sends SIGTERM to the live run owner and waits up to ten seconds for shutdown.
+// Stop sends SIGTERM to the live run owner and waits up to ten seconds for it to release the run;
+// it returns false when nothing was running and an error when the owner outlives the wait.
 func Stop(r *Run) (bool, error) {
 	pid := Owner(r)
 	if pid == 0 {
@@ -676,8 +677,11 @@ func Stop(r *Run) (bool, error) {
 	if e := syscall.Kill(pid, syscall.SIGTERM); e != nil {
 		return false, e
 	}
-	for i := 0; i < 200 && Alive(pid); i++ {
+	for i := 0; i < 200 && Owner(r) == pid; i++ {
 		time.Sleep(50 * time.Millisecond)
+	}
+	if Owner(r) == pid {
+		return false, fmt.Errorf("run %s did not stop within 10 seconds (pid %d)", r.Label(), pid)
 	}
 	return true, nil
 }

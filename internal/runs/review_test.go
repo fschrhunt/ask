@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"testing"
+
+	"github.com/fschrhunt/ask/internal/home"
 )
 
 // TestOwnerRequiresHeldLock treats a stale PID, even a reused live PID, as idle.
@@ -17,4 +19,12 @@ func TestOwnerRequiresHeldLock(t *testing.T) {
 		t.Fatalf("stale lock owned by %d", got)
 	}
 
+}
+
+// TestAddUsageKeepsOnlyReported never invents zero token counts for an agent that reports only cost.
+func TestAddUsageKeepsOnlyReported(t *testing.T) {
+	got := home.JSON(AddUsage(home.O("cost", 0.5), home.O("cost", 0.25)), false)
+	if got != `{"cost":0.75}` {
+		t.Fatal(got)
+	}
 }

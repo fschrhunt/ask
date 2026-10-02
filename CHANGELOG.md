@@ -8,6 +8,18 @@
   name; installing a different source where a package is installed fails instead of updating it.
 - A task hook's `refuse` or a result hook's `fail` that is not a string is noted instead of
   silently ignored.
+- Follow-ups and runs fixed: `-c RUN --worktree` (or `"worktree": true` with `"continue"`) is
+  refused for a run in your checkout instead of writing there; a batch task's follow-up never takes
+  the batch's or another run's name; `-c` accepts a single run's folder and says when a run has
+  not finished; a timeout above 2000000 seconds says so.
+- Worktrees: parallel runs with the same name each claim their own worktree and branch, and task
+  ids with dots (`v1..v2`, `api.lock`) give valid branch names. ask's own git calls ignore a
+  `core.fsmonitor` a write run sets.
+- `ask stop` fails when the run is still going after 10 seconds instead of saying `stopped`.
+  Checking whether a run is running no longer takes its lock, so `ask runs` or `ask stop` can't
+  make a concurrent `--resume` fail; the lock file no longer holds a pid, as the kernel reports it.
+  Usage sums keep only the counts an agent reported, so a cost-only agent shows no zero tokens.
+
 - The live view shows tokens and cost while agents run, and a batch's footer keeps a running
   total. ask reads an agent's report as the agent rewrites it; agents that report usage only at
   the end show it at the end, as before. Plain status lines are unchanged.

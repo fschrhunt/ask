@@ -78,7 +78,8 @@ ask add-rate-limiting-login · started · Sonnet 5.5 · write · worktree ~/.ask
 ask add-rate-limiting-login · ok · Sonnet 5.5 · 3:05 · 4 files changed · branch ask/add-rate-limiting-login · 120.4k in · 6.2k out
 ```
 
-The worktree starts from the repository's `HEAD`, at `~/.ask/worktrees/RUN`, on branch `ask/RUN`.
+The worktree starts from the repository's `HEAD`, at `~/.ask/worktrees/RUN`, on branch `ask/RUN`
+(`RUN-2` and so on if another run's worktree has that name, so parallel runs never share one).
 If the run changed something, both are kept for you to review and merge:
 
 ```sh

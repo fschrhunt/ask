@@ -14,8 +14,9 @@ import (
 )
 
 // git returns output and success, silently handling repositories without a HEAD.
+// It turns off core.fsmonitor, so a write run cannot plant a command for ask's own git calls to run.
 func git(dir string, args []string, input string) (string, bool) {
-	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+	cmd := exec.Command("git", append([]string{"-C", dir, "-c", "core.fsmonitor=false"}, args...)...)
 	cmd.Stdin = strings.NewReader(input)
 	if len(args) > 0 && args[0] != "worktree" && args[0] != "branch" {
 		cmd.Env = append(os.Environ(), "GIT_OPTIONAL_LOCKS=0")
@@ -187,27 +188,37 @@ type Worktree struct {
 	Dirty                   bool
 }
 
-// Add creates a branch from HEAD or reuses a follow-up's worktree at the recorded name.
-func Add(p home.Paths, dir, name string) (*Worktree, error) {
+// Add creates a worktree on branch ask/NAME from HEAD at name, or at name-2, name-3 and so on when
+// another task already has that folder; it claims the folder atomically, so parallel tasks never
+// share one. reuse is for follow-ups: they continue the worktree at name, recreating it if removed.
+func Add(p home.Paths, dir, name string, reuse bool) (*Worktree, error) {
 	root, ok := git(dir, []string{"rev-parse", "--show-toplevel"}, "")
 	root = home.Trim(root)
 	if !ok || root == "" {
 		return nil, fmt.Errorf("--worktree needs a git repository; %s is not in one", dir)
 	}
+	if e := os.MkdirAll(p.Worktrees, 0700); e != nil {
+		return nil, e
+	}
 	path := filepath.Join(p.Worktrees, name)
-	branch := "ask/" + name
-	if _, e := os.Stat(path); e != nil {
-		if e = os.MkdirAll(p.Worktrees, 0700); e != nil {
-			return nil, e
-		}
+	e := os.Mkdir(path, 0700)
+	for i := 2; os.IsExist(e) && !reuse; i++ {
+		path = filepath.Join(p.Worktrees, name+"-"+strconv.Itoa(i))
+		e = os.Mkdir(path, 0700)
+	}
+	branch := "ask/" + filepath.Base(path)
+	if e == nil {
 		_, exists := git(root, []string{"rev-parse", "--verify", "-q", "refs/heads/" + branch}, "")
 		args := []string{"worktree", "add", path, branch}
 		if !exists {
 			args = []string{"worktree", "add", "-b", branch, path, "HEAD"}
 		}
 		if _, ok := git(root, args, ""); !ok {
+			os.Remove(path)
 			return nil, fmt.Errorf("could not create a worktree for %s; does it have a commit?", root)
 		}
+	} else if !os.IsExist(e) {
+		return nil, e
 	}
 	prefix, ok := git(dir, []string{"rev-parse", "--show-prefix"}, "")
 	if !ok {
