@@ -27,6 +27,9 @@ Go 1.26 or newer, standard library only. ask runs as one binary; agents may use 
   - `git`: what a write run changed, and worktrees.
   - `process`: process groups, timeouts, stopping everything on SIGINT/SIGTERM; Linux parent-death signals.
   - `status`: status lines and the `ask runs` table.
+  - `setup`: what `ask setup` offers: official agents and their CLIs, the ask skill per app,
+    Claude Code's title hook.
+  - `tui`: gh-style terminal prompts (confirm, select, multi-select, input) and raw mode.
   - `schema`: the `--schema` check.
   - `home`: `~/.ask` paths, the contract environment, `models.json` and `settings.json`, atomic JSON writes,
     typed JSON records and readable encoding, `UsageError`.

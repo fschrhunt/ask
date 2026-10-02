@@ -74,3 +74,45 @@ func (s *setup) runIn(dir string, args ...string) output {
 	defer func() { s.cwd = "" }()
 	return s.ask(args...)
 }
+
+// TestSetupCommand pins ask setup for machines: its report, its exit status and its flags.
+func TestSetupCommand(t *testing.T) {
+	t.Run("--check reports every agent and setting, and exits 1 while an installed agent cannot run", func(t *testing.T) {
+		s := fresh(t)
+		r := s.ask("setup", "--check")
+		eq(t, r.code, 0)
+		match(t, r.stdout, `(?m)^  ✓ fake +ready · \d+ models?$`)
+		match(t, r.stdout, `(?m)^  timeout +900 \(default\)$`)
+		s.script("agents", "claude", `echo "Claude Code not found: install it" >&2; exit 1`)
+		r = s.ask("setup", "--check", "--json")
+		eq(t, r.code, 1)
+		match(t, r.stdout, `"reason": "Claude Code not found: install it"`)
+	})
+	t.Run("flags set defaults, skills and the Claude Code hook without asking", func(t *testing.T) {
+		s := fresh(t)
+		s.mkdir(filepath.Join(s.tmp, ".claude"))
+		r := s.ask("setup", "--model", "fake:small", "-j", "6", "--worktrees", "~/wt/ask-{name}", "--skills", "claude-code", "--hook")
+		eq(t, r.code, 0)
+		settings := obj(t, s.read(filepath.Join(s.home, "settings.json")))
+		eq(t, settings.s("model")+" "+settings.s("worktrees"), "fake:small ~/wt/ask-{name}")
+		eq(t, settings.n("jobs"), 6.0)
+		match(t, s.read(filepath.Join(s.tmp, ".claude", "skills", "ask", "SKILL.md")), `(?m)^name: ask$`)
+		match(t, s.read(filepath.Join(s.tmp, ".claude", "settings.json")), `"command": "ask title --hook"`)
+		eq(t, s.ask("-C", s.tmp, "hi").stdout, "fake: hi\n")
+		eq(t, s.ask("setup", "-m", "").code, 0)
+		eq(t, strings.Contains(s.read(filepath.Join(s.home, "settings.json")), "model"), false)
+	})
+	t.Run("bad values and flag combinations are usage errors", func(t *testing.T) {
+		s := fresh(t)
+		for _, args := range [][]string{{"setup", "-j", "0"}, {"setup", "--json"}, {"setup", "--hook", "--no-hook"}, {"setup", "--skills", "emacs"}, {"setup", "extra"}} {
+			eq(t, s.ask(args...).code, 2)
+		}
+	})
+	t.Run("without a terminal or flags it reports and says how to change things", func(t *testing.T) {
+		s := fresh(t)
+		r := s.ask("setup")
+		eq(t, r.code, 0)
+		match(t, r.stdout, `(?m)^Agents$`)
+		match(t, r.stderr, `run ask setup in a terminal`)
+	})
+}

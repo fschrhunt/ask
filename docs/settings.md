@@ -1,7 +1,8 @@
 # Settings
 
 `~/.ask/settings.json` (or `$ASK_HOME/settings.json`) holds your defaults. Every key is optional;
-without the file, ask uses the built-in defaults below.
+without the file, ask uses the built-in defaults below. `ask setup` changes them for you, in a
+terminal or with flags (see [Setup](setup.md)), or edit the file.
 
 ```json
 {

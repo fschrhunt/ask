@@ -44,7 +44,7 @@ is on your `PATH`. See [Install](docs/install.md) for checksums and updates.
 ### Use
 
 ```sh
-ask install claude codex                            # agents for the CLIs you use
+ask setup                                           # connect your agents, set defaults
 ask models                                          # what you can run here
 ask -m claude:sonnet-5.5 "Why does the login test fail?"  # read-only, the default
 ask -c login-test-fail -w "Fix it, then run the test." # follow up: same agent, same conversation
@@ -82,7 +82,7 @@ stay stable across releases.
 ### Docs
 
 [Install](docs/install.md) · [Usage](docs/usage.md) · [Runs](docs/runs.md) ·
-[Batches](docs/batches.md) · [Models](docs/models.md) · [Settings](docs/settings.md) · [Agents](docs/agents.md) ·
+[Setup](docs/setup.md) · [Batches](docs/batches.md) · [Models](docs/models.md) · [Settings](docs/settings.md) · [Agents](docs/agents.md) ·
 [Hosts](docs/hosts.md) · [Hooks](docs/hooks.md) · [Commands](docs/commands.md) · [Packages](docs/packages.md) ·
 [Compatibility](docs/compatibility.md)
 
