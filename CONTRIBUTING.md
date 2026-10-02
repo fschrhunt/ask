@@ -4,7 +4,7 @@ Smallness is the point: no dependencies, and nothing about any particular agent.
 A change that makes ask simpler is welcome; one that adds a moving part needs a strong reason.
 `AGENTS.md` has the code map.
 
-- Go 1.25 or newer, git and a POSIX shell are needed for development. `go test ./...` builds ask
+- Go 1.26 or newer, git and a POSIX shell are needed for development. `go test ./...` builds ask
   and `test/fake`, a Go fake agent, once in `TestMain` and runs the binary in temporary homes.
   The tests are offline; no model is called.
 - `gofmt -l .` should be empty, and `go vet ./...` should pass. Build with

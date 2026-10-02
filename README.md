@@ -22,7 +22,7 @@ extract it, and put `ask` on your `PATH`. ask is one binary; it needs no Node or
 Git is needed for worktrees, tracking changes and packages. Add an agent for each coding agent you
 use (below); agents may be written in any language and keep their own requirements.
 
-With Go 1.25 or newer:
+With Go 1.26 or newer:
 
 ```sh
 go install github.com/fschrhunt/ask/cmd/ask@latest
