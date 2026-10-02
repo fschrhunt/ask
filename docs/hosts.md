@@ -33,7 +33,9 @@ asks for a title and returns `updatedInput` only when one is available:
 
 ```sh
 #!/bin/sh
+# ~/.claude/hooks/ask-title: name every ask run in Claude Code's task list and run it in the background.
 input=$(cat)
+case "$input" in *ask*) ;; *) exit 0 ;; esac   # most Bash calls never mention ask
 command=$(printf '%s' "$input" | jq -r '.tool_input.command // ""')
 description=$(printf '%s' "$input" | jq -r '.tool_input.description // ""')
 title=$(ask title --command "$command" --description "$description")
@@ -49,8 +51,19 @@ printf '%s' "$input" | jq --arg title "$title" '{
 The original command stays in `updatedInput`; the host description becomes the title and the
 command runs in the background. See [Hooks](hooks.md) for ask's own `title` event.
 
-For example, if the script is `/absolute/path/ask-title`, add this to Claude Code settings:
+Save it as `~/.claude/hooks/ask-title`, make it executable, and register it in
+`~/.claude/settings.json` with its full path (it needs `jq`):
 
 ```json
-{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"/absolute/path/ask-title"}]}]}}
+{
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Bash", "hooks": [{ "type": "command", "command": "/Users/you/.claude/hooks/ask-title" }] }
+    ]
+  }
+}
 ```
+
+From then on an agent's `ask -m claude:sonnet-5.5 -w "Fix the login test"` shows in Claude Code's
+task list as `Sonnet 5.5 · Fix the login test · write`, running in the background, whatever
+description the agent wrote. Other Bash calls are left alone.

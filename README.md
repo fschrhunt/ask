@@ -47,7 +47,7 @@ is on your `PATH`. See [Install](docs/install.md) for checksums and updates.
 ask models                                          # what you can run here
 ask -m claude:sonnet-5.5 "Why does the login test fail?"  # read-only, the default
 ask -c k3f9a2 -w "Fix it, then run the test."       # follow up: same agent, same conversation
-ask -m claude:sonnet-5.5 -w --worktree "Add rate limits." # its own git worktree and branch
+ask -m claude:sonnet-5.5 -w --worktree "Add rate limiting to login." # own worktree and branch
 ask batch -j 4 -m claude:haiku-4.5 tasks.json             # many tasks in parallel
 ```
 

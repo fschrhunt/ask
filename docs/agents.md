@@ -174,13 +174,16 @@ if (out.is_error) {
 console.log(out.result);
 ```
 
+Run inside ask's own repository:
+
 ```text
-$ ask -m claude:haiku-4.5 "Read TOKEN.txt and reply with only its word."
-ask vtqxl4 · ok · Haiku 4.5 · 4.9s · 51.6k in · 159 out · $0.02
-PELICAN
-$ ask -c vtqxl4 "What word did you read? Reply with it in lowercase."
-ask qx6v99 · ok · Haiku 4.5 · 3.2s · 26.0k in · 52 out · $0.02
-pelican
+$ ask -m claude:haiku-4.5 "Which file decides how ask formats its status lines? One sentence."
+ask m5y6qq · ok · Haiku 4.5 · 8.5s · 94.7k in · 439 out · $0.08
+The file `internal/status/status.go` formats ask's status lines, including event lines, completion
+status, and batch summaries.
+$ ask -c m5y6qq "Which function in it formats the usage part, like '31.0k in · 812 out'?"
+ask htt4g7 · ok · Haiku 4.5 · 6.0s · 34.9k in · 362 out · $0.08
+The `Usage` function formats token usage and optional cost in the pattern "input in · output out".
 ```
 
 ## Other agents

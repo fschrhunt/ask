@@ -53,14 +53,14 @@ ask models
 ```
 
 ```text
-claude:haiku-4.5
 claude:sonnet-5.5
+claude:haiku-4.5
 ```
 
 And try a first run:
 
 ```sh
-ask -m claude:haiku-4.5 "What is in this directory?"
+ask -m claude:haiku-4.5 "What does this project do?"
 ```
 
 ## Update
