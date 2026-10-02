@@ -72,7 +72,8 @@ Run ` + "`ask --help`" + ` for usage and ` + "`ask models`" + ` for the models a
 - ` + "`ask -c RUN \"follow-up\"`" + `: continue that run's conversation. RUN is the name in its status line.
 - ` + "`ask batch FILE`" + `: many tasks in parallel, one JSON result array.
 
-Run ask in the background when you can; status lines on stderr say how each run went.
+Run ask in the background when you can, then ` + "`ask wait RUN`" + ` (or several runs) to collect the
+answers; status lines on stderr say how each run went.
 `
 
 // SkillState is "missing", "current", "outdated" (written by an older ask) or "yours".

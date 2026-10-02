@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- `ask wait RUN...` blocks until runs finish, then prints them like `ask show` (several runs as one
+  JSON array); `-t` gives up after that many seconds. The ask skill tells agents to collect their
+  background runs with it.
+- `ask clean` removes worktrees whose work has landed (merged, squash-merged or unchanged) with
+  their branches, and run records older than `--days` (30), after showing the plan; `--dry-run`
+  and `--yes` for scripts.
+- `ask --version` reports the module version for `go install` builds instead of `dev`.
+- `ask help` marks a command of yours that one of ask's own commands hides.
 - The official agents for Claude Code, Codex and Opencode live in ask's repository, in
   `packages/`, and are built into the binary: `ask install claude` installs without the network,
   to `~/.ask/packages/ask/packages/claude`, and an installed official agent is rewritten whenever

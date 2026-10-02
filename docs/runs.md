@@ -78,6 +78,21 @@ ask show summarize-public-api-src/api  # one task of a batch
 
 Showing a whole batch prints its outcome count on stderr and exits 1 if any task failed; saved wall time is not recorded.
 
+## Waiting for runs
+
+`ask wait` blocks until runs finish, then prints them the way `ask show` does. Start runs in the
+background, keep working, and collect them when you need the answers:
+
+```sh
+ask -m claude:sonnet-5.5 "Why does the login test fail?" &
+ask -m codex:gpt-6.1-sol "Review the session code for races." &
+ask wait login-test-fail                       # one run: its answer on stdout
+ask wait login-test-fail review-session-code   # several: their results as one JSON array
+ask wait fix-api -t 1800                        # give up after 30 minutes (exit 1)
+```
+
+A run that was stopped before finishing exits 1 with how to continue it.
+
 ## Stopping a run
 
 `ask stop RUN` stops a run going in another terminal or in the background, and every agent it
@@ -89,6 +104,31 @@ ask stop login-test-fail
 
 A stopped batch can be resumed with `ask batch --resume RUN`, which reruns only the tasks that did
 not finish ok.
+
+## Cleaning up
+
+Write runs keep their worktree and branch when they changed something, so you can review and
+merge it; finished run records stay too. `ask clean` removes what is no longer needed:
+
+```sh
+ask clean               # shows the plan, then asks
+ask clean --dry-run     # only shows it
+ask clean --yes         # for scripts
+ask clean --days 7      # runs older than a week (default 30)
+```
+
+```text
+Worktrees
+  remove  ~/.ask/worktrees/add-rate-limiting-login  ask/add-rate-limiting-login · merged into origin/main
+  keep    ~/.ask/worktrees/fix-session-race         ask/fix-session-race · not merged into origin/main
+Runs
+  remove  14 runs older than 30 days
+```
+
+A worktree goes once it has no uncommitted changes and every file its branch changed matches the
+main branch (origin's default, `main` or `master`), as after a merge or a squash merge, or when it
+changed nothing; its branch goes with it. Anything else stays. Run records go when they are older
+than `--days`, not running, and hold no worktree that stays.
 
 ## Where runs live
 

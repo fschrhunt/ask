@@ -671,7 +671,8 @@ func Execute(a *agent.Registry, r *Run, jobs int, enabled bool, report func(Even
 	return r.Results, failure
 }
 
-// Recent returns up to limit readable runs newest first, only those keep accepts when it is not nil.
+// Recent returns up to limit (every one when negative) readable runs newest first, only those keep
+// accepts when it is not nil.
 func Recent(p home.Paths, limit int, keep func(*Run) bool) []*Run {
 	names := []string{}
 	for _, name := range find.List(p.Runs) {
@@ -730,3 +731,9 @@ func Stop(r *Run) (bool, error) {
 	}
 	return true, nil
 }
+
+// All returns every readable run, newest first.
+func All(p home.Paths) []*Run { return Recent(p, -1, nil) }
+
+// Delete removes a run's record folder.
+func Delete(r *Run) error { return os.RemoveAll(r.Dir) }

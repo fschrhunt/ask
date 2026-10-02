@@ -282,3 +282,43 @@ func Checkouts(dir string) []string {
 	}
 	return paths
 }
+
+// Landed reports whether a kept worktree's branch needs nothing more, with why: it changed
+// nothing since it started, or every file it changed already matches a default branch (origin's
+// HEAD, main or master), as after a merge or a squash merge. Uncommitted changes never land.
+func Landed(path, branch string) (bool, string) {
+	status, ok := git(path, []string{"status", "--porcelain"}, "")
+	if !ok {
+		return false, "git cannot read it"
+	}
+	if home.Trim(status) != "" {
+		return false, "uncommitted changes"
+	}
+	targets := []string{}
+	if ref, ok := git(path, []string{"rev-parse", "--abbrev-ref", "origin/HEAD"}, ""); ok {
+		targets = append(targets, home.Trim(ref))
+	}
+	for _, name := range []string{"main", "master"} {
+		if _, ok := git(path, []string{"rev-parse", "--verify", "-q", "refs/heads/" + name}, ""); ok {
+			targets = append(targets, name)
+		}
+	}
+	for _, target := range targets {
+		base, ok := git(path, []string{"merge-base", target, branch}, "")
+		if !ok {
+			continue
+		}
+		files, _ := git(path, []string{"diff", "--name-only", "-z", home.Trim(base), branch}, "")
+		names := strings.Split(strings.TrimRight(files, "\x00"), "\x00")
+		if files == "" {
+			return true, "no changes"
+		}
+		if _, same := git(path, append([]string{"diff", "--quiet", target, branch, "--"}, names...), ""); same {
+			return true, "merged into " + target
+		}
+	}
+	if len(targets) == 0 {
+		return false, "no main branch to compare with"
+	}
+	return false, "not merged into " + targets[0]
+}
