@@ -19,6 +19,7 @@ import (
 var options = map[string][]string{
 	"run":   {"-m", "-r", "-w", "--worktree", "-c", "--json", "--schema", "-C", "-t", "--max-cost", "--no-hooks"},
 	"batch": {"-m", "-r", "-w", "--worktree", "--json", "--schema", "-C", "-t", "--max-cost", "-j", "--resume", "--no-hooks"},
+	"bench": {"-m", "-r", "-w", "-C", "-t", "--max-cost", "-j", "-n", "--json", "--keep", "--yes", "--no-hooks"},
 	"title": {"--command", "--description", "--hook"},
 	"setup": {"--check", "--json", "--yes"}, "settings": {"--json", "--dry-run"}, "docs": {"--raw", "--search", "--url"}, "update": {"--check"},
 	"show": {"--json"}, "runs": {"-n", "--all"}, "wait": {"-t", "--json"}, "clean": {"--days", "--dry-run", "--yes"}, "stop": {}, "models": {"--names", "--all", "--enable", "--disable", "--max-cost"}, "help": {}, "install": {}, "packages": {}, "remove": {},
@@ -127,7 +128,11 @@ func parse(command string, argv []string) (home.Object, []string, error) {
 				return nil, nil, home.Usage("missing value for %s", arg)
 			} else {
 				i++
-				opts.Set(flag, argv[i])
+				if command == "bench" && flag == "-m" && opts.B("-m") {
+					opts.Set(flag, opts.S("-m")+","+argv[i]) // each -m adds a model to compare
+				} else {
+					opts.Set(flag, argv[i])
+				}
 			}
 		} else {
 			words = append(words, arg)
@@ -205,6 +210,8 @@ func main(argv []string, version string) (int, error) {
 		return 0, nil
 	case "batch":
 		return batch(a, opts, words)
+	case "bench":
+		return bench(a, opts, words)
 	case "setup":
 		if len(words) == 1 {
 			return 0, home.Usage("ask settings %s opens one agent's settings", words[0])

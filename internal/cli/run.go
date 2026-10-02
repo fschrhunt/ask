@@ -237,21 +237,11 @@ func runOne(a *agent.Registry, opts home.Object, words []string) (int, error) {
 
 // batch records or resumes tasks and prints all results in task order.
 func batch(a *agent.Registry, opts home.Object, words []string) (int, error) {
-	jobs := 4
-	if settings, e := a.Paths.ReadSettings(); e != nil {
+	jobs, e := jobCount(a, opts)
+	if e != nil {
 		return 0, e
-	} else if settings.Has("jobs") {
-		jobs = int(settings.N("jobs"))
-	}
-	if opts.B("-j") {
-		n, e := number("-j", opts.S("-j"), true)
-		if e != nil {
-			return 0, e
-		}
-		jobs = integer(n)
 	}
 	var r *runs.Run
-	var e error
 	var notes []hooks.Note
 	if opts.B("--resume") {
 		extra := []string{}
@@ -300,6 +290,40 @@ func batch(a *agent.Registry, opts home.Object, words []string) (int, error) {
 			return 0, e
 		}
 	}
+	results, e := execute(a, r, jobs, !opts.B("--no-hooks"), notes)
+	if e != nil {
+		return 0, e
+	}
+	fmt.Fprintln(os.Stdout, home.JSON(home.ResultRecords(results), true))
+	for _, x := range results {
+		if !x.B("ok") {
+			return 1, nil
+		}
+	}
+	return 0, nil
+}
+
+// jobCount is how many tasks run at once: -j, else the jobs setting, else 4.
+func jobCount(a *agent.Registry, opts home.Object) (int, error) {
+	jobs := 4
+	if settings, e := a.Paths.ReadSettings(); e != nil {
+		return 0, e
+	} else if settings.Has("jobs") {
+		jobs = int(settings.N("jobs"))
+	}
+	if opts.B("-j") {
+		n, e := number("-j", opts.S("-j"), true)
+		if e != nil {
+			return 0, e
+		}
+		jobs = integer(n)
+	}
+	return jobs, nil
+}
+
+// execute runs a created run's unfinished tasks with the live rows and status lines a batch
+// shows on stderr, and returns every task's result in task order.
+func execute(a *agent.Registry, r *runs.Run, jobs int, hooksOn bool, notes []hooks.Note) ([]home.Object, error) {
 	todo := 0
 	for _, x := range r.Results {
 		if !x.B("ok") {
@@ -318,21 +342,15 @@ func batch(a *agent.Registry, opts home.Object, words []string) (int, error) {
 	for _, n := range notes {
 		report(runs.Event{Kind: "note", Note: n})
 	}
-	results, e := runs.Execute(a, r, jobs, !opts.B("--no-hooks"), report)
+	results, e := runs.Execute(a, r, jobs, hooksOn, report)
 	process.AwaitShutdown()
 	summary := status.BatchEnd(r, float64(time.Since(begin).Milliseconds())/1000)
 	live.Finish(summary, false)
 	if e != nil {
-		return 0, e
+		return nil, e
 	}
 	if live == nil {
 		fmt.Fprintln(os.Stderr, status.StyledLine(summary, os.Stderr))
 	}
-	fmt.Fprintln(os.Stdout, home.JSON(home.ResultRecords(results), true))
-	for _, x := range results {
-		if !x.B("ok") {
-			return 1, nil
-		}
-	}
-	return 0, nil
+	return results, nil
 }

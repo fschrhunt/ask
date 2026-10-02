@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `ask bench` compares models on the same tasks: every task on every `-m` model, `-n` times, each
+  passing when the agent finishes and the task's own `check` command exits 0. Write attempts get
+  fresh worktrees from the same commit. It prints passes, median time, tokens and cost per model,
+  and `ask show` prints a bench again. A command of yours named `bench` is now hidden by it.
 - Install with `curl -fsSL https://fschrhunt.com/ask/install.sh | sh` (checksum-verified, into
   `~/.local/bin`) or Homebrew, from ask's own repository: `brew tap fschrhunt/ask
   https://github.com/fschrhunt/ask && brew install ask`.

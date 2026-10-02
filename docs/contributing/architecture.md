@@ -34,7 +34,7 @@ Each folder in `internal/` is one Go package with a `// Package` comment saying 
 
 | Package | Purpose |
 | --- | --- |
-| `cli` | The commands, one file each (`run.go`, `runs.go`, `models.go`, `packages.go`, `settings.go` and its `menus.go`, `setup.go`, `title.go` and its `shell.go` tokenizer, `docs.go`, `update.go`, `help.go`), and `cli.go`: dispatch, options, exit codes |
+| `cli` | The commands, one file each (`run.go`, `bench.go`, `runs.go`, `models.go`, `packages.go`, `settings.go` and its `menus.go`, `setup.go`, `title.go` and its `shell.go` tokenizer, `docs.go`, `update.go`, `help.go`), and `cli.go`: dispatch, options, exit codes |
 | `runs` | Runs on disk: ids and names, `RUN/TASK` references, locks, results; preparing tasks and follow-ups; running them in parallel; stopping |
 | `task` | One task, start to finish |
 | `agent` | Finding agents, listing their models, running one under the contract, model display names |

@@ -19,6 +19,7 @@ docs page for that feature.
 | --- | --- | --- |
 | `run_test.go` | One task: options, prompts, answers, `--json`, `--schema`, timeouts, signals | usage.md |
 | `batch_test.go` | `ask batch`: task files, defaults, parallel results, `--resume` | batches.md |
+| `bench_test.go` | `ask bench`: every task on every model, checks, worktrees, the report | bench.md |
 | `runs_test.go` | Saved runs: `runs`, `show`, `wait`, `stop`, `clean`, locks, private state | runs.md |
 | `names_test.go` | Run names: from the prompt, taken over by follow-ups, name hooks | runs.md |
 | `followups_test.go` | `-c`: which session, model and access a follow-up gets | runs.md |
