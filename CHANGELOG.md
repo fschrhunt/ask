@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Host titles drop a model the description repeats, so `Sonnet 5.5 · Mine sessions` titles as
+  `Sonnet 5.5 · Mine sessions`, not `Sonnet 5.5 · Sonnet 5.5 · Mine sessions`.
 - `ask install` refuses sources whose host, owner or repository is `.`, `..` or starts with `-`,
   and SCP-style sources whose user part hides another host, so a package always lands in
   `~/.ask/packages/HOST/OWNER/REPO`. `OWNER/REPO` always means GitHub, even beside a folder of that
