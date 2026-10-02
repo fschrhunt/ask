@@ -140,9 +140,13 @@ Output
   stderr   Status lines: ask RUN · state · model · details
   exit     0 ok · 1 failed · 2 usage error
 
+Runs
+  RUN is named from the prompt, like login-checked; a follow-up
+  keeps the name. The run's id, like k3f9a2, works too.
+
 Examples
   ask -m claude:haiku-4.5 "Where is login checked?"
-  ask -c k3f9a2 -w "Fix it and run the test."` + "\n\ndocs  " + docsURL + "/usage.md"
+  ask -c login-checked -w "Fix it and run the test."` + "\n\ndocs  " + docsURL + "/usage.md"
 	case "batch":
 		return `ask batch · run tasks in parallel
 
@@ -163,7 +167,7 @@ Tasks · a JSON array, or one object per line
   schema     A JSON Schema, inline
 
 Results · a JSON array on stdout, in task order
-  run, id           Run and task ids
+  run, id           RUN/TASK, and the task id
   model, name       Requested model and the model's own name
   ok                true or false
   answer, error     The answer, or why it failed
@@ -180,7 +184,7 @@ Options
 
 Examples
   ask batch -j 4 -m claude:haiku-4.5 tasks.json
-  ask batch --resume p81c0d` + "\n\ndocs  " + docsURL + "/batches.md"
+  ask batch --resume summarize-public-api` + "\n\ndocs  " + docsURL + "/batches.md"
 	case "show":
 		return `ask show · print a run again, without starting its agent
 
@@ -193,8 +197,8 @@ Output
   stderr   The run's status line
 
 Examples
-  ask show k3f9a2
-  ask show p81c0d/api --json` + "\n\ndocs  " + docsURL + "/runs.md"
+  ask show login-checked
+  ask show summarize-public-api/api --json` + "\n\ndocs  " + docsURL + "/runs.md"
 	case "runs":
 		return `ask runs · list recent runs, newest first
 
@@ -205,7 +209,7 @@ Options
   -n N   How many (default: 20)
 
 Output
-  RUN  STARTED  STATUS  MODEL  TIME  TASK
+  RUN  ID  STARTED  STATUS  MODEL  TIME  TASK
 
 Examples
   ask runs
@@ -221,7 +225,7 @@ Output
   exit     0 stopped · 1 not running
 
 Example
-  ask stop k3f9a2` + "\n\ndocs  " + docsURL + "/runs.md"
+  ask stop login-checked` + "\n\ndocs  " + docsURL + "/runs.md"
 	case "models":
 		return `ask models · list the models you can use
 

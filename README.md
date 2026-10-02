@@ -46,7 +46,7 @@ is on your `PATH`. See [Install](docs/install.md) for checksums and updates.
 ```sh
 ask models                                          # what you can run here
 ask -m claude:sonnet-5.5 "Why does the login test fail?"  # read-only, the default
-ask -c k3f9a2 -w "Fix it, then run the test."       # follow up: same agent, same conversation
+ask -c login-test-fail -w "Fix it, then run the test." # follow up: same agent, same conversation
 ask -m claude:sonnet-5.5 -w --worktree "Add rate limiting to login." # own worktree and branch
 ask batch -j 4 -m claude:haiku-4.5 tasks.json             # many tasks in parallel
 ```
@@ -56,12 +56,12 @@ on stderr naming the run, the model that ran, and what it
 changed and cost:
 
 ```text
-ask k3f9a2 · started · Sonnet 5.5 · read · ~/code/app
-ask k3f9a2 · ok · Sonnet 5.5 · 48.0s · 31.0k in · 812 out · $0.09
+ask login-test-fail · started · Sonnet 5.5 · read · ~/code/app
+ask login-test-fail · ok · Sonnet 5.5 · 48.0s · 31.0k in · 812 out · $0.09
 ```
 
-Every run is recorded: `ask runs` lists them, `ask show RUN` prints one again, and `ask stop RUN`
-stops one.
+Every run is named after its prompt and recorded: `ask runs` lists them, `ask show RUN` prints one
+again, and `ask stop RUN` stops one.
 
 ### Make it yours
 

@@ -27,7 +27,7 @@ A batch is a JSON array, or one JSON object per line:
 | `model` | `agent:id[#effort]`. Required unless the batch's `-m` gives a default or the task continues a run. |
 | `write` | `true` for read and write. Default: the batch's `-w`, else read only. |
 | `worktree` | `true` to work in its own git worktree and branch (creating one needs write). Default: the batch's `--worktree`. |
-| `continue` | A run to follow up, like `"k3f9a2"` or `"p81c0d/api"` (see [Runs](runs.md#follow-ups)). |
+| `continue` | A run to follow up, like `"login-test-fail"` or `"summarize-public-api-src/api"` (see [Runs](runs.md#follow-ups)). |
 | `dir` | Directory the agent works in. Default: the batch's `-C`, else the current directory. |
 | `json`, `schema` | Like `--json` and `--schema`; `schema` is the schema itself, not a file. |
 | `timeout` | Seconds for this task. Default: the batch's `-t`, else 900. |
@@ -44,14 +44,14 @@ ask batch -j 4 -m claude:haiku-4.5 tasks.json
 then a summary with total usage and cost. In pipes, the same status lines go to stderr as tasks start and end:
 
 ```text
-ask p81c0d · started · batch of 3 · 3 at a time
-ask p81c0d/api · started · Haiku 4.5 · read · ~/code/app
-ask p81c0d/tests · started · GPT-6.1 Sol · read · ~/code/app
-ask p81c0d/fix · started · Haiku 4.5 · write · ~/code/app
-ask p81c0d/api · ok · Haiku 4.5 · 18.1s · 22.4k in · 640 out · $0.07
-ask p81c0d/fix · ok · Haiku 4.5 · 25.3s · 1 file changed · 30.2k in · 410 out · $0.03
-ask p81c0d/tests · failed · GPT-6.1 Sol · 15:00 · timed out
-ask p81c0d · 2/3 ok · 15:00 · 52.6k in · 1.1k out · $0.11
+ask summarize-public-api-src · started · batch of 3 · 3 at a time
+ask summarize-public-api-src/api · started · Haiku 4.5 · read · ~/code/app
+ask summarize-public-api-src/tests · started · GPT-6.1 Sol · read · ~/code/app
+ask summarize-public-api-src/fix · started · Haiku 4.5 · write · ~/code/app
+ask summarize-public-api-src/api · ok · Haiku 4.5 · 18.1s · 22.4k in · 640 out · $0.07
+ask summarize-public-api-src/fix · ok · Haiku 4.5 · 25.3s · 1 file changed · 30.2k in · 410 out · $0.03
+ask summarize-public-api-src/tests · failed · GPT-6.1 Sol · 15:00 · timed out
+ask summarize-public-api-src · 2/3 ok · 15:00 · 52.6k in · 1.1k out · $0.11
 ```
 
 ## Results
@@ -61,7 +61,7 @@ stdout gets one JSON array, in task order, whatever order the tasks finished in:
 ```json
 [
   {
-    "run": "p81c0d/api",
+    "run": "summarize-public-api-src/api",
     "id": "api",
     "model": "claude:haiku-4.5",
     "write": false,
@@ -74,7 +74,7 @@ stdout gets one JSON array, in task order, whatever order the tasks finished in:
     "dir": "/home/me/code/app"
   },
   {
-    "run": "p81c0d/tests",
+    "run": "summarize-public-api-src/tests",
     "id": "tests",
     "model": "codex:gpt-6.1-sol",
     "write": false,
@@ -114,13 +114,13 @@ gh issue list --label bug --limit 5 --json number,title,body |
   ask batch -w --worktree -m claude:sonnet-5.5 -
 ```
 
-Each issue becomes a task with its own branch (`ask/RUN-1-issue-12`), so you review and merge them
-one by one.
+Each issue becomes a task with its own branch (`ask/RUN-1-issue-12`, where RUN is the batch's
+name), so you review and merge them one by one.
 
 **Follow up on every task of a batch:**
 
 ```sh
-ask show p81c0d | jq -c '.[] | select(.ok) | {continue: .run, prompt: "Now write a test for that."}' | ask batch -w -
+ask show summarize-public-api-src | jq -c '.[] | select(.ok) | {continue: .run, prompt: "Now write a test for that."}' | ask batch -w -
 ```
 
 ## Resuming
@@ -129,7 +129,7 @@ A batch that was stopped, or had failures, can be resumed. Only tasks that did n
 again, exactly as recorded:
 
 ```sh
-ask batch --resume p81c0d
+ask batch --resume summarize-public-api-src
 ```
 
 `--resume` takes only `-j` and `--no-hooks`. Only one ask can run a batch at a time; a second is refused while the
