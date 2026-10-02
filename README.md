@@ -1,9 +1,6 @@
 <div align="center">
-  <picture>
-    <source srcset="assets/white/lockup.svg" media="(prefers-color-scheme: dark)">
-    <source srcset="assets/black/lockup.svg" media="(prefers-color-scheme: light)">
-    <img src="assets/black/lockup.svg" alt="ask" height="52">
-  </picture>
+  <img src="assets/white/lockup.svg#gh-dark-mode-only" alt="ask" height="52">
+  <img src="assets/black/lockup.svg#gh-light-mode-only" alt="ask" height="52">
 
   <h3>Every model, as a subagent.</h3>
 
@@ -20,11 +17,8 @@
 curl -fsSL https://fschrhunt.com/ask/install.sh | sh
 ```
 
-  <picture>
-    <source srcset="assets/screens/dark/run.svg" media="(prefers-color-scheme: dark)">
-    <source srcset="assets/screens/light/run.svg" media="(prefers-color-scheme: light)">
-    <img src="assets/screens/light/run.svg" alt="ask answering why a test fails, then fixing it in the same conversation" width="760">
-  </picture>
+  <img src="assets/screens/dark/run.svg#gh-dark-mode-only" alt="ask answering why a test fails, then fixing it in the same conversation" width="760">
+  <img src="assets/screens/light/run.svg#gh-light-mode-only" alt="ask answering why a test fails, then fixing it in the same conversation" width="760">
 </div>
 
 <br>
@@ -67,22 +61,16 @@ the task and gives you the answer.
 like, and prints every answer as one JSON array. Start runs in the background and collect them
 with `ask wait`.
 
-<p align="center"><picture>
-    <source srcset="assets/screens/dark/batch.svg" media="(prefers-color-scheme: dark)">
-    <source srcset="assets/screens/light/batch.svg" media="(prefers-color-scheme: light)">
-    <img src="assets/screens/light/batch.svg" alt="ask batch running a review on three models at once" width="760">
-  </picture></p>
+<p align="center"><img src="assets/screens/dark/batch.svg#gh-dark-mode-only" alt="ask batch running a review on three models at once" width="760">
+  <img src="assets/screens/light/batch.svg#gh-light-mode-only" alt="ask batch running a review on three models at once" width="760"></p>
 
 ## See it before it saves
 
 `ask settings` holds every control: agents and their models, defaults, cost limits, worktrees,
 and the apps that use ask. Nothing is written until you have seen the change.
 
-<p align="center"><picture>
-    <source srcset="assets/screens/dark/settings.svg" media="(prefers-color-scheme: dark)">
-    <source srcset="assets/screens/light/settings.svg" media="(prefers-color-scheme: light)">
-    <img src="assets/screens/light/settings.svg" alt="ask settings showing each file's changes before saving" width="760">
-  </picture></p>
+<p align="center"><img src="assets/screens/dark/settings.svg#gh-dark-mode-only" alt="ask settings showing each file's changes before saving" width="760">
+  <img src="assets/screens/light/settings.svg#gh-light-mode-only" alt="ask settings showing each file's changes before saving" width="760"></p>
 
 ## Make it yours
 
