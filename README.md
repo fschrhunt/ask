@@ -20,7 +20,11 @@
 curl -fsSL https://fschrhunt.com/ask/install.sh | sh
 ```
 
-  <img src="assets/screens/run.svg" alt="ask answering why a test fails, then fixing it in the same conversation" width="760">
+  <picture>
+    <source srcset="assets/screens/dark/run.svg" media="(prefers-color-scheme: dark)">
+    <source srcset="assets/screens/light/run.svg" media="(prefers-color-scheme: light)">
+    <img src="assets/screens/light/run.svg" alt="ask answering why a test fails, then fixing it in the same conversation" width="760">
+  </picture>
 </div>
 
 <br>
@@ -63,14 +67,22 @@ the task and gives you the answer.
 like, and prints every answer as one JSON array. Start runs in the background and collect them
 with `ask wait`.
 
-<p align="center"><img src="assets/screens/batch.svg" alt="ask batch running a review on three models at once" width="760"></p>
+<p align="center"><picture>
+    <source srcset="assets/screens/dark/batch.svg" media="(prefers-color-scheme: dark)">
+    <source srcset="assets/screens/light/batch.svg" media="(prefers-color-scheme: light)">
+    <img src="assets/screens/light/batch.svg" alt="ask batch running a review on three models at once" width="760">
+  </picture></p>
 
 ## See it before it saves
 
 `ask settings` holds every control: agents and their models, defaults, cost limits, worktrees,
 and the apps that use ask. Nothing is written until you have seen the change.
 
-<p align="center"><img src="assets/screens/settings.svg" alt="ask settings showing each file's changes before saving" width="760"></p>
+<p align="center"><picture>
+    <source srcset="assets/screens/dark/settings.svg" media="(prefers-color-scheme: dark)">
+    <source srcset="assets/screens/light/settings.svg" media="(prefers-color-scheme: light)">
+    <img src="assets/screens/light/settings.svg" alt="ask settings showing each file's changes before saving" width="760">
+  </picture></p>
 
 ## Make it yours
 

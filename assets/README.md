@@ -9,3 +9,7 @@ Each folder contains the same three SVG marks in one color. The black set uses G
 | Logo | [SVG](black/logo.svg) | [SVG](white/logo.svg) | Rounded square with a cursor bar |
 
 The SVGs have transparent backgrounds and no font or raster dependencies. Scale them proportionally and leave surrounding space in the layout. The black and white variants share the same geometry.
+
+`screens/` holds the README's terminal pictures, each drawn twice, `light/` and `dark/`, so the
+README can match the reader's theme. Edit the transcripts in `screens/render.py` and run
+`python3 assets/screens/render.py assets/screens` to redraw them.
