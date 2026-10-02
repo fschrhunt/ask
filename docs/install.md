@@ -29,7 +29,7 @@ brew tap fschrhunt/ask https://github.com/fschrhunt/ask
 brew install ask
 ```
 
-Each release updates the formula, [`HomebrewFormula/ask.rb`](../HomebrewFormula/ask.rb), so
+Each release updates the formula, [`ask.rb`](../ask.rb), so
 `brew upgrade ask` brings the latest.
 
 ## With Go

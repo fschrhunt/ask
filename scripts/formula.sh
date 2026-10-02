@@ -1,10 +1,10 @@
 #!/bin/sh
-# Writes HomebrewFormula/ask.rb, the Homebrew formula that installs a release's binary, from the release's
+# Writes ask.rb, the Homebrew formula that installs a release's binary, from the release's
 # checksums.txt. The release workflow runs it after publishing; ask's repository is its own tap:
 #
 #   brew tap fschrhunt/ask https://github.com/fschrhunt/ask && brew install ask
 #
-# usage: scripts/formula.sh vX.Y.Z CHECKSUMS > HomebrewFormula/ask.rb
+# usage: scripts/formula.sh vX.Y.Z CHECKSUMS > ask.rb
 set -eu
 tag=$1
 sums=$2

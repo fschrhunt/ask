@@ -14,7 +14,7 @@ ones use Node.js 18+, standard library only).
 - `go build -o ask ./cmd/ask`: build the binary; `./ask --help` is the contract for flags and output.
 - `cd packages/claude && node --test`: one official agent's tests, against a fake CLI in `test/bin`.
 - `scripts/release.sh vX.Y.Z`: release, in two runs (see CONTRIBUTING.md); `install.sh` is the
-  installer people run, `HomebrewFormula/ask.rb` the formula each release regenerates.
+  installer people run, `ask.rb` the formula each release regenerates.
 
 ## Code map
 

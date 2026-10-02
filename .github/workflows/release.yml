@@ -96,7 +96,7 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           gh release download "$TAG" -p checksums.txt -O "$RUNNER_TEMP/checksums.txt"
-          scripts/formula.sh "$TAG" "$RUNNER_TEMP/checksums.txt" > HomebrewFormula/ask.rb
+          scripts/formula.sh "$TAG" "$RUNNER_TEMP/checksums.txt" > ask.rb
           git diff --quiet && exit 0
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
