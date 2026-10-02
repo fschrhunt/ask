@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Host titles read batch tasks from heredocs: piped to `ask batch -`, or written by `cat > FILE`
+  earlier in the same command, so a batch started that way is titled `Batch of N · Model · …`.
 - The live view shows tokens and cost while agents run, and a batch's footer keeps a running
   total. ask reads an agent's report as the agent rewrites it; agents that report usage only at
   the end show it at the end, as before. Plain status lines are unchanged.
