@@ -122,6 +122,18 @@ func TestSubagent(t *testing.T) {
 		eq(t, s.calls()[1].s("cwd"), filepath.Join(s.home, "worktrees", id))
 		match(t, git("branch", "--list", "ask/"+id), `ask/`+id)
 	})
+	t.Run("a follow-up of a task whose worktree was removed never runs in a folder another run holds", func(t *testing.T) {
+		s := fresh(t)
+		dir, git := s.repo()
+		r := s.run([]string{"batch", "-m", "fake:small", "-w", "--worktree", "-C", dir, "-"}, `[{"id":"a","prompt":"look"}]`, nil)
+		id := runID(t, r.stderr)
+		taken := filepath.Join(s.home, "worktrees", id+"-1-a")
+		git("worktree", "add", "-q", "-b", "other", taken)
+		s.ask("-c", id+"/a", "now change it")
+		if cwd := s.calls()[1].s("cwd"); cwd == taken || !strings.HasPrefix(cwd, filepath.Join(s.home, "worktrees")) {
+			t.Fatalf("follow-up ran in %s", cwd)
+		}
+	})
 	t.Run("--worktree needs -w and a git repository", func(t *testing.T) {
 		s := fresh(t)
 		read := s.ask("-m", "fake:small", "--worktree", "go")

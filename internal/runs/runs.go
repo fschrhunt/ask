@@ -211,7 +211,8 @@ func Alive(pid int) bool {
 }
 
 // Owner returns the pid holding a run's lock, asking the kernel without taking the lock,
-// or 0 when no other process holds it.
+// 0 when no other process holds it, or -1 when it is held by a process outside this PID
+// namespace (a container or sandbox), which the kernel reports as pid 0.
 func Owner(r *Run) int {
 	f, err := os.Open(filepath.Join(r.Dir, "lock"))
 	if err != nil {
@@ -221,6 +222,9 @@ func Owner(r *Run) int {
 	held := syscall.Flock_t{Type: syscall.F_WRLCK}
 	if syscall.FcntlFlock(f.Fd(), syscall.F_GETLK, &held) != nil || held.Type == syscall.F_UNLCK {
 		return 0
+	}
+	if held.Pid <= 0 {
+		return -1
 	}
 	return int(held.Pid)
 }
@@ -234,7 +238,11 @@ func lock(r *Run) (*os.File, error) {
 	}
 	if err = syscall.FcntlFlock(f.Fd(), syscall.F_SETLK, &syscall.Flock_t{Type: syscall.F_WRLCK}); err != nil {
 		f.Close()
-		return nil, home.Usage("run %s is running (pid %d); stop it with `ask stop %s`", r.Label(), Owner(r), r.Label())
+		pid := ""
+		if owner := Owner(r); owner > 0 {
+			pid = fmt.Sprintf(" (pid %d)", owner)
+		}
+		return nil, home.Usage("run %s is running%s; stop it with `ask stop %s`", r.Label(), pid, r.Label())
 	}
 	if err = f.Chmod(0600); err != nil {
 		f.Close()
@@ -348,6 +356,7 @@ func Prepare(p home.Paths, items []any, defaults home.Object, label string, sing
 			}
 			if kept, ok := result.Get("worktree").(home.Object); ok {
 				x.Set("worktree", filepath.Base(kept.S("path")))
+				x.Set("reuse", true)
 			}
 			if t.B("worktree") && !x.B("worktree") {
 				return nil, home.Usage("%s: a follow-up runs where %s ran, which is not a worktree; drop --worktree", where, t.S("continue"))
@@ -370,7 +379,7 @@ func Prepare(p home.Paths, items []any, defaults home.Object, label string, sing
 		x.Set("write", x.B("write"))
 		if x.B("worktree") && !x.B("write") {
 			info, err := os.Stat(filepath.Join(p.Worktrees, x.S("worktree")))
-			if !x.B("continues") || err != nil || !info.IsDir() {
+			if !x.B("reuse") || err != nil || !info.IsDir() {
 				return nil, home.Usage("%s: a worktree is for write runs; add -w", where)
 			}
 		}
@@ -548,6 +557,7 @@ func withHooks(a *agent.Registry, h *hooks.Hooks, t home.Object, ref string, rep
 		next := t.Clone()
 		if worktree != nil {
 			next.Set("worktree", filepath.Base(worktree.Path))
+			next.Set("reuse", true)
 		}
 		next.Set("prompt", followup.Text)
 		next.Set("session", result.Get("session"))
@@ -668,11 +678,15 @@ func Recent(p home.Paths, limit int) []*Run {
 }
 
 // Stop sends SIGTERM to the live run owner and waits up to ten seconds for it to release the run;
-// it returns false when nothing was running and an error when the owner outlives the wait.
+// it returns false when nothing was running and an error when the owner outlives the wait or
+// runs outside this PID namespace, where ask cannot signal it.
 func Stop(r *Run) (bool, error) {
 	pid := Owner(r)
 	if pid == 0 {
 		return false, nil
+	}
+	if pid < 0 {
+		return false, fmt.Errorf("run %s is running outside this sandbox or container; stop it from there", r.Label())
 	}
 	if e := syscall.Kill(pid, syscall.SIGTERM); e != nil {
 		return false, e

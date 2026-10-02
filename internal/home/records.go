@@ -4,6 +4,7 @@ import "encoding/json"
 
 // TaskRecord is the version 1 prepared task on disk, in the documented field order.
 // Schema retains user key order; omitted optional fields remain omitted on a new record.
+// Reuse marks a follow-up continuing a worktree the previous turn kept, rather than claiming one.
 type TaskRecord struct {
 	ID        string          `json:"id"`
 	Prompt    string          `json:"prompt"`
@@ -14,6 +15,7 @@ type TaskRecord struct {
 	Dir       string          `json:"dir"`
 	Timeout   float64         `json:"timeout"`
 	Worktree  string          `json:"worktree,omitempty"`
+	Reuse     bool            `json:"reuse,omitempty"`
 	Session   string          `json:"session,omitempty"`
 	Continues string          `json:"continues,omitempty"`
 }

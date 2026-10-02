@@ -190,7 +190,7 @@ type Worktree struct {
 
 // Add creates a worktree on branch ask/NAME from HEAD at name, or at name-2, name-3 and so on when
 // another task already has that folder; it claims the folder atomically, so parallel tasks never
-// share one. reuse is for follow-ups: they continue the worktree at name, recreating it if removed.
+// share one. reuse is for follow-ups of a kept worktree: they continue the one at name, recreating it if removed.
 func Add(p home.Paths, dir, name string, reuse bool) (*Worktree, error) {
 	root, ok := git(dir, []string{"rev-parse", "--show-toplevel"}, "")
 	root = home.Trim(root)

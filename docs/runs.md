@@ -32,7 +32,8 @@ own line of turns, named `RUN-TASK` (or `RUN-TASK-2` and so on when another run 
 
 A follow-up:
 
-- runs where the first run ran: the same directory, or the same worktree if it is still present.
+- runs where the first run ran: the same directory, or the same worktree if it kept one (a
+  removed worktree is created again, under a new name if another run has taken that one).
   `--worktree` can't move a follow-up of a run in your checkout into a worktree; ask refuses it;
 - keeps the model and access (`-r`/`-w`) unless you give new ones. The model may change within
   the same agent (`-c login-test-fail -m claude:haiku-4.5`), but not to another agent;

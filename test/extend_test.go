@@ -133,6 +133,16 @@ func TestExtend(t *testing.T) {
 		git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "v1")
 		github := map[string]string{"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "url." + s.tmp + "/.insteadOf", "GIT_CONFIG_VALUE_0": "https://github.com/"}
 		match(t, s.run([]string{"install", "acme/tools"}, "", github).stderr, `installed github.com/acme/tools`)
+		match(t, s.run([]string{"install", "acme/tools"}, "", github).stderr, `up to date`)
+	})
+	t.Run("install refuses a local folder whose name leaves no package name", func(t *testing.T) {
+		s := fresh(t)
+		repo := filepath.Join(s.tmp, "team", "...git")
+		s.mkdir(repo)
+		s.gitAt(repo)("init", "-q", "-b", "main")
+		r := s.ask("install", repo)
+		eq(t, r.code, 2)
+		eq(t, exists(filepath.Join(s.home, "packages")), false)
 	})
 	t.Run("install refuses a source other than the one installed in its place", func(t *testing.T) {
 		s := fresh(t)

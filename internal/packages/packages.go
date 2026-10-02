@@ -45,7 +45,11 @@ func Locate(p home.Paths, source string) (string, string, error) {
 		source = "https://github.com/" + source
 	} else if _, e := os.Stat(source); e == nil {
 		path, _ := filepath.Abs(source)
-		return path, filepath.Join(p.Packages, "local", filepath.Base(filepath.Dir(path)), strings.TrimSuffix(filepath.Base(path), ".git")), nil
+		name := strings.TrimSuffix(filepath.Base(path), ".git")
+		if name == "" || name == "." || name == ".." {
+			return "", "", home.Usage("cannot install %s: its folder name leaves no package name", source)
+		}
+		return path, filepath.Join(p.Packages, "local", filepath.Base(filepath.Dir(path)), name), nil
 	}
 	m := sourcePattern.FindStringSubmatch(source)
 	if m == nil || strings.HasPrefix(source, "-") {
@@ -113,7 +117,7 @@ func Install(p home.Paths, source string) (string, error) {
 		return "", e
 	}
 	if _, e := os.Stat(dir); e == nil {
-		origin, _ := git([]string{"remote", "get-url", "origin"}, dir)
+		origin, _ := git([]string{"config", "--get", "remote.origin.url"}, dir)
 		if plain(origin) != plain(url) {
 			name, _ := filepath.Rel(p.Packages, dir)
 			return "", home.Usage("%s is installed from %s; remove it first", name, home.Trim(origin))
