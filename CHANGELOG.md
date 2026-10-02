@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- `ask setup`: in a terminal, a walkthrough the first time (agents for the CLIs it finds, a default
+  model, where worktrees go, the ask skill for Claude Code, Codex, Opencode, Cursor and pi, and
+  task titles in Claude Code) and your settings after. Flags do the same without asking:
+  `--agents`, `-m`, `-t`, `-j`, `--worktrees`, `--branches`, `--skills`, `--hook`/`--no-hook`,
+  `--yes`, and `--check` (with `--json`) to report. ask points to it wherever no agent is set up.
+- `ask install NAME` always means the official agent, even beside a folder of that name; name a
+  local repository by a path. One-letter words no longer end up in run names (`ask's` was `ask-s`).
 - `ask install claude`, `codex` or `opencode` installs the official agent package for that CLI
   (`fschrhunt/ask-NAME`), and `ask install` takes several sources at once. After installing, ask
   checks every agent a package brings and says whether it is ready, or why not, like a missing

@@ -178,6 +178,32 @@ func (p Paths) ReadSettings() (Object, error) {
 	if !ok {
 		return nil, Usage(`%s must be a JSON object, like {"worktrees": "~/code/worktrees/ask-{name}"}`, path)
 	}
+	if e := p.checkSettings(o); e != nil {
+		return nil, e
+	}
+	return o, nil
+}
+
+// WriteSettings checks and saves settings, leaving out keys with empty values.
+func (p Paths) WriteSettings(o Object) error {
+	keep := Object{}
+	for k, v := range o {
+		if v != nil && v != "" {
+			keep[k] = v
+		}
+	}
+	if e := p.checkSettings(keep); e != nil {
+		return e
+	}
+	if e := os.MkdirAll(p.Home, 0700); e != nil {
+		return e
+	}
+	return WriteJSON(filepath.Join(p.Home, "settings.json"), keep)
+}
+
+// checkSettings rejects unknown keys and values of the wrong kind, naming the key.
+func (p Paths) checkSettings(o Object) error {
+	path := filepath.Join(p.Home, "settings.json")
 	for key, val := range o {
 		bad := ""
 		switch key {
@@ -195,20 +221,20 @@ func (p Paths) ReadSettings() (Object, error) {
 			}
 		case "worktrees":
 			if _, e := p.worktreeTemplate(val); e != nil {
-				return nil, e
+				return e
 			}
 		case "branches":
 			if s, ok := val.(string); !ok || strings.Count(s, "{name}") != 1 || strings.ContainsAny(s, " ~^:?*[\\") || strings.HasPrefix(s, "-") || strings.HasPrefix(s, "/") {
 				bad = `a branch name holding {name} once, like "ask/{name}"`
 			}
 		default:
-			return nil, Usage("%s has an unknown setting %q; settings: %s", path, key, strings.Join(Settings, ", "))
+			return Usage("%s has an unknown setting %q; settings: %s", path, key, strings.Join(Settings, ", "))
 		}
 		if bad != "" {
-			return nil, Usage("%s: %q must be %s", path, key, bad)
+			return Usage("%s: %q must be %s", path, key, bad)
 		}
 	}
-	return o, nil
+	return nil
 }
 
 // Branch returns the branch for the worktree named name: the branches setting with {name}

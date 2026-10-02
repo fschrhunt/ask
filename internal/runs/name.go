@@ -48,7 +48,7 @@ func join(list []string, max int) string {
 func Slug(prompt string) string {
 	keep := []string{}
 	for _, w := range words(prompt) {
-		if !filler[w] && (len(keep) == 0 || keep[len(keep)-1] != w) {
+		if !filler[w] && (len(w) > 1 || w[0] >= '0' && w[0] <= '9') && (len(keep) == 0 || keep[len(keep)-1] != w) {
 			keep = append(keep, w)
 		}
 	}

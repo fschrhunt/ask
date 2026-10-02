@@ -29,10 +29,11 @@ var options = map[string][]string{
 	"run":   {"-m", "-r", "-w", "--worktree", "-c", "--json", "--schema", "-C", "-t", "--no-hooks"},
 	"batch": {"-m", "-r", "-w", "--worktree", "--json", "--schema", "-C", "-t", "-j", "--resume", "--no-hooks"},
 	"title": {"--command", "--description", "--hook"},
+	"setup": {"--check", "--json", "--yes", "--agents", "-m", "-t", "-j", "--worktrees", "--branches", "--skills", "--hook", "--no-hook"},
 	"show":  {"--json"}, "runs": {"-n", "--all"}, "stop": {}, "models": {"--names"}, "help": {}, "install": {}, "packages": {}, "remove": {},
 }
-var long = map[string]string{"--model": "-m", "--read": "-r", "--write": "-w", "--continue": "-c", "--dir": "-C", "--timeout": "-t"}
-var value = map[string]bool{"-m": true, "-c": true, "--schema": true, "-C": true, "-t": true, "-j": true, "-n": true, "--resume": true, "--command": true, "--description": true}
+var long = map[string]string{"--model": "-m", "--read": "-r", "--write": "-w", "--continue": "-c", "--dir": "-C", "--timeout": "-t", "--jobs": "-j"}
+var value = map[string]bool{"-m": true, "-c": true, "--schema": true, "-C": true, "-t": true, "-j": true, "-n": true, "--resume": true, "--command": true, "--description": true, "--agents": true, "--worktrees": true, "--branches": true, "--skills": true}
 
 // suggestion returns a valid option only when the spelling is one edit away.
 func suggestion(command, wrong string) string {
@@ -551,7 +552,7 @@ func models(a *agent.Registry, names bool) (int, error) {
 		fmt.Fprintln(os.Stderr, "ask: could not list the models of "+e)
 	}
 	if len(ids) == 0 {
-		fmt.Fprintln(os.Stderr, "ask: no models; ask install claude, codex or opencode adds an agent (see ask help agents)")
+		fmt.Fprintln(os.Stderr, "ask: no models; run ask setup to connect your coding agents")
 	}
 	previous := ""
 	for _, id := range ids {
@@ -629,29 +630,37 @@ func checkAgents(p home.Paths, dir string) bool {
 			fmt.Fprintf(os.Stderr, "ask: %s: %s is used instead of this package's; remove it to use this one\n", name, home.Tilde(used))
 			continue
 		}
-		r := process.Run(path, []string{"models"}, process.Options{Env: p.Env(nil), Timeout: 60 * time.Second})
-		if r.Code != 0 {
-			why := process.Reason(r.Stderr)
-			if why == "" {
-				why = fmt.Sprintf("%s models exited %d", name, r.Code)
-			}
-			fmt.Fprintf(os.Stderr, "ask: %s is not ready: %s\n", name, why)
-			ready = false
-			continue
-		}
-		ids := 0
-		for _, l := range strings.Split(home.Trim(r.Stdout), "\n") {
-			if home.Trim(l) != "" {
-				ids++
-			}
-		}
-		if ids == 0 {
-			fmt.Fprintf(os.Stderr, "ask: %s is ready; it lists no models, so name the ones you use, like ask -m %s:MODEL (see ask help models)\n", name, name)
+		ok, text := readiness(p, name, path)
+		if ok {
+			fmt.Fprintf(os.Stderr, "ask: %s is ready%s\n", name, text)
 		} else {
-			fmt.Fprintf(os.Stderr, "ask: %s is ready: %s, see ask models\n", name, status.Plural(ids, "model"))
+			fmt.Fprintf(os.Stderr, "ask: %s is not ready: %s\n", name, text)
+			ready = false
 		}
 	}
 	return ready
+}
+
+// readiness runs NAME models from path: ready with a note about its models, or not with the reason.
+func readiness(p home.Paths, name, path string) (bool, string) {
+	r := process.Run(path, []string{"models"}, process.Options{Env: p.Env(nil), Timeout: 60 * time.Second})
+	if r.Code != 0 {
+		why := process.Reason(r.Stderr)
+		if why == "" {
+			why = fmt.Sprintf("%s models exited %d", name, r.Code)
+		}
+		return false, why
+	}
+	ids := 0
+	for _, l := range strings.Split(home.Trim(r.Stdout), "\n") {
+		if home.Trim(l) != "" {
+			ids++
+		}
+	}
+	if ids == 0 {
+		return true, fmt.Sprintf("; it lists no models, so name the ones you use, like ask -m %s:MODEL (see ask help models)", name)
+	}
+	return true, ": " + status.Plural(ids, "model") + ", see ask models"
 }
 
 // listPackages prints each installation and its directory contents.
@@ -750,6 +759,11 @@ func main(argv []string, version string) (int, error) {
 		return 0, nil
 	case "batch":
 		return batch(a, opts, words)
+	case "setup":
+		if len(words) != 0 {
+			return 0, home.Usage("ask setup takes no arguments; see ask setup --help")
+		}
+		return setupCommand(p, opts)
 	case "show":
 		return show(p, opts, words)
 	case "stop":

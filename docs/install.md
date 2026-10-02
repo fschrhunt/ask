@@ -40,10 +40,16 @@ cp ask ~/.local/bin/ask
 
 `ask --version` prints the release tag, or `dev` for an unversioned source build.
 
-## Add an agent
+## Set up
 
-ask runs each coding agent through an agent: a small executable that runs that agent's CLI. ask
-ships none, but installs the official ones by name:
+```sh
+ask setup
+```
+
+It finds the coding agent CLIs you have, connects ask to them, sets your defaults and teaches the
+apps you work in to use ask; see [Setup](setup.md). ask runs each coding agent through an agent:
+a small executable that runs that agent's CLI. ask ships none, but installs the official ones by
+name, which is what setup does:
 
 ```sh
 ask install claude        # Claude Code
@@ -52,8 +58,8 @@ ask install opencode      # Opencode
 ```
 
 Each needs its CLI installed and logged in, and Node.js 18 or newer. The agent finds the CLI even
-when it isn't on your `PATH`, and `ask install` says what is missing if anything is. To write
-your own, see [Agents](agents.md): a minimal one is a few lines of shell.
+when it isn't on your `PATH`, and setup says what is missing if anything is. To write your own,
+see [Agents](agents.md): a minimal one is a few lines of shell.
 
 Then check what ask can reach:
 

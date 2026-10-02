@@ -24,7 +24,7 @@ func modelLines(a *agent.Registry) string {
 	ids, failures := a.List(config)
 	agents := find.Sorted(a.Paths, "agents")
 	if len(agents) == 0 {
-		return "  None yet; ask install claude, codex or opencode adds one"
+		return "  None yet; run ask setup"
 	}
 	width := 0
 	for _, entry := range agents {
@@ -72,6 +72,7 @@ Usage
   ask -c RUN [options] PROMPT      Follow up in the same conversation
 
 Commands
+  setup      Set up agents, defaults and your apps
   batch      Run many tasks in parallel
   show       Print a saved answer
   runs       List recent runs
@@ -302,8 +303,32 @@ Hooks are executables in ~/.ask/hooks. The docs have the contract and examples.`
 	case "agents":
 		return `ask agents · run a coding agent's CLI for ask
 
-ask install claude, codex or opencode adds an official agent. Your own are executables in
+ask setup connects the official agents for the CLIs you have. Your own are executables in
 ~/.ask/agents; the docs have the contract and examples.` + "\n\ndocs  " + docsURL + "/agents.md"
+	case "setup":
+		return `ask setup · set up agents, defaults and the apps that use ask
+
+Usage
+  ask setup               In a terminal: a walkthrough the first time, then your settings
+  ask setup --check       Report, and exit 1 while an installed agent can't run
+  ask setup [flags]       Change things without asking, for scripts and agents
+
+Flags
+  --agents LIST     Install official agents: claude, codex, opencode
+  -m, --model M     Default model; "" for none
+  -t, --timeout S   Seconds per task; "" for 900
+  -j, --jobs N      Batch tasks at once; "" for 4
+  --worktrees T     Where --worktree works, with {name}; "" for ~/.ask/worktrees/{name}
+  --branches T      Worktree branch, with {name}; "" for ask/{name}
+  --skills LIST     Add the ask skill to claude-code, codex, opencode, cursor, pi or all
+  --hook            Title ask runs in Claude Code's task list; --no-hook removes it
+  --yes             Apply the recommended setup: agents for the CLIs found, skills, hook
+  --check --json    The report as JSON
+
+Examples
+  ask setup
+  ask setup --agents claude,codex -m claude:sonnet-5.5 --skills all --hook
+  ask setup --check --json` + "\n\ndocs  " + docsURL + "/setup.md"
 	case "settings":
 		return `ask settings · your defaults, in ~/.ask/settings.json
 
