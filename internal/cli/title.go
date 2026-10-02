@@ -291,8 +291,13 @@ func allDigits(s string) bool {
 }
 
 // titleJob uses a supplied description, or a clipped first prompt line, as one safe line.
-func titleJob(description, prompt string) string {
-	text := strings.TrimSpace(description)
+// Leading " · " parts the label already says, like a host's own "Sonnet 5.5 · Fix it", are dropped.
+func titleJob(description, prompt, label string) string {
+	parts := strings.Split(strings.TrimSpace(description), " · ")
+	for len(parts) > 1 && saidIn(label, parts[0]) {
+		parts = parts[1:]
+	}
+	text := strings.TrimSpace(strings.Join(parts, " · "))
 	if text == "" {
 		text, _, _ = strings.Cut(strings.TrimSpace(prompt), "\n")
 		r := []rune(text)
@@ -306,6 +311,17 @@ func titleJob(description, prompt string) string {
 		r[0] = unicode.ToUpper(r[0])
 	}
 	return string(r)
+}
+
+// saidIn reports whether part repeats one of label's parts, such as its model with or without effort.
+func saidIn(label, part string) bool {
+	part = strings.ToLower(strings.TrimSpace(part))
+	for _, have := range strings.Split(strings.ToLower(label), " · ") {
+		if part != "" && (have == part || strings.HasPrefix(have, part+" (")) {
+			return true
+		}
+	}
+	return false
 }
 
 // titlePath resolves literal host paths relative to preceding cd commands.
@@ -449,7 +465,7 @@ func invocationTitle(a *agent.Registry, argv []string, description, dir string, 
 			return "", nil
 		}
 		label = a.Name(m, "")
-		job := titleJob(description, prompt)
+		job := titleJob(description, prompt, label)
 		if job != "" && (prompt != "-" || strings.TrimSpace(description) != "") {
 			label += " · " + job
 		}
@@ -463,7 +479,7 @@ func invocationTitle(a *agent.Registry, argv []string, description, dir string, 
 		}
 		return label, opts
 	}
-	if job := titleJob(description, prompt); job != "" {
+	if job := titleJob(description, prompt, label); job != "" {
 		label += " · " + job
 	}
 	return label, opts

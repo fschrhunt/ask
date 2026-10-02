@@ -19,7 +19,8 @@ written by an earlier `cat > FILE <<'EOF'` in the same command, since that file 
 when the host asks. A batch file path is resolved from the invocation
 directory, even when `-C` sets the tasks' working directory. Resumes get `Resume RUN`.
 
-Job text comes from the trimmed description, with its first letter capitalized. Without one,
+Job text comes from the trimmed description, with its first letter capitalized; leading
+` · ` parts the title already says, like the model in `Sonnet 5.5 · Fix it`, are dropped. Without one,
 ask uses the first prompt line (including saved follow-up or task-file prompts), clipped to
 60 characters with `…`. Models use the same display names as `ask models --names`.
 
