@@ -401,31 +401,35 @@ func chain(first, second string) string {
 	return second
 }
 
+// AddUsage sums usage objects, keeping cost only when one reports it; nil when none has usage.
+func AddUsage(list ...any) any {
+	var sum home.Object
+	for _, v := range list {
+		part, ok := v.(home.Object)
+		if !ok || !home.Truth(v) {
+			continue
+		}
+		if sum == nil {
+			sum = home.Object{}
+		}
+		for _, key := range []string{"input", "output", "cached"} {
+			sum.Set(key, sum.N(key)+part.N(key))
+		}
+		if part.Has("cost") {
+			sum.Set("cost", sum.N("cost")+part.N("cost"))
+		}
+	}
+	if sum == nil {
+		return nil
+	}
+	return sum
+}
+
 // combine keeps the last answer while summing time, usage, commits and cumulative file changes.
 func combine(a, b home.Object) home.Object {
-	var usage any
-	parts := []home.Object{}
-	for _, v := range []any{a.Get("usage"), b.Get("usage")} {
-		if home.Truth(v) {
-			part, _ := v.(home.Object)
-			parts = append(parts, part)
-		}
-	}
-	if len(parts) > 0 {
-		sum := home.Object{}
-		for _, part := range parts {
-			for _, key := range []string{"input", "output", "cached"} {
-				sum.Set(key, sum.N(key)+part.N(key))
-			}
-			if part.Has("cost") {
-				sum.Set("cost", sum.N("cost")+part.N("cost"))
-			}
-		}
-		usage = sum
-	}
 	x := b.Clone()
 	x.Set("seconds", home.Number(home.Fixed(a.N("seconds")+b.N("seconds"), 1)))
-	x.Set("usage", usage)
+	x.Set("usage", AddUsage(a.Get("usage"), b.Get("usage")))
 	x.Set("followups", a.N("followups")+1)
 	if a.Has("changes") || b.Has("changes") {
 		files := map[string]string{}
@@ -466,7 +470,7 @@ func combine(a, b home.Object) home.Object {
 	return x
 }
 
-// Event is a task's start, hook note/follow-up, or final result, with its position.
+// Event is a task's start, usage so far (in Result), hook note/follow-up, or final result, with its position.
 type Event struct {
 	Kind    string
 	Index   int
@@ -499,7 +503,13 @@ func withHooks(a *agent.Registry, h *hooks.Hooks, t home.Object, ref string, rep
 		}
 	}
 	started := func(info task.Started) { worktree = info.Worktree; report(Event{Kind: "start", Started: info}) }
-	result := task.Run(a, t, started)
+	var earlier any // usage of finished rounds, so live usage keeps counting through follow-ups
+	progress := func(u home.Object) {
+		if sum, ok := AddUsage(earlier, u).(home.Object); ok {
+			report(Event{Kind: "usage", Result: sum})
+		}
+	}
+	result := task.Run(a, t, started, progress)
 	if process.Stopping() {
 		return nil
 	}
@@ -541,7 +551,8 @@ func withHooks(a *agent.Registry, h *hooks.Hooks, t home.Object, ref string, rep
 		next := t.Clone()
 		next.Set("prompt", followup.Text)
 		next.Set("session", result.Get("session"))
-		nextResult := task.Run(a, next, started)
+		earlier = result.Get("usage")
+		nextResult := task.Run(a, next, started, progress)
 		if process.Stopping() {
 			return nil
 		}

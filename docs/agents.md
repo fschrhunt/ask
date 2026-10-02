@@ -64,7 +64,9 @@ In the report, `session` is the agent session the run used, `name` is the model 
 (`Sonnet 5.5`), the counts are tokens, `cost` is in USD, and `note` is a short remark ask adds to
 the status line (`hit step cap; answer may be partial`). Every field is optional. ask reads the
 report even when the run fails or times out, so write it as early as you know something, above all
-the session, and rewrite it whole as you learn more.
+the session, and rewrite it whole as you learn more. ask also reads it while the agent runs, so
+usage you rewrite as it grows shows live in the terminal. Write a temporary file and rename it over
+the report, so ask never reads half a file; ask skips a report it can't parse until the next one.
 
 ask handles everything else: timeouts, stopping, batches, recording runs, follow-ups, worktrees,
 reporting what changed and checking JSON answers.
@@ -185,6 +187,11 @@ $ ask -c file-decides-ask-formats "Which function in it formats the usage part, 
 ask file-decides-ask-formats · ok · Haiku 4.5 · 6.0s · 34.9k in · 362 out · $0.08
 The `Usage` function formats token usage and optional cost in the pattern "input in · output out".
 ```
+
+To show usage live, stream instead: `--output-format stream-json --verbose
+--include-partial-messages` prints each model call's usage as it starts (`message_start`) and
+finishes (`message_delta`), and the run's cost in the final `result` event. Rewrite the report
+with the running sum on each one.
 
 ## Other agents
 

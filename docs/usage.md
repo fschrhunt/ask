@@ -176,8 +176,9 @@ ask login-test-fail · ok · Sonnet 5.5 · 14.2s · 31.0k in · 812 out · $0.09
 
 Stopping ask (Ctrl-C) stops the agent too.
 
-On a terminal, stderr shows a spinner with the model name, read/write access, directory and
-elapsed time, then a final marked row. Hook notes and follow-ups appear beneath their task.
+On a terminal, stderr shows a spinner with the model name, read/write access, directory,
+elapsed time and the tokens and cost so far, as the agent reports them (see
+[Agents](agents.md#running-name)), then a final marked row. Hook notes and follow-ups appear beneath their task.
 Batches show a header and task rows with queued, running, ok or failed state and reasons.
 Rows fit the terminal width; very large batches show a count of hidden lines.
 The frame finishes before answers print, so stdout may share the terminal. Ctrl-C stops agents,

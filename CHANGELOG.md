@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- The live view shows tokens and cost while agents run, and a batch's footer keeps a running
+  total. ask reads an agent's report as the agent rewrites it; agents that report usage only at
+  the end show it at the end, as before. Plain status lines are unchanged.
 - Runs are named after their prompt, like `login-test-fail`, and the name works wherever a run id
   does: `ask -c login-test-fail`, `ask show`, `ask stop`, `--resume`, and worktree branches
   (`ask/login-test-fail`). Every run keeps its fixed id too. A follow-up takes over its

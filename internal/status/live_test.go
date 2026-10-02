@@ -4,23 +4,25 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/fschrhunt/ask/internal/home"
 )
 
-// TestFrame pins running, queued and final rows, with color optional.
+// TestFrame pins running rows with usage so far, queued and final rows, and a footer with total usage.
 func TestFrame(t *testing.T) {
 	now := time.Unix(100, 0)
 	s := LiveState{Header: "ask abc123 · batch of 3", Batch: true, Started: now.Add(-2 * time.Second), Rows: []LiveRow{
-		{Ref: "abc123/a", Name: "Small One", Access: "read", Dir: "/tmp", State: "running", Started: now.Add(-2 * time.Second)},
+		{Ref: "abc123/a", Name: "Small One", Access: "read", Dir: "/tmp", State: "running", Started: now.Add(-2 * time.Second), Usage: home.O("input", 1200.0, "output", 30.0, "cost", 0.05)},
 		{Ref: "abc123/b", Name: "Big", State: "queued"},
 		{Ref: "abc123/c", Name: "Big", State: "failed", Reason: "quota exceeded"},
 	}}
 	got := Frame(s, now, 0, 100, 24, false, true)
 	want := []string{
 		"ask abc123 · batch of 3",
-		"⠋ a  Small One  read · /tmp · 0:02",
+		"⠋ a  Small One  read · /tmp · 0:02 · 1.2k in · 30 out · $0.05",
 		"· b  Big        queued",
 		"✗ c  Big        quota exceeded",
-		"0/3 ok · 1 failed · 0:02",
+		"0/3 ok · 1 failed · 0:02 · 1.2k in · 30 out · $0.05",
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Fatalf("%#v", got)
