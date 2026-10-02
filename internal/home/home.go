@@ -149,8 +149,9 @@ func (p Paths) ReadSettings() (Object, error) {
 	return o, nil
 }
 
-// WriteSettings checks and saves settings, leaving out keys with empty values.
-func (p Paths) WriteSettings(o Object) error {
+// SettingsText checks settings and returns settings.json's text for them, leaving out keys with
+// empty values; no settings at all is "", no file.
+func (p Paths) SettingsText(o Object) (string, error) {
 	keep := Object{}
 	for k, v := range o {
 		if v != nil && v != "" {
@@ -158,12 +159,40 @@ func (p Paths) WriteSettings(o Object) error {
 		}
 	}
 	if e := p.checkSettings(keep); e != nil {
+		return "", e
+	}
+	if len(keep) == 0 {
+		return "", nil
+	}
+	return JSON(keep, true) + "\n", nil
+}
+
+// WriteSettings checks and saves settings, removing the file when none are left.
+func (p Paths) WriteSettings(o Object) error {
+	text, e := p.SettingsText(o)
+	if e != nil {
 		return e
+	}
+	return p.writeText("settings.json", text)
+}
+
+// writeText replaces a file in ask's home atomically, or removes it for "".
+func (p Paths) writeText(name, text string) error {
+	path := filepath.Join(p.Home, name)
+	if text == "" {
+		if e := os.Remove(path); e != nil && !os.IsNotExist(e) {
+			return e
+		}
+		return nil
 	}
 	if e := os.MkdirAll(p.Home, 0700); e != nil {
 		return e
 	}
-	return WriteJSON(filepath.Join(p.Home, "settings.json"), keep)
+	tmp := filepath.Join(p.Home, "."+name+".tmp")
+	if e := os.WriteFile(tmp, []byte(text), 0600); e != nil {
+		return e
+	}
+	return os.Rename(tmp, path)
 }
 
 // checkSettings rejects unknown keys and values of the wrong kind, naming the key.

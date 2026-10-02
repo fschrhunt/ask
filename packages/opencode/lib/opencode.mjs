@@ -4,7 +4,7 @@
  * agent, so read runs inject rules for plan: file tools plus the read-only inspection commands.
  * Injected config is applied last and the last matching rule wins. Write runs use build with the
  * user's own permissions. It lists every model of the providers you have set up in Opencode;
- * turn off the ones you don't use with ask models or ask setup opencode. Models are named like the other agents',
+ * turn off the ones you don't use with ask models or ask settings opencode. Models are named like the other agents',
  * family-version-variant in lowercase (deepseek-4.1-flash for opencode-go/deepseek-v4.1-flash),
  * found in any provider; a provider/model id is used as it is. The session id of the first event is
  * reported at once; a follow-up continues it with --session. A new read run's prompt starts with

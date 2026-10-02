@@ -32,7 +32,7 @@ inner invocation skips them. Only model-listing agent processes can start.
 ## Claude Code
 
 Claude Code shows each background command in its task list by the command's description. Let ask
-write that description: `ask setup --hook` adds a `PreToolUse` hook for `Bash` to
+write that description: `ask settings set hook on` adds a `PreToolUse` hook for `Bash` to
 `~/.claude/settings.json`, or add it yourself:
 
 ```json

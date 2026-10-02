@@ -21,7 +21,7 @@ func TestHelpOverview(t *testing.T) {
 		r := s.ask("help", topic)
 		eq(t, r.code, 0)
 		match(t, r.stdout, `(?m)^ask `+topic+` · `)
-		match(t, r.stdout, `\ndocs  github.com/fschrhunt/ask/tree/main/docs/`+page+`\.md\n$`)
+		match(t, r.stdout, `\ndocs  ask docs `+page+`\n$`)
 	}
 }
 

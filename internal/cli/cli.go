@@ -24,17 +24,18 @@ import (
 	"github.com/fschrhunt/ask/internal/process"
 	"github.com/fschrhunt/ask/internal/runs"
 	"github.com/fschrhunt/ask/internal/status"
+	"github.com/fschrhunt/ask/internal/tui"
 )
 
 var options = map[string][]string{
 	"run":   {"-m", "-r", "-w", "--worktree", "-c", "--json", "--schema", "-C", "-t", "--max-cost", "--no-hooks"},
 	"batch": {"-m", "-r", "-w", "--worktree", "--json", "--schema", "-C", "-t", "--max-cost", "-j", "--resume", "--no-hooks"},
 	"title": {"--command", "--description", "--hook"},
-	"setup": {"--check", "--json", "--yes", "--agents", "-m", "-t", "-j", "--max-cost", "--worktrees", "--branches", "--skills", "--hook", "--no-hook"},
-	"show":  {"--json"}, "runs": {"-n", "--all"}, "wait": {"-t", "--json"}, "clean": {"--days", "--dry-run", "--yes"}, "stop": {}, "models": {"--names", "--all", "--enable", "--disable", "--max-cost"}, "help": {}, "install": {}, "packages": {}, "remove": {},
+	"setup": {"--check", "--json", "--yes"}, "settings": {"--json", "--dry-run"}, "docs": {"--raw", "--search", "--url"},
+	"show": {"--json"}, "runs": {"-n", "--all"}, "wait": {"-t", "--json"}, "clean": {"--days", "--dry-run", "--yes"}, "stop": {}, "models": {"--names", "--all", "--enable", "--disable", "--max-cost"}, "help": {}, "install": {}, "packages": {}, "remove": {},
 }
 var long = map[string]string{"--model": "-m", "--read": "-r", "--write": "-w", "--continue": "-c", "--dir": "-C", "--timeout": "-t", "--jobs": "-j"}
-var value = map[string]bool{"-m": true, "-c": true, "--schema": true, "-C": true, "-t": true, "-j": true, "-n": true, "--resume": true, "--command": true, "--description": true, "--agents": true, "--days": true, "--max-cost": true, "--worktrees": true, "--branches": true, "--skills": true}
+var value = map[string]bool{"-m": true, "-c": true, "--schema": true, "-C": true, "-t": true, "-j": true, "-n": true, "--resume": true, "--command": true, "--description": true, "--agents": true, "--days": true, "--max-cost": true, "--search": true, "--worktrees": true, "--branches": true, "--skills": true}
 
 // suggestion returns a valid option only when the spelling is one edit away.
 func suggestion(command, wrong string) string {
@@ -680,6 +681,11 @@ func changeModels(a *agent.Registry, config home.Models, opts home.Object, words
 		}
 		fmt.Fprintf(os.Stderr, "ask: %s:%s is %s\n", m.Agent, m.ID, state)
 	}
+	path := filepath.Join(a.Paths.Home, "models.json")
+	if before, after := read(path), home.ModelsText(config); before != after {
+		fmt.Fprintln(os.Stderr)
+		tui.Review(os.Stderr, []tui.Change{{Path: home.Tilde(path), Before: before, After: after}}, status.CanStyle(os.Stderr), termWidth())
+	}
 	return 0, a.Paths.WriteModels(config)
 }
 
@@ -859,13 +865,17 @@ func main(argv []string, version string) (int, error) {
 	case "batch":
 		return batch(a, opts, words)
 	case "setup":
-		if len(words) > 1 {
-			return 0, home.Usage("ask setup takes at most one agent, like ask setup opencode")
-		}
 		if len(words) == 1 {
-			return setupAgent(p, words[0])
+			return 0, home.Usage("ask settings %s opens one agent's settings", words[0])
+		}
+		if len(words) > 1 {
+			return 0, home.Usage("ask setup takes no arguments; see ask setup --help")
 		}
 		return setupCommand(p, opts)
+	case "settings":
+		return settingsCommand(p, opts, words)
+	case "docs":
+		return docsCommand(opts, words)
 	case "show":
 		return show(p, opts, words)
 	case "wait":

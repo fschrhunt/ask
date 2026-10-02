@@ -48,3 +48,16 @@ func TestPrompts(t *testing.T) {
 		t.Fatalf("ctrl-c: %v", e)
 	}
 }
+
+// TestDiff pins the review's line diff: shared lines left out, removals before additions.
+func TestDiff(t *testing.T) {
+	got := strings.Join(Diff("{\n  \"a\": 1,\n  \"b\": 2\n}\n", "{\n  \"a\": 1,\n  \"b\": 3\n}\n"), "|")
+	if got != `-   "b": 2|+   "b": 3` {
+		t.Fatalf("%q", got)
+	}
+	var out bytes.Buffer
+	Review(&out, []Change{{Path: "x.json", Before: "a\n", After: "b\n"}}, false, 80)
+	if out.String() != "x.json  +1 -1\n- a\n+ b\n\n1 file changed, 1 insertion(+), 1 deletion(-)\n" {
+		t.Fatalf("%q", out.String())
+	}
+}

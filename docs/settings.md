@@ -1,8 +1,65 @@
 # Settings
 
-`~/.ask/settings.json` (or `$ASK_HOME/settings.json`) holds your defaults. Every key is optional;
-without the file, ask uses the built-in defaults below. `ask setup` changes them for you, in a
-terminal or with flags (see [Setup](setup.md)), or edit the file.
+`ask settings` is where you change ask: your agents and their models, your defaults, where
+worktrees go, and what the apps you work in know about ask.
+
+## In a terminal
+
+```text
+ask settings  ~/.ask
+
+? What do you want to change?
+❯ Agents           claude, codex, opencode
+  Defaults         claude:sonnet-5.5 · no cost limit · edited
+  Worktrees        ~/code/worktrees/ask-{name}
+  Apps             ask skill in 5 of 5 apps · task titles on
+  Review and save  1 change
+  Done
+```
+
+Nothing is written while you edit: what you change is marked `edited`, and **Review and save**
+shows exactly what will change, file by file, before it asks:
+
+```text
+~/.ask/settings.json  +1 -1
+  "timeout": 900
+  "timeout": 1800
+
+1 file changed, 1 insertion(+), 1 deletion(-)
+
+? Save these changes? (Y/n)
+```
+
+Removed lines sit on a red band and added ones on a green band, under a bar naming each file
+with its counts. Leaving with unsaved changes asks whether to
+save them, and Ctrl-C discards them.
+
+- **Agents**: each agent: install or remove an official one, which of its models are on, and
+  their cost limits. `ask settings NAME` opens one directly, like `ask settings opencode`.
+- **Defaults**: the model when you don't give `-m`, the cost limit, the timeout and batch jobs.
+- **Worktrees**: where `--worktree` works, and its branch name.
+- **Apps**: the ask skill for each app that reads skills, and task titles in Claude Code.
+
+## From scripts and agents
+
+```sh
+ask settings get                       # every setting, defaults marked
+ask settings get model
+ask settings get --json                # the values that apply
+ask settings set max_cost 2            # shows what changes, then saves
+ask settings set worktrees '~/code/worktrees/ask-{name}' --dry-run
+ask settings unset model               # back to the default
+ask settings set hook on
+ask settings set skills all
+```
+
+`set` and `unset` print the same review on stderr; `--dry-run` stops there. Without a terminal,
+`ask settings` prints `get`, and `ask settings NAME` prints that agent's models with on or off.
+
+## settings.json
+
+Your defaults are in `~/.ask/settings.json` (or `$ASK_HOME/settings.json`). Every key is optional;
+without the file, ask uses the built-in defaults below.
 
 ```json
 {
@@ -28,6 +85,7 @@ terminal or with flags (see [Setup](setup.md)), or edit the file.
 task. With the example above, `ask -w --worktree "Add rate limiting to login"` works in
 `~/code/worktrees/ask-add-rate-limiting-login` on branch `ask/add-rate-limiting-login`.
 
-An unknown key or a value of the wrong kind is an error that names the key, so a typo never
-silently does nothing. Settings change only new runs: a follow-up finds its worktree where the
+`ask settings set` also takes `hook` (`on` or `off`) and `skills` (`claude-code`, `codex`,
+`opencode`, `cursor`, `pi` or `all`), which live in those apps' own files. An unknown key or a
+value of the wrong kind is an error that names the key, so a typo never silently does nothing. Settings change only new runs: a follow-up finds its worktree where the
 current `worktrees` setting puts it.

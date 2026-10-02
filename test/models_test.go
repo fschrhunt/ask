@@ -20,7 +20,7 @@ func TestModelsOnOff(t *testing.T) {
 	match(t, r.stderr, `fake:small is off in models.json; turn it on with ask models fake:small --enable`)
 	s.ask("models", "fake:small", "--enable")
 	eq(t, s.ask("-m", "fake:small", "hi").code, 0)
-	noMatch(t, s.read(filepath.Join(s.home, "models.json")), `small`)
+	eq(t, exists(filepath.Join(s.home, "models.json")), false)
 	s.write(filepath.Join(s.home, "models.json"), `{"fake": ["extra"]}`)
 	match(t, s.ask("models").stdout, `(?m)^fake:extra$`)
 }

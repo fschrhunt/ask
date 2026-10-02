@@ -20,11 +20,13 @@ var ErrInterrupted = errors.New("interrupted")
 type Option struct{ Label, Note string }
 
 // Prompter asks questions on one terminal. Color adds gh's accents; without it output is plain.
+// Unicode draws ● and ○ for chosen and not, instead of [x] and [ ].
 type Prompter struct {
-	In    io.Reader
-	Out   io.Writer
-	Color bool
-	lines int
+	In      io.Reader
+	Out     io.Writer
+	Color   bool
+	Unicode bool
+	lines   int
 }
 
 // Raw switches a terminal to unbuffered, unechoed input and returns the function that restores it.
@@ -110,15 +112,19 @@ func (p *Prompter) draw(lines []string) {
 	p.lines = len(lines)
 }
 
-// done replaces the prompt with its answered form, "? Question answer", and forgets its lines.
+// done replaces the prompt with its answered form, "✔ Question answer", and forgets its lines.
 func (p *Prompter) done(question, answer string) {
-	p.draw([]string{p.paint("32", "?") + " " + p.paint("1", question) + " " + p.paint("36", answer)})
+	mark := "?"
+	if p.Unicode {
+		mark = "✔"
+	}
+	p.draw([]string{p.paint("2", mark) + " " + question + " " + p.paint("1", answer)})
 	p.lines = 0
 }
 
 // question is a prompt's first line, with a dim hint.
 func (p *Prompter) question(q, hint string) string {
-	line := p.paint("32", "?") + " " + p.paint("1", q)
+	line := p.paint("2", "?") + " " + p.paint("1", q)
 	if hint != "" {
 		line += " " + p.paint("2", hint)
 	}
@@ -184,8 +190,11 @@ func (p *Prompter) optionLine(o Option, current bool, box string, width int) str
 		label += strings.Repeat(" ", width-len([]rune(o.Label)))
 	}
 	if current {
-		mark = p.paint("36", "> ")
-		label = p.paint("36", label)
+		mark = p.paint("1", "> ")
+		if p.Unicode {
+			mark = p.paint("1", "❯ ")
+		}
+		label = p.paint("1", label)
 	}
 	line := mark + box + label
 	if o.Note != "" {
@@ -248,7 +257,7 @@ func (p *Prompter) Select(q string, options []Option, start int) (int, error) {
 	for {
 		shown := visible(options, filter)
 		cursor = min(max(cursor, 0), max(len(shown)-1, 0))
-		p.draw(p.listLines(q, "[type to filter · ↑↓ move · enter choose]", filter, options, shown, cursor, func(int) string { return "" }))
+		p.draw(p.listLines(q, "↑↓ · enter · type to filter", filter, options, shown, cursor, func(int) string { return "" }))
 		k, e := p.key()
 		if e != nil {
 			return 0, e
@@ -284,15 +293,20 @@ func (p *Prompter) MultiSelect(q string, options []Option, chosen []bool) ([]boo
 	filter := ""
 	cursor := 0
 	box := func(i int) string {
-		if picked[i] {
-			return p.paint("32", "[x]") + " "
+		switch {
+		case picked[i] && p.Unicode:
+			return p.paint("1", "●") + " "
+		case p.Unicode:
+			return p.paint("2", "○") + " "
+		case picked[i]:
+			return p.paint("1", "[x]") + " "
 		}
 		return "[ ] "
 	}
 	for {
 		shown := visible(options, filter)
 		cursor = min(max(cursor, 0), max(len(shown)-1, 0))
-		p.draw(p.listLines(q, "[type to filter · ↑↓ move · space select · ctrl-a all · enter done]", filter, options, shown, cursor, box))
+		p.draw(p.listLines(q, "space to choose · ctrl-a all · enter when done · type to filter", filter, options, shown, cursor, box))
 		k, e := p.key()
 		if e != nil {
 			return nil, e
@@ -388,9 +402,20 @@ func (p *Prompter) Input(q, def string) (string, error) {
 
 // Say prints a finished line, like "✓ Installed claude", that later prompts never redraw.
 func (p *Prompter) Say(mark, text string) {
-	code := map[string]string{"✓": "32", "!": "33", "✗": "31", "•": "2"}[mark]
+	code := map[string]string{"✓": "1", "!": "1", "✗": "31", "•": "2"}[mark]
+	if mark == "✓" && p.Unicode {
+		mark = "✔"
+	}
 	fmt.Fprint(p.Out, p.paint(code, mark)+" "+text+"\r\n")
 }
 
 // Bold styles a heading.
 func (p *Prompter) Bold(text string) string { return p.paint("1", text) }
+
+// Dim styles a quiet note.
+func (p *Prompter) Dim(text string) string { return p.paint("2", text) }
+
+// Title prints a screen's name in bold with a quiet note after it, then a blank line.
+func (p *Prompter) Title(name, note string) {
+	fmt.Fprint(p.Out, p.Bold(name)+"  "+p.Dim(note)+"\r\n\r\n")
+}

@@ -12,8 +12,6 @@ import (
 	"github.com/fschrhunt/ask/internal/status"
 )
 
-const docsURL = "github.com/fschrhunt/ask/tree/main/docs"
-
 // modelLines groups each local agent's model ids, or why it could not list them, one agent per
 // row with the names aligned, wrapped to 80 columns so help reads the same on any terminal or pipe.
 func modelLines(a *agent.Registry) string {
@@ -75,7 +73,8 @@ Usage
   ask -c RUN [options] PROMPT      Follow up in the same conversation
 
 Commands
-  setup      Set up agents, defaults and your apps
+  setup      Set ask up the first time
+  settings   Change agents, defaults, worktrees and apps
   batch      Run many tasks in parallel
   show       Print a saved answer
   wait       Wait for runs to finish, then print them
@@ -84,6 +83,7 @@ Commands
   clean      Remove finished worktrees and old runs
   models     List available models
   title      Name a command for a host
+  docs       Read the docs
   install    Install or update packages
   packages   List installed packages
   remove     Remove a package`}
@@ -119,7 +119,7 @@ Commands
   --no-hooks           Skip your hooks
 
 Models
-`+modelLines(a), "ask help run for run options · ask COMMAND --help for the rest\ndocs  "+docsURL)
+`+modelLines(a), "ask help run for run options · ask COMMAND --help for the rest\ndocs  ask docs")
 	return strings.Join(lines, "\n\n")
 }
 
@@ -157,7 +157,7 @@ Runs
 
 Examples
   ask -m claude:haiku-4.5 "Where is login checked?"
-  ask -c login-checked -w "Fix it and run the test."` + "\n\ndocs  " + docsURL + "/usage.md"
+  ask -c login-checked -w "Fix it and run the test."` + "\n\ndocs  ask docs usage"
 	case "batch":
 		return `ask batch · run tasks in parallel
 
@@ -197,7 +197,7 @@ Options
 
 Examples
   ask batch -j 4 -m claude:haiku-4.5 tasks.json
-  ask batch --resume summarize-public-api` + "\n\ndocs  " + docsURL + "/batches.md"
+  ask batch --resume summarize-public-api` + "\n\ndocs  ask docs batches"
 	case "show":
 		return `ask show · print a run again, without starting its agent
 
@@ -211,7 +211,7 @@ Output
 
 Examples
   ask show login-checked
-  ask show summarize-public-api/api --json` + "\n\ndocs  " + docsURL + "/runs.md"
+  ask show summarize-public-api/api --json` + "\n\ndocs  ask docs runs"
 	case "runs":
 		return `ask runs · list recent runs, newest first
 
@@ -227,7 +227,7 @@ Output
 
 Examples
   ask runs
-  ask runs --all -n 50` + "\n\ndocs  " + docsURL + "/runs.md"
+  ask runs --all -n 50` + "\n\ndocs  ask docs runs"
 	case "wait":
 		return `ask wait · wait for runs to finish, then print them
 
@@ -245,7 +245,7 @@ Output
 
 Examples
   ask wait login-test-fail
-  ask wait fix-api fix-tests -t 1800` + "\n\ndocs  " + docsURL + "/runs.md"
+  ask wait fix-api fix-tests -t 1800` + "\n\ndocs  ask docs runs"
 	case "clean":
 		return `ask clean · remove worktrees whose work has landed, and old runs
 
@@ -264,7 +264,7 @@ Options
 
 Examples
   ask clean
-  ask clean --dry-run --days 7` + "\n\ndocs  " + docsURL + "/runs.md"
+  ask clean --dry-run --days 7` + "\n\ndocs  ask docs runs"
 	case "stop":
 		return `ask stop · stop a run and its agents
 
@@ -276,7 +276,7 @@ Output
   exit     0 stopped · 1 not running
 
 Example
-  ask stop login-checked` + "\n\ndocs  " + docsURL + "/runs.md"
+  ask stop login-checked` + "\n\ndocs  ask docs runs"
 	case "models":
 		return `ask models · list the models you can use, and turn them on or off
 
@@ -299,7 +299,7 @@ Examples
   ask models --all
   ask models codex:gpt-5.6-sol opencode:gpt-4o --disable
   ask models claude:opus-5.5 --max-cost 10
-  ask setup opencode                 Choose in a filterable list` + "\n\ndocs  " + docsURL + "/models.md"
+  ask settings opencode              Choose in a filterable list` + "\n\ndocs  ask docs models"
 	case "title":
 		return `ask title · name a command for a host's task list
 
@@ -317,7 +317,7 @@ Hooks
   title hooks may rename it; --no-hooks in the command skips them
 
 Example
-  ask title --command 'ask -m claude:haiku-4.5 "Check tests"' --description "check tests"` + "\n\ndocs  " + docsURL + "/hosts.md"
+  ask title --command 'ask -m claude:haiku-4.5 "Check tests"' --description "check tests"` + "\n\ndocs  ask docs hosts"
 	case "install":
 		return `ask install · install agents and packages, or update every package
 
@@ -337,7 +337,7 @@ Output
 Examples
   ask install claude codex
   ask install owner/repo
-  ask install` + "\n\ndocs  " + docsURL + "/packages.md"
+  ask install` + "\n\ndocs  ask docs packages"
 	case "packages":
 		return `ask packages · list installed packages and what they offer
 
@@ -345,7 +345,7 @@ Usage
   ask packages
 
 Example
-  ask packages` + "\n\ndocs  " + docsURL + "/packages.md"
+  ask packages` + "\n\ndocs  ask docs packages"
 	case "remove":
 		return `ask remove · remove a package
 
@@ -353,55 +353,84 @@ Usage
   ask remove PACKAGE
 
 Example
-  ask remove owner/repo` + "\n\ndocs  " + docsURL + "/packages.md"
+  ask remove owner/repo` + "\n\ndocs  ask docs packages"
 	case "hooks":
 		return `ask hooks · change tasks before they run and check results after
 
-Hooks are executables in ~/.ask/hooks. The docs have the contract and examples.` + "\n\ndocs  " + docsURL + "/hooks.md"
+Hooks are executables in ~/.ask/hooks. The docs have the contract and examples.` + "\n\ndocs  ask docs hooks"
 	case "agents":
 		return `ask agents · run a coding agent's CLI for ask
 
-ask setup connects the official agents for the CLIs you have. Your own are executables in
-~/.ask/agents; the docs have the contract and examples.` + "\n\ndocs  " + docsURL + "/agents.md"
+ask setup connects the official agents for the CLIs you have, and ask settings NAME changes
+one. Your own are executables in
+~/.ask/agents; the docs have the contract and examples.` + "\n\ndocs  ask docs agents"
 	case "setup":
-		return `ask setup · set up agents, defaults and the apps that use ask
+		return `ask setup · set ask up the first time, or check it
 
 Usage
-  ask setup               In a terminal: a walkthrough the first time, then your settings
-  ask setup NAME          One agent: which of its models are on, and their cost limits
-  ask setup --check       Report, and exit 1 while an installed agent can't run
-  ask setup [flags]       Change things without asking, for scripts and agents
+  ask setup             In a terminal: a walkthrough, then a review before anything is saved;
+                        once set up, your settings
+  ask setup --yes       The recommended setup without asking: agents for the CLIs found,
+                        the ask skill, task titles in Claude Code; shows what it changes
+  ask setup --check     Report, and exit 1 while an installed agent can't run
 
-Flags
-  --agents LIST     Install official agents: claude, codex, opencode
-  -m, --model M     Default model; "" for none
-  -t, --timeout S   Seconds per task; "" for 900
-  -j, --jobs N      Batch tasks at once; "" for 4
-  --max-cost USD    Dollars a task may spend; 0 or "" for no limit
-  --worktrees T     Where --worktree works, with {name}; "" for ~/.ask/worktrees/{name}
-  --branches T      Worktree branch, with {name}; "" for ask/{name}
-  --skills LIST     Add the ask skill to claude-code, codex, opencode, cursor, pi or all
-  --hook            Title ask runs in Claude Code's task list; --no-hook removes it
-  --yes             Apply the recommended setup: agents for the CLIs found, skills, hook
-  --check --json    The report as JSON
+Options
+  --json   With --check, the report as JSON
 
 Examples
   ask setup
-  ask setup --agents claude,codex -m claude:sonnet-5.5 --skills all --hook
-  ask setup --check --json` + "\n\ndocs  " + docsURL + "/setup.md"
+  ask setup --check --json` + "\n\ndocs  ask docs setup"
+	case "docs":
+		return `ask docs · read ask's docs, built in
+
+Usage
+  ask docs                  Every page, with what it covers
+  ask docs PAGE             One page: styled in a terminal, markdown when piped
+  ask docs --search TERM    Every line in the docs that mentions TERM
+
+Options
+  --raw     Markdown, even in a terminal
+  --url     The page on GitHub instead
+
+Pages
+  index, install, setup, settings, usage, runs, batches, models, agents, hosts,
+  hooks, commands, packages, compatibility, and the official agents: claude,
+  codex, opencode. A page's first letters are enough, like ask docs batch.
+
+Examples
+  ask docs settings
+  ask docs --search worktree
+  ask docs claude --raw` + "\n\ndocs  ask docs index"
 	case "settings":
-		return `ask settings · your defaults, in ~/.ask/settings.json
+		return `ask settings · change agents, defaults, worktrees and apps
+
+Usage
+  ask settings                  In a terminal: every setting, grouped; edits wait for review
+  ask settings NAME             One agent: install or remove it, its models, their cost limits
+  ask settings get [KEY]        Print settings, or one value
+  ask settings set KEY VALUE    Show what changes, then save it
+  ask settings unset KEY        Back to the default
 
 Keys
-  model       The model when -m gives none, like "claude:sonnet-5.5"
+  model       The model when -m gives none, like claude:sonnet-5.5
   timeout     Seconds per task (default: 900)
   jobs        Batch tasks at once (default: 4)
   max_cost    Dollars a task may spend; ask stops it there (default: no limit)
-  worktrees   Where --worktree works, like "~/code/worktrees/ask-{name}"
-  branches    A worktree's branch, like "ask/{name}" (the default)
+  worktrees   Where --worktree works, like ~/code/worktrees/ask-{name}
+  branches    A worktree's branch (default: ask/{name})
+  hook        on or off: title ask runs in Claude Code's task list
+  skills      Apps to give the ask skill: claude-code, codex, opencode, cursor, pi, all
 
-Example
-  {"model": "claude:sonnet-5.5", "worktrees": "~/code/worktrees/ask-{name}"}` + "\n\ndocs  " + docsURL + "/settings.md"
+Options
+  --dry-run   With set or unset, show what would change and save nothing
+  --json      With get, the values that apply, as JSON
+
+Examples
+  ask settings
+  ask settings opencode
+  ask settings set max_cost 2
+  ask settings set worktrees '~/code/worktrees/ask-{name}' --dry-run
+  ask settings get --json` + "\n\ndocs  ask docs settings"
 	}
 	return ""
 }

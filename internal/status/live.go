@@ -325,6 +325,9 @@ func (l *Live) Finish(summary string, stopped bool) {
 }
 
 // localeUTF8 chooses Unicode marks only when the active locale can display them.
+// UTF8 reports whether the locale can show symbols like ● and ✓.
+func UTF8() bool { return localeUTF8() }
+
 func localeUTF8() bool {
 	for _, key := range []string{"LC_ALL", "LC_CTYPE", "LANG"} {
 		if locale, ok := os.LookupEnv(key); ok && locale != "" {

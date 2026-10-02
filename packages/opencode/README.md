@@ -21,7 +21,7 @@ have set up in Opencode, once each. That can be a hundred or more; turn off the 
 use, in a list you can filter:
 
 ```sh
-ask setup opencode
+ask settings opencode
 ask models opencode:gpt-4o --disable     # or one at a time
 ```
 

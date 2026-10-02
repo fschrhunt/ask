@@ -2,19 +2,29 @@
 
 ## Unreleased
 
-- Turn models on and off: `ask models MODEL... --enable|--disable`, or `ask setup NAME` for a
+- `ask settings`: every setting in one place. In a terminal, a menu of Agents (each agent's models,
+  cost limits, install and remove; `ask settings NAME` opens one), Defaults, Worktrees and Apps.
+  Nothing is written while you edit; Review and save shows each file's changes as a diff, then
+  asks. For scripts, `ask settings get [KEY]`, `set KEY VALUE` and `unset KEY` show the same
+  review, with `--dry-run` and `--json`. `ask models` changes show the diff too.
+- `ask setup` is the first run: a walkthrough that ends with that review, `--yes` and `--check`.
+  Its setting flags moved to `ask settings set`.
+- `ask docs`: the docs, built in. `ask docs PAGE` (a prefix is enough), `--search TERM`, `--raw`
+  and `--url`; the official agents' READMEs are pages too. Help footers name their page.
+- The terminal look is black, white and greys; color marks only diffs and outcomes.
+- Turn models on and off: `ask models MODEL... --enable|--disable`, or `ask settings NAME` for a
   filterable list of everything an agent offers. Off models are hidden from `ask models` and help
   and refused by `-m`; `ask models --all` shows both. `models.json` keeps only your choices per
   agent: `false` for off, `true` to add a model, `{"enabled", "max_cost"}` for a model's own cost
   limit; the older list form still works.
 - The Opencode agent lists every model of the providers you have set up in Opencode, instead of
   none. Help shows a count for an agent with more than a dozen models.
-- Cost limits, off unless set: the `max_cost` setting (`ask setup --max-cost 2`), a model's own
+- Cost limits, off unless set: the `max_cost` setting (`ask settings set max_cost 2`), a model's own
   limit (`ask models claude:opus-5.5 --max-cost 10`) and `--max-cost` per run or batch, which wins.
   Agents get the limit in `ASK_MAX_COST`; ask stops an agent whose reported cost passes it, keeping
   its session for `ask -c`. The Claude Code agent hands it to Claude Code's `--max-budget-usd`,
   since Claude Code reports cost only when it ends; Codex reports no cost, so limits skip it.
-- Lists in `ask setup` filter as you type; ctrl-a selects everything shown.
+- Lists in `ask setup` and `ask settings` filter as you type; ctrl-a selects everything shown.
 - `ask wait RUN...` blocks until runs finish, then prints them like `ask show` (several runs as one
   JSON array); `-t` gives up after that many seconds. The ask skill tells agents to collect their
   background runs with it.
@@ -31,9 +41,8 @@
   no longer prints.
 - `ask setup`: in a terminal, a walkthrough the first time (agents for the CLIs it finds, a default
   model, where worktrees go, the ask skill for Claude Code, Codex, Opencode, Cursor and pi, and
-  task titles in Claude Code) and your settings after. Flags do the same without asking:
-  `--agents`, `-m`, `-t`, `-j`, `--worktrees`, `--branches`, `--skills`, `--hook`/`--no-hook`,
-  `--yes`, and `--check` (with `--json`) to report. ask points to it wherever no agent is set up.
+  task titles in Claude Code); `--yes` applies the recommended setup and `--check` (with `--json`)
+  reports. ask points to it wherever no agent is set up.
 - `ask install NAME` always means the official agent, even beside a folder of that name; name a
   local repository by a path. One-letter words no longer end up in run names (`ask's` was `ask-s`).
 - `ask install claude`, `codex` or `opencode` installs the official agent package for that CLI
