@@ -105,7 +105,7 @@ your version.
 | | |
 | --- | --- |
 | [Install](docs/install.md) · [Setup](docs/setup.md) · [Settings](docs/settings.md) | Getting ask and setting it up |
-| [Usage](docs/usage.md) · [Runs](docs/runs.md) · [Batches](docs/batches.md) · [Models](docs/models.md) | Running tasks, following up, many at once, cost limits |
+| [Usage](docs/usage.md) · [Runs](docs/runs.md) · [Batches](docs/batches.md) · [Bench](docs/bench.md) · [Models](docs/models.md) | Running tasks, following up, many at once, comparing models, cost limits |
 | [Agents](docs/agents.md) · [Hooks](docs/hooks.md) · [Commands](docs/commands.md) · [Packages](docs/packages.md) | Extending ask |
 | [Hosts](docs/hosts.md) · [Compatibility](docs/compatibility.md) | Other tools using ask, and what stays stable |
 

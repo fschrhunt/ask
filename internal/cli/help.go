@@ -76,6 +76,7 @@ Commands
   setup      Set ask up the first time
   settings   Change agents, defaults, worktrees and apps
   batch      Run many tasks in parallel
+  bench      Compare models on the same tasks
   show       Print a saved answer
   wait       Wait for runs to finish, then print them
   runs       List recent runs
@@ -159,6 +160,38 @@ Runs
 Examples
   ask -m claude:haiku-4.5 "Where is login checked?"
   ask -c login-checked -w "Fix it and run the test."` + "\n\ndocs  ask docs usage"
+	case "bench":
+		return `ask bench · compare models on the same tasks
+
+Usage
+  ask bench -m MODEL -m MODEL [options] FILE|-
+
+Every task runs on every model, -n times each. An attempt passes when
+its agent finishes and the task's check exits 0.
+
+Tasks · a batch file, without model, plus
+  check      Shell command run where the agent worked, the answer
+             on stdin; exit 0 passes (default: finishing passes)
+
+Options
+  -m MODEL       A model to compare; give one -m per model
+  -n N           Attempts per task and model (default: 1)
+  -w, -C, -t     Defaults for every task, as in batch
+  --max-cost USD Each attempt's cost limit
+  -j N           Attempts at once (default: 4)
+  --keep         Keep write attempts' worktrees (default: discarded)
+  --json         Print the report as JSON (default in a pipe)
+  --yes          Start without asking in a terminal
+  --no-hooks     Skip your hooks
+
+Output
+  stdout   A row per model: passed, median time, tokens, cost, $/pass
+  stderr   Live rows and status lines, as in batch
+  exit     0 when the bench ran, whatever passed · 2 usage error
+
+Examples
+  ask bench -m claude:sonnet-5.5 -m codex:gpt-6.1-sol -n 3 bench.json
+  ask show RUN                     the table again` + "\n\ndocs  ask docs bench"
 	case "batch":
 		return `ask batch · run tasks in parallel
 

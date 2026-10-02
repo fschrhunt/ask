@@ -3,6 +3,8 @@ package cli
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/fschrhunt/ask/internal/git"
@@ -206,6 +208,19 @@ func show(p home.Paths, opts home.Object, words []string) (int, error) {
 	r, i, e := runs.Open(p, words[0])
 	if e != nil {
 		return 0, e
+	}
+	if b, e := os.ReadFile(filepath.Join(r.Dir, "bench.json")); e == nil && !strings.Contains(words[0], "/") {
+		report, e := home.ParsePayload(string(b))
+		if e != nil {
+			return 0, fmt.Errorf("%s: bench.json is damaged: %v", r.Label(), e)
+		}
+		fmt.Fprintln(os.Stderr, status.StyledLine(status.BatchSaved(r), os.Stderr))
+		if opts.B("--json") {
+			fmt.Fprintln(os.Stdout, home.JSON(report, true))
+		} else {
+			fmt.Fprint(os.Stdout, benchTable(report))
+		}
+		return 0, nil
 	}
 	if i < 0 {
 		fmt.Fprintln(os.Stderr, status.StyledLine(status.BatchSaved(r), os.Stderr))

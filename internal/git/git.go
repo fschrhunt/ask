@@ -264,6 +264,20 @@ func Remove(w *Worktree) bool {
 	return true
 }
 
+// Discard removes a worktree and its branch whatever they hold, for throwaway work such as a
+// bench attempt; everything else keeps changed worktrees and uses Remove.
+func Discard(w *Worktree) bool {
+	root, _ := git(w.Path, []string{"rev-parse", "--git-common-dir"}, "")
+	root = home.Trim(root)
+	if _, ok := git(w.Path, []string{"worktree", "remove", "--force", w.Path}, ""); !ok {
+		return false
+	}
+	if root != "" {
+		git(filepath.Join(root, ".."), []string{"branch", "-D", w.Branch}, "")
+	}
+	return true
+}
+
 // Checkouts returns the main checkout and every worktree of the repository holding dir, as
 // physical paths, or nil when dir is not in a git repository.
 func Checkouts(dir string) []string {

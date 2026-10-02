@@ -12,6 +12,7 @@ everything it does, with examples you can copy.
 | [Usage](usage.md) | One task: read and write, what changed, worktrees, JSON answers, output |
 | [Runs](runs.md) | Run names, follow-ups, listing, waiting, stopping and cleaning up runs |
 | [Batches](batches.md) | Many tasks in parallel, recorded runs, resuming |
+| [Bench](bench.md) | Comparing models on the same tasks, scored by your own checks |
 | [Models](models.md) | Model ids, effort, turning models on and off, and models.json |
 | [Agents](agents.md) | Reaching a coding agent: the contract, read-only, and examples |
 | [Hosts](hosts.md) | Background command titles and a Claude Code hook |
