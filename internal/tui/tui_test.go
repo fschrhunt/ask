@@ -15,15 +15,20 @@ func prompter(keys string) (*Prompter, *bytes.Buffer) {
 
 // TestPrompts pins each prompt's keys and its answered line.
 func TestPrompts(t *testing.T) {
-	p, out := prompter("\x1b[Bj\x1b[A\r")
+	p, out := prompter("\x1b[B\x1b[B\x1b[A\r")
 	i, e := p.Select("Pick", []Option{{Label: "a"}, {Label: "b"}, {Label: "c"}}, 0)
 	if e != nil || i != 1 || !strings.HasSuffix(out.String(), "? Pick b\r\n") {
 		t.Fatalf("select: %d %v %q", i, e, out.String())
 	}
-	p, _ = prompter(" a\r")
+	p, _ = prompter(" \x01\r")
 	picked, e := p.MultiSelect("Pick", []Option{{Label: "a"}, {Label: "b"}}, []bool{false, true})
 	if e != nil || picked[0] || picked[1] {
-		t.Fatalf("space then a toggles everything off: %v %v", picked, e)
+		t.Fatalf("space then ctrl-a toggles everything off: %v %v", picked, e)
+	}
+	p, out = prompter("ta\r")
+	i, e = p.Select("Pick", []Option{{Label: "alpha"}, {Label: "beta"}, {Label: "gamma", Note: "third"}}, 0)
+	if e != nil || i != 1 || !strings.Contains(out.String(), "filter: ta") {
+		t.Fatalf("typing filters, enter takes the first match: %d %v", i, e)
 	}
 	p, out = prompter("ab\x7fc\r")
 	text, e := p.Input("Name", "x")

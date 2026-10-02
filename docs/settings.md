@@ -8,6 +8,7 @@ terminal or with flags (see [Setup](setup.md)), or edit the file.
 {
   "model": "claude:sonnet-5.5",
   "timeout": 1800,
+  "max_cost": 2,
   "jobs": 6,
   "worktrees": "~/code/worktrees/ask-{name}",
   "branches": "ask/{name}"
@@ -19,6 +20,7 @@ terminal or with flags (see [Setup](setup.md)), or edit the file.
 | `model` | The model when neither `-m`, a batch task, nor a follow-up gives one | none: `-m` is required |
 | `timeout` | Seconds a task may run, unless `-t` or the task says otherwise | `900` |
 | `jobs` | Batch tasks at once, unless `-j` says otherwise | `4` |
+| `max_cost` | Dollars a task may spend before ask stops it, unless `--max-cost` or the model's own limit in [models.json](models.md#modelsjson) says otherwise; `0` for none (see [Cost limits](usage.md#cost-limits)) | none |
 | `worktrees` | Where `--worktree` puts a run's worktree: an absolute or `~` path whose last part holds `{name}` once | `~/.ask/worktrees/{name}` |
 | `branches` | The branch of a run's worktree, holding `{name}` once | `ask/{name}` |
 

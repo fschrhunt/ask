@@ -145,6 +145,9 @@ func EventLine(r *runs.Run, e runs.Event) string {
 func Done(r home.Object) string {
 	outcome := "failed"
 	note := r.S("error")
+	if strings.HasPrefix(note, "stopped at the $") && r.B("session") {
+		note += "; ask -c " + r.S("run") + " continues it"
+	}
 	if r.B("ok") {
 		outcome = "ok"
 		note = r.S("note")

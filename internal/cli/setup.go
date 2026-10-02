@@ -83,9 +83,12 @@ func survey(p home.Paths) (*machine, error) {
 
 // settingText shows a setting's value with unit, or its built-in default marked as such.
 func settingText(s home.Object, key string, unit ...string) string {
-	defaults := map[string]string{"model": "none: give -m", "timeout": "900", "jobs": "4", "worktrees": "~/.ask/worktrees/{name}", "branches": "ask/{name}"}
+	defaults := map[string]string{"model": "none: give -m", "timeout": "900", "jobs": "4", "max_cost": "none", "worktrees": "~/.ask/worktrees/{name}", "branches": "ask/{name}"}
 	text, suffix := defaults[key], " (default)"
-	if s.Has(key) {
+	if key == "max_cost" && s.N(key) > 0 {
+		return "$" + home.Dollars(s.N(key)) + " a task"
+	}
+	if s.Has(key) && !(key == "max_cost" && s.N(key) == 0) {
 		text, suffix = home.String(s.Get(key)), ""
 	}
 	if len(unit) > 0 && !(key == "model" && !s.Has(key)) {
@@ -216,8 +219,8 @@ func setSetting(p home.Paths, key, value string) error {
 	var v any = value
 	if value == "" {
 		v = nil
-	} else if key == "timeout" || key == "jobs" {
-		n, e := strconv.ParseFloat(value, 64)
+	} else if key == "timeout" || key == "jobs" || key == "max_cost" {
+		n, e := strconv.ParseFloat(strings.TrimPrefix(value, "$"), 64)
 		if e != nil {
 			return home.Usage("%s must be a number, not %q", key, value)
 		}
@@ -240,7 +243,7 @@ func setupFlags(p home.Paths, opts home.Object, say func(string, string)) (int, 
 			}
 		}
 	}
-	for _, f := range [][2]string{{"-m", "model"}, {"-t", "timeout"}, {"-j", "jobs"}, {"--worktrees", "worktrees"}, {"--branches", "branches"}} {
+	for _, f := range [][2]string{{"-m", "model"}, {"-t", "timeout"}, {"-j", "jobs"}, {"--max-cost", "max_cost"}, {"--worktrees", "worktrees"}, {"--branches", "branches"}} {
 		flag, key := f[0], f[1]
 		if opts.Has(flag) {
 			if e := setSetting(p, key, opts.S(flag)); e != nil {
@@ -338,7 +341,7 @@ func recommended(p home.Paths, say func(string, string)) (int, error) {
 func setupCommand(p home.Paths, opts home.Object) (int, error) {
 	plain := func(mark, text string) { fmt.Fprintln(os.Stderr, mark+" "+text) }
 	acting := false
-	for _, f := range []string{"--agents", "-m", "-t", "-j", "--worktrees", "--branches", "--skills", "--hook", "--no-hook"} {
+	for _, f := range []string{"--agents", "-m", "-t", "-j", "--max-cost", "--worktrees", "--branches", "--skills", "--hook", "--no-hook"} {
 		acting = acting || opts.Has(f)
 	}
 	if opts.B("--hook") && opts.B("--no-hook") {
@@ -355,7 +358,7 @@ func setupCommand(p home.Paths, opts home.Object) (int, error) {
 	case acting:
 		code, e = setupFlags(p, opts, plain)
 	case !opts.B("--check") && status.IsTerminal(os.Stdin) && status.IsTerminal(os.Stdout):
-		return interactive(p)
+		return interactive(p, "")
 	}
 	if e != nil {
 		return 0, e
@@ -378,8 +381,9 @@ func setupCommand(p home.Paths, opts home.Object) (int, error) {
 	return code, nil
 }
 
-// interactive runs the walkthrough or the settings screen on the terminal.
-func interactive(p home.Paths) (int, error) {
+// interactive runs on the terminal: one agent's screen when agentName is given, else the
+// walkthrough the first time and the settings screen after.
+func interactive(p home.Paths, agentName string) (int, error) {
 	restore, e := tui.Raw(os.Stdin)
 	if e != nil {
 		return 0, e
@@ -395,9 +399,12 @@ func interactive(p home.Paths) (int, error) {
 	for _, a := range m.Agents {
 		first = first && !a.Installed
 	}
-	if first {
+	switch {
+	case agentName != "":
+		e = agentScreen(p, t, agentName)
+	case first:
 		e = walkthrough(p, t, m)
-	} else {
+	default:
 		e = settingsScreen(p, t)
 	}
 	if errors.Is(e, tui.ErrInterrupted) {
@@ -412,6 +419,19 @@ func walkthrough(p home.Paths, t *tui.Prompter, m *machine) error {
 	fmt.Fprint(t.Out, t.Bold("Welcome to ask.")+" Let's connect your coding agents.\r\n\r\n")
 	if e := chooseAgents(p, t, m); e != nil {
 		return e
+	}
+	if config, err := p.ReadModels(); err == nil {
+		entries, _ := agent.New(p).Catalog(config)
+		count := map[string]int{}
+		for _, x := range entries {
+			owner, _, _ := strings.Cut(x.ID, ":")
+			count[owner]++
+		}
+		for _, a := range setup.Agents {
+			if count[a.Name] > 12 {
+				t.Say("•", fmt.Sprintf("%s offers %d models; ask setup %s chooses which ask uses", a.Name, count[a.Name], a.Name))
+			}
+		}
 	}
 	if e := chooseModel(p, t); e != nil {
 		return e
@@ -483,6 +503,8 @@ func settingsScreen(p home.Paths, t *tui.Prompter) error {
 			{Label: "Branches", Note: settingText(m.Settings, "branches")},
 			{Label: "Timeout", Note: settingText(m.Settings, "timeout", "seconds")},
 			{Label: "Batch jobs", Note: settingText(m.Settings, "jobs", "at once")},
+			{Label: "Models and cost limits", Note: "by agent"},
+			{Label: "Cost limit", Note: settingText(m.Settings, "max_cost")},
 			{Label: "The ask skill", Note: skillText},
 		}
 		if hasHost(m, "claude-code") {
@@ -510,6 +532,10 @@ func settingsScreen(p home.Paths, t *tui.Prompter) error {
 			e = askSetting(p, t, "timeout", "Seconds a task may run", "900")
 		case "Batch jobs":
 			e = askSetting(p, t, "jobs", "Batch tasks at once", "4")
+		case "Models and cost limits":
+			e = pickAgentScreen(p, t, m)
+		case "Cost limit":
+			e = askSetting(p, t, "max_cost", "Dollars a task may spend, 0 for no limit", "0")
 		case "The ask skill":
 			e = chooseSkills(t, m)
 		case "Task titles in Claude Code":
@@ -668,4 +694,193 @@ func chooseSkills(t *tui.Prompter, m *machine) error {
 		}
 	}
 	return nil
+}
+
+// setupAgent runs ask setup NAME: that agent's screen in a terminal, or its models elsewhere.
+func setupAgent(p home.Paths, name string) (int, error) {
+	if find.Path(p, "agents", name) == "" {
+		hint := "write one, see docs/agents.md"
+		if packages.Builtin(name) {
+			hint = "ask setup --agents " + name + " installs it"
+		}
+		return 0, home.Usage("no %s agent is installed; %s", name, hint)
+	}
+	if status.IsTerminal(os.Stdin) && status.IsTerminal(os.Stdout) {
+		return interactive(p, name)
+	}
+	config, e := p.ReadModels()
+	if e != nil {
+		return 0, e
+	}
+	entries, _ := agent.New(p).Catalog(config)
+	for _, x := range entries {
+		if owner, id, _ := strings.Cut(x.ID, ":"); owner == name {
+			state := "on"
+			if x.Off {
+				state = "off"
+			}
+			if c, _ := config.Get(owner, id); c.MaxCost > 0 {
+				state += "\tmax $" + home.Dollars(c.MaxCost)
+			}
+			fmt.Fprintf(os.Stdout, "%s\t%s\n", x.ID, state)
+		}
+	}
+	fmt.Fprintln(os.Stderr, "ask: run ask setup "+name+" in a terminal to change these, or use ask models MODEL --enable|--disable|--max-cost N")
+	return 0, nil
+}
+
+// pickAgentScreen asks which installed agent to set up, then opens its screen.
+func pickAgentScreen(p home.Paths, t *tui.Prompter, m *machine) error {
+	options := []tui.Option{}
+	for _, a := range m.Agents {
+		if a.Installed {
+			options = append(options, tui.Option{Label: a.Name, Note: a.Title})
+		}
+	}
+	if len(options) == 0 {
+		t.Say("•", "no agent is installed yet; choose Agents first")
+		return nil
+	}
+	i, e := t.Select("Which agent?", options, 0)
+	if e != nil {
+		return e
+	}
+	return agentScreen(p, t, options[i].Label)
+}
+
+// agentScreen sets up one agent: which of its models are on, and their cost limits.
+func agentScreen(p home.Paths, t *tui.Prompter, name string) error {
+	for {
+		config, e := p.ReadModels()
+		if e != nil {
+			return e
+		}
+		entries, failures := agent.New(p).Catalog(config)
+		mine := []agent.Entry{}
+		for _, x := range entries {
+			if owner, _, _ := strings.Cut(x.ID, ":"); owner == name {
+				mine = append(mine, x)
+			}
+		}
+		for _, e := range failures {
+			if strings.HasPrefix(e, name+": ") {
+				t.Say("!", "could not list the models of "+e)
+			}
+		}
+		on, limited := 0, 0
+		for _, x := range mine {
+			if !x.Off {
+				on++
+			}
+			_, id, _ := strings.Cut(x.ID, ":")
+			if c, _ := config.Get(name, id); c.MaxCost > 0 {
+				limited++
+			}
+		}
+		limits := "the default for every model"
+		if limited > 0 {
+			limits = status.Plural(limited, "model") + " with their own"
+		}
+		items := []tui.Option{
+			{Label: "Models", Note: fmt.Sprintf("%d of %d on", on, len(mine))},
+			{Label: "Cost limits", Note: limits},
+			{Label: "Done"},
+		}
+		i, e := t.Select(name+": what do you want to change?", items, 0)
+		if e != nil {
+			return e
+		}
+		switch items[i].Label {
+		case "Models":
+			e = chooseModelsOn(p, t, name, config, mine)
+		case "Cost limits":
+			e = chooseCostLimit(p, t, name, config, mine)
+		case "Done":
+			return nil
+		}
+		if e != nil {
+			if errors.Is(e, tui.ErrInterrupted) {
+				return e
+			}
+			t.Say("✗", e.Error())
+		}
+	}
+}
+
+// chooseModelsOn turns an agent's models on or off; models.json records the ones that are off.
+func chooseModelsOn(p home.Paths, t *tui.Prompter, name string, config home.Models, mine []agent.Entry) error {
+	if len(mine) == 0 {
+		t.Say("•", name+" lists no models; add one with ask models "+name+":MODEL --enable")
+		return nil
+	}
+	options, chosen := []tui.Option{}, []bool{}
+	for _, x := range mine {
+		_, id, _ := strings.Cut(x.ID, ":")
+		options = append(options, tui.Option{Label: id, Note: x.Name})
+		chosen = append(chosen, !x.Off)
+	}
+	picked, e := t.MultiSelect("Which "+name+" models should ask use?", options, chosen)
+	if e != nil {
+		return e
+	}
+	for i, x := range mine {
+		_, id, _ := strings.Cut(x.ID, ":")
+		c, _ := config.Get(name, id)
+		c.Off = !picked[i]
+		keep(config, name, id, c, x.Listed)
+	}
+	if e := p.WriteModels(config); e != nil {
+		return e
+	}
+	t.Say("✓", "saved to "+home.Tilde(filepath.Join(p.Home, "models.json")))
+	return nil
+}
+
+// chooseCostLimit sets one model's cost limit, which replaces the max_cost setting for its runs.
+func chooseCostLimit(p home.Paths, t *tui.Prompter, name string, config home.Models, mine []agent.Entry) error {
+	options := []tui.Option{}
+	for _, x := range mine {
+		if x.Off {
+			continue
+		}
+		_, id, _ := strings.Cut(x.ID, ":")
+		note := "default: " + settingText(mustSettings(p), "max_cost")
+		if c, _ := config.Get(name, id); c.MaxCost > 0 {
+			note = "$" + home.Dollars(c.MaxCost) + " a task"
+		}
+		options = append(options, tui.Option{Label: id, Note: note})
+	}
+	if len(options) == 0 {
+		return nil
+	}
+	i, e := t.Select("Which model's limit?", options, 0)
+	if e != nil {
+		return e
+	}
+	id := options[i].Label
+	c, _ := config.Get(name, id)
+	def := "0"
+	if c.MaxCost > 0 {
+		def = home.Dollars(c.MaxCost)
+	}
+	for {
+		v, e := t.Input("Dollars a "+id+" task may spend, 0 for the default", def)
+		if e != nil {
+			return e
+		}
+		n, err := strconv.ParseFloat(strings.TrimPrefix(v, "$"), 64)
+		if err != nil || n < 0 {
+			t.Say("✗", "give dollars, like 10")
+			continue
+		}
+		c.MaxCost = n
+		listed := true
+		for _, x := range mine {
+			if x.ID == name+":"+id {
+				listed = x.Listed
+			}
+		}
+		keep(config, name, id, c, listed)
+		return p.WriteModels(config)
+	}
 }

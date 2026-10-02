@@ -45,6 +45,11 @@ The thread id Codex announces first is reported to ask at once, so `ask -c RUN` 
 The agent rewrites ask's report as each Codex turn completes, so token counts show live. Codex
 reports no cost. The report names the model by Codex's display name.
 
+## Cost limits
+
+Codex reports no cost, so ask's cost limits don't apply to it; a ChatGPT plan isn't billed per
+token anyway. Use `-t` to bound how long a run may take.
+
 ## Environment
 
 | Variable | |

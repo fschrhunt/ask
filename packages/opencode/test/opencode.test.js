@@ -67,8 +67,8 @@ async function models(extra = {}) {
 const after = (argv, flag) => argv[argv.indexOf(flag) + 1];
 const GROUNDING = 'Answer from the files in your working directory: search and read them before answering. Never guess file names, functions or facts; if you cannot find something, say so.\n\n';
 
-test('lists no models', async () => {
-  assert.deepEqual(await models(), []);
+test('lists every model Opencode offers, once each by clean name', async () => {
+  assert.deepEqual(await models(), ['deepseek-4.1-flash', 'glm-5', 'kimi-k3', 'm', 'qwen-3.8-flash']);
 });
 
 test('read runs use the plan agent with injected read-only permissions', async () => {

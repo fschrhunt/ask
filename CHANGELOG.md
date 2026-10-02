@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Turn models on and off: `ask models MODEL... --enable|--disable`, or `ask setup NAME` for a
+  filterable list of everything an agent offers. Off models are hidden from `ask models` and help
+  and refused by `-m`; `ask models --all` shows both. `models.json` keeps only your choices per
+  agent: `false` for off, `true` to add a model, `{"enabled", "max_cost"}` for a model's own cost
+  limit; the older list form still works.
+- The Opencode agent lists every model of the providers you have set up in Opencode, instead of
+  none. Help shows a count for an agent with more than a dozen models.
+- Cost limits, off unless set: the `max_cost` setting (`ask setup --max-cost 2`), a model's own
+  limit (`ask models claude:opus-5.5 --max-cost 10`) and `--max-cost` per run or batch, which wins.
+  Agents get the limit in `ASK_MAX_COST`; ask stops an agent whose reported cost passes it, keeping
+  its session for `ask -c`. The Claude Code agent hands it to Claude Code's `--max-budget-usd`,
+  since Claude Code reports cost only when it ends; Codex reports no cost, so limits skip it.
+- Lists in `ask setup` filter as you type; ctrl-a selects everything shown.
 - `ask wait RUN...` blocks until runs finish, then prints them like `ask show` (several runs as one
   JSON array); `-t` gives up after that many seconds. The ask skill tells agents to collect their
   background runs with it.

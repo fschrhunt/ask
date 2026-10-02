@@ -220,3 +220,13 @@ test('the launcher says how to get Node.js when it finds none', { skip: fixedNod
   assert.equal(r.code, 1);
   assert.equal(r.stderr, 'claude needs Node.js 18 or newer: install it from https://nodejs.org (or set ASK_NODE)\n');
 });
+
+test("passes ask's cost limit to Claude Code, and reports reaching it in ask's words", async () => {
+  const r = await run('hi', { extra: { ASK_MAX_COST: '0.005' } });
+  assert.equal(after(r.calls[0].argv, '--max-budget-usd'), '0.005');
+  assert.equal(r.code, 1);
+  assert.match(r.stderr.trim().split('\n').pop(), /^stopped at the \$0\.005 cost limit$/);
+  assert.equal(r.report.cost, 0.01);
+  assert.equal(r.report.input, 35);
+  assert.ok(r.report.session);
+});

@@ -47,13 +47,14 @@ ask runs the agent with no arguments, in the directory the agent should work in 
 
 | Input | |
 | --- | --- |
-| stdin | The prompt, complete. ask has already added any read-run or JSON instructions. |
+| stdin | The prompt, complete. ask adds only the JSON instruction for `--json` or `--schema`. |
 | `ASK_MODEL` | The model id, without the agent or effort: `sonnet-5.5`. |
 | `ASK_EFFORT` | The effort from `#effort`, or empty. |
 | `ASK_ACCESS` | `read` or `write`. |
 | `ASK_SCHEMA` | Set only with `--schema`: a file holding the JSON Schema, for CLIs that enforce one. |
 | `ASK_SESSION` | Set only for a follow-up: the session to continue (see [Sessions](#sessions)). |
 | `ASK_REPORT` | A file path for the optional report. |
+| `ASK_MAX_COST` | Set only when the task has a cost limit: dollars, like `2` or `0.5`. See [Cost limits](#cost-limits). |
 
 | Output | |
 | --- | --- |
@@ -87,6 +88,16 @@ id. An agent that supports them:
 
 ask runs a follow-up in the same directory as the run it continues, which most CLIs need to find
 the session. An agent that reports no session simply can't be continued; ask says so.
+
+## Cost limits
+
+When a task has a cost limit (`--max-cost`, models.json or the `max_cost` setting), ask passes it
+in `ASK_MAX_COST` and watches the cost in your report: once it passes the limit, ask stops the
+agent as it does on a timeout and records `stopped at the $2.00 cost limit`. So an agent that
+rewrites its report with the cost as it grows gets the limit for free. An agent whose CLI reports
+cost only at the end can pass the limit to the CLI, if it has a budget option, and fail with the
+same words when the CLI stops; the official Claude Code agent does that. Either way, keep the
+session in the report so `ask -c` can continue the work.
 
 ## Read-only
 

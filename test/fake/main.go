@@ -33,7 +33,7 @@ func main() {
 	stdin := string(b)
 	cwd, _ := os.Getwd()
 	call := map[string]any{"pid": os.Getpid(), "stdin": stdin, "cwd": cwd}
-	for key, env := range map[string]string{"access": "ASK_ACCESS", "model": "ASK_MODEL", "effort": "ASK_EFFORT", "session": "ASK_SESSION", "contract": "ASK_CONTRACT"} {
+	for key, env := range map[string]string{"access": "ASK_ACCESS", "model": "ASK_MODEL", "effort": "ASK_EFFORT", "session": "ASK_SESSION", "contract": "ASK_CONTRACT", "max_cost": "ASK_MAX_COST"} {
 		if v, ok := os.LookupEnv(env); ok {
 			call[key] = v
 		}
@@ -82,6 +82,12 @@ func main() {
 		signal.Ignore(syscall.SIGTERM)
 	}
 	matches := func(key string) bool { s := os.Getenv(key); return s != "" && strings.Contains(stdin, s) }
+	if matches("FAKE_SPEND") {
+		writeReport(map[string]any{"session": session, "input": 100, "output": 10, "cost": 3.0})
+		for {
+			time.Sleep(time.Second)
+		}
+	}
 	if matches("FAKE_HANG") {
 		for {
 			time.Sleep(time.Second)

@@ -253,9 +253,15 @@ func lock(r *Run) (*os.File, error) {
 
 // Prepare validates task fields and inherits a followed-up task's agent, access and location.
 // New worktrees are named after label, the run's name or ID. The model and timeout settings
-// fill in what neither the task nor its defaults give.
+// fill in what neither the task nor its defaults give. A task's cost limit is its own max_cost,
+// else its model's in models.json, else the max_cost setting; 0 means none. A model that
+// models.json turns off is refused.
 func Prepare(p home.Paths, items []any, defaults home.Object, label string, single bool, missing func(string) error) ([]home.Object, error) {
 	settings, e := p.ReadSettings()
+	if e != nil {
+		return nil, e
+	}
+	models, e := p.ReadModels()
 	if e != nil {
 		return nil, e
 	}
@@ -384,8 +390,27 @@ func Prepare(p home.Paths, items []any, defaults home.Object, label string, sing
 		if !x.B("model") {
 			return nil, missing(where)
 		}
-		if _, e := agent.Parse(p, x.S("model")); e != nil {
+		m, e := agent.Parse(p, x.S("model"))
+		if e != nil {
 			return nil, e
+		}
+		entry, _ := models.Get(m.Agent, m.ID)
+		if entry.Off {
+			return nil, home.Usage("%s: %s:%s is off in models.json; turn it on with ask models %s:%s --enable", where, m.Agent, m.ID, m.Agent, m.ID)
+		}
+		limit := settings.N("max_cost")
+		if entry.MaxCost > 0 {
+			limit = entry.MaxCost
+		}
+		if t.Has("max_cost") {
+			n, ok := t.Get("max_cost").(float64)
+			if !ok || n < 0 {
+				return nil, home.Usage("%s: max_cost must be dollars, 0 or more (0 for no limit)", where)
+			}
+			limit = n
+		}
+		if limit > 0 {
+			x.Set("max_cost", limit)
 		}
 		x.Set("write", x.B("write"))
 		if x.B("worktree") && !x.B("write") {

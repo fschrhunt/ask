@@ -16,11 +16,13 @@ nvm (the newest), fnm or `~/.local/bin`. Without one, `ask models` shows what to
 
 ## Models
 
-Opencode offers hundreds of models, so `opencode models` here lists none. Add the ones you use to
-`~/.ask/models.json`:
+The agent lists every model `opencode models` shows, which is every model of the providers you
+have set up in Opencode, once each. That can be a hundred or more; turn off the ones you don't
+use, in a list you can filter:
 
-```json
-{ "opencode": ["deepseek-4.1-flash", "qwen-3.8-flash"] }
+```sh
+ask setup opencode
+ask models opencode:gpt-4o --disable     # or one at a time
 ```
 
 Name a model like ask's other agents, family-version-variant in lowercase: `deepseek-4.1-flash` for
@@ -55,6 +57,13 @@ with `--session`. A follow-up's prompt is passed as is.
 The agent rewrites ask's report after every step with the tokens and cost so far, so both show
 live. Opencode 2.0 prints no usage for the step that writes the answer, so once Opencode exits the
 agent reads that step's tokens and cost from `opencode session export` and adds them.
+
+## Cost limits
+
+Opencode reports cost after every step, so ask enforces its limit (`--max-cost`, models.json or
+the `max_cost` setting) itself: once the reported cost passes it, ask stops Opencode. The run fails
+as `stopped at the $2.00 cost limit`, keeps its session, and `ask -c RUN` continues it. Cost is
+known after each step, so a run can go over the limit by up to one step's cost.
 
 ## Environment
 
