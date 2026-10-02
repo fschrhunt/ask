@@ -71,10 +71,14 @@ fetch "$releases/download/$version/checksums.txt" "$work/checksums.txt" || fail 
 expected=$(grep " $archive\$" "$work/checksums.txt" | cut -d' ' -f1)
 if command -v sha256sum >/dev/null 2>&1; then actual=$(sha256sum "$work/$archive" | cut -d' ' -f1)
 else actual=$(shasum -a 256 "$work/$archive" | cut -d' ' -f1); fi
-[ -n "$expected" ] && [ "$expected" = "$actual" ] || fail "checksum mismatch for $archive; refusing to install"
+if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
+  fail "checksum mismatch for $archive; refusing to install"
+fi
 
 tar -xzf "$work/$archive" -C "$work" ask
-[ -f "$work/ask" ] && [ ! -L "$work/ask" ] || fail "$archive has no ask binary"
+if [ ! -f "$work/ask" ] || [ -L "$work/ask" ]; then
+  fail "$archive has no ask binary"
+fi
 got=$("$work/ask" --version 2>/dev/null || true)
 [ "$got" = "$version" ] || fail "$archive says it is \"$got\", not $version"
 
