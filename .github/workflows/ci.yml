@@ -25,6 +25,10 @@ jobs:
         with:
           node-version: 22
       - run: for d in packages/*/; do (cd "$d" && node --test) || exit 1; done
+      - run: shellcheck install.sh scripts/*.sh
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+      # The installer people run, against the latest release.
+      - run: sh install.sh --dir "$RUNNER_TEMP/ask" && "$RUNNER_TEMP/ask/ask" --version
   macOS:
     runs-on: macos-latest
     steps:
@@ -41,3 +45,4 @@ jobs:
         with:
           node-version: 22
       - run: for d in packages/*/; do (cd "$d" && node --test) || exit 1; done
+      - run: sh install.sh --dir "$RUNNER_TEMP/ask" && "$RUNNER_TEMP/ask/ask" --version

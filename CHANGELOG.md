@@ -1,5 +1,17 @@
 # ask releases
 
+## Unreleased
+
+- Install with `curl -fsSL https://fschrhunt.com/ask/install.sh | sh` (checksum-verified, into
+  `~/.local/bin`) or Homebrew, from ask's own repository: `brew tap fschrhunt/ask
+  https://github.com/fschrhunt/ask && brew install ask`.
+- `ask update` replaces an installer or archive install with the latest release, after checking
+  its checksum; `--check` only reports. Homebrew and go install are pointed to their own update.
+  In a terminal, ask mentions a newer release at most once a day (`ASK_NO_UPDATE_CHECK=1` stops it).
+- Releases carry build provenance (`gh attestation verify`), run CI's checks and `govulncheck`
+  first, and are installed for real on macOS and Linux. `scripts/release.sh` releases in two runs.
+- A new README.
+
 ## v0.1.0 · 2026-10-02
 
 The first release. ask hands tasks to the coding agents you already use, Claude Code, Codex,

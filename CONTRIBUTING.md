@@ -15,4 +15,19 @@ A change that makes ask simpler is welcome; one that adds a moving part needs a 
   `docs/agents.md`).
 - To report an issue, include the output of `ask --help` and `ask models`.
 
+## Releasing
+
+From an up-to-date main checkout:
+
+```sh
+scripts/release.sh v0.2.0    # opens a PR naming CHANGELOG.md's Unreleased section v0.2.0
+scripts/release.sh v0.2.0    # after merging it: checks CI passed on main, then tags
+```
+
+The tag runs `.github/workflows/release.yml`: CI's checks plus `govulncheck`, a check that the tag
+is on main with a changelog section, archives for macOS and Linux with checksums and build
+provenance, the release with that section as its notes, the Homebrew formula on main
+(`scripts/formula.sh`), and a real `install.sh` install of the release on both systems. When the
+run record format changed, pin a record from the release in `test/fixtures/run-vX.Y.Z/`.
+
 By contributing you agree that your work is licensed under the MIT license of this project.
