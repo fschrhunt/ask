@@ -267,7 +267,7 @@ Usage
   ask install [SOURCE...]
 
 Source
-  NAME         An official agent: claude, codex, opencode (fschrhunt/ask-NAME)
+  NAME         An official agent, built into ask: claude, codex, opencode
   OWNER/REPO   A GitHub repository
   URL          Any git repository
   PATH         A local git repository, like ./tools or ~/code/tools

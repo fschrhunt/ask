@@ -48,7 +48,7 @@ ask setup
 
 It finds the coding agent CLIs you have, connects ask to them, sets your defaults and teaches the
 apps you work in to use ask; see [Setup](setup.md). ask runs each coding agent through an agent:
-a small executable that runs that agent's CLI. ask ships none, but installs the official ones by
+a small executable that runs that agent's CLI. The official ones are built into ask and install by
 name, which is what setup does:
 
 ```sh

@@ -35,23 +35,23 @@ func git(args []string, dir string) (string, error) {
 
 var shorthand = regexp.MustCompile(`^\w[\w-]*/[\w.-]+$`)
 
-// official names the agent packages ask install NAME means: claude is fschrhunt/ask-claude.
-var official = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
-
-// Official is the GitHub owner and name prefix of the official agent packages.
-const Official = "fschrhunt/ask-"
+// bare is a source without a slash or dot, which names a built-in package, like claude.
+var bare = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
 
 var sourcePattern = regexp.MustCompile(`^(?:[a-z][a-z0-9+.-]*://(?:[^@/]+@)?|[\w.-]+@)?([\w.-]+)[/:]([\w.-]+)/([\w.-]+?)(?:\.git)?/?$`)
 
 // Locate resolves an official agent name, GitHub shorthand, a git URL or a local path to its
-// installation directory. A bare NAME always means the official package fschrhunt/ask-NAME and
+// installation directory. A bare NAME always means a package built into ask, with no URL, and
 // OWNER/REPO always means GitHub, whatever folders are here; any other source that exists on
 // disk, like ./tools, is a local repository.
 // A URL's host, owner and repository become the directory's three names, so none may be
 // empty, "." or "..", or start with "-", and the directory always stays inside packages.
 func Locate(p home.Paths, source string) (string, string, error) {
-	if official.MatchString(source) {
-		source = Official + source
+	if bare.MatchString(source) {
+		if !Builtin(source) {
+			return "", "", home.Usage("no official agent %q; ask installs %s by name, and other packages as OWNER/REPO, a git URL or ./path", source, strings.Join(Builtins(), ", "))
+		}
+		return "", BuiltinDir(p, source), nil
 	}
 	if shorthand.MatchString(source) {
 		source = "https://github.com/" + source
@@ -100,8 +100,12 @@ func Installed(p home.Paths) []find.Executable {
 	return all
 }
 
-// Update pulls fast-forward only and reports whether HEAD changed.
+// Update pulls fast-forward only and reports whether HEAD changed; a built-in package is
+// brought up to this ask's build instead.
 func Update(p home.Paths, dir string) (string, error) {
+	if filepath.Dir(dir) == filepath.Dir(BuiltinDir(p, "x")) && Builtin(filepath.Base(dir)) {
+		return InstallBuiltin(p, filepath.Base(dir))
+	}
 	before, e := git([]string{"rev-parse", "HEAD"}, dir)
 	if e != nil {
 		return "", e
@@ -127,6 +131,9 @@ func Install(p home.Paths, source string) (string, error) {
 	url, dir, e := Locate(p, source)
 	if e != nil {
 		return "", e
+	}
+	if url == "" {
+		return InstallBuiltin(p, source)
 	}
 	if _, e := os.Stat(dir); e == nil {
 		origin, _ := git([]string{"config", "--get", "remote.origin.url"}, dir)

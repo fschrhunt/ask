@@ -1,6 +1,7 @@
 package test
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -9,10 +10,30 @@ import (
 // TestSetup pins what makes ask easy to set up and adapt: official agent names, readiness checks,
 // settings, runs per repository and the host title hook.
 func TestSetup(t *testing.T) {
-	t.Run("ask install NAME installs fschrhunt/ask-NAME, even beside a folder NAME, and says whether each agent is ready", func(t *testing.T) {
+	t.Run("ask install NAME installs the official agent built into ask, even beside a folder NAME", func(t *testing.T) {
 		s := fresh(t)
-		s.mkdir(filepath.Join(s.tmp, "demo"))
-		repo := filepath.Join(s.tmp, "fschrhunt", "ask-demo")
+		s.mkdir(filepath.Join(s.tmp, "claude"))
+		r := s.ask("install", "claude")
+		match(t, r.stderr, `(?m)^ask: installed ask/packages/claude: agents: claude$`)
+		match(t, r.stderr, `(?m)^ask: claude is (ready|not ready)`)
+		agent := filepath.Join(s.home, "packages", "ask", "packages", "claude", "agents", "claude")
+		info, e := os.Stat(agent)
+		if e != nil || info.Mode()&0111 == 0 {
+			t.Fatalf("agent not executable: %v %v", info, e)
+		}
+		match(t, s.ask("packages").stdout, `(?m)^ask/packages/claude +agents: claude$`)
+		match(t, s.ask("install", "claude").stderr, `ask/packages/claude: up to date`)
+		os.WriteFile(agent, []byte("#!/bin/sh\necho stale\n"), 0755)
+		os.WriteFile(filepath.Join(filepath.Dir(filepath.Dir(agent)), ".ask-version"), []byte("old\n"), 0644)
+		s.ask("runs")
+		eq(t, strings.Contains(s.read(agent), "stale"), false)
+		bad := s.ask("install", "gemini")
+		eq(t, bad.code, 2)
+		match(t, bad.stderr, `no official agent "gemini"; ask installs claude, codex, opencode by name`)
+	})
+	t.Run("ask install says whether each agent a package brings is ready", func(t *testing.T) {
+		s := fresh(t)
+		repo := filepath.Join(s.tmp, "acme", "ask-demo")
 		s.mkdir(repo)
 		git := s.gitAt(repo)
 		git("init", "-q", "-b", "main")
@@ -22,9 +43,9 @@ func TestSetup(t *testing.T) {
 		git("add", ".")
 		git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "v1")
 		github := map[string]string{"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "url." + s.tmp + "/.insteadOf", "GIT_CONFIG_VALUE_0": "https://github.com/"}
-		r := s.run([]string{"install", "demo"}, "", github)
+		r := s.run([]string{"install", "acme/ask-demo"}, "", github)
 		eq(t, r.code, 1)
-		match(t, r.stderr, `installed github.com/fschrhunt/ask-demo`)
+		match(t, r.stderr, `installed github.com/acme/ask-demo`)
 		match(t, r.stderr, `(?m)^ask: demo is ready: 1 model, see ask models$`)
 		match(t, r.stderr, `(?m)^ask: broken is not ready: broken needs its CLI: install it from example.com$`)
 		match(t, r.stderr, `(?m)^ask: fake: .*agents/fake is used instead of this package's`)

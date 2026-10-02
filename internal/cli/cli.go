@@ -710,6 +710,7 @@ func main(argv []string, version string) (int, error) {
 		fmt.Fprintln(os.Stdout, version)
 		return 0, nil
 	}
+	packages.Refresh(p)
 	command := "run"
 	if len(argv) > 0 {
 		if _, ok := options[argv[0]]; ok && argv[0] != "run" {

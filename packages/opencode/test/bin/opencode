@@ -1,0 +1,53 @@
+#!/usr/bin/env node
+/*
+ * Fake `opencode` for the tests: prints Opencode's `--format json` events. Every call is appended
+ * to $FAKE_LOG as one JSON line {pid, argv, stdin, cwd, config}, config being the injected
+ * OPENCODE_CONFIG_CONTENT. The answer is $FAKE_ANSWER (default: the last prompt line) after
+ * $FAKE_STEPS steps (default 1). A prompt containing $FAKE_FAIL fails, $FAKE_HANG never returns,
+ * $FAKE_SLOW answers after 300 ms; $FAKE_PAUSE waits that many ms after reporting usage. $FAKE_EXIT is the exit code after an answer.
+ * Each step is message msg_N with a step_finish of its usage, none with $FAKE_NO_USAGE, and none
+ * for the answering step with $FAKE_UNFINISHED, as Opencode 2.0 prints. `opencode session export`
+ * prints those steps' messages with their usage. `opencode models` lists a few provider/model ids,
+ * some offered by several providers.
+ */
+import { appendFileSync, readFileSync } from 'node:fs';
+
+const argv = process.argv.slice(2);
+if (argv[0] === 'models') {
+  const ids = ['opencode-go/m', 'opencode-go/deepseek-v4.1-flash', 'opencode-go/qwen3.8-flash', 'other/deepseek-v4.1-flash', 'opencode/deepseek-v4.1-flash'];
+  console.log([...ids, 'zeta/glm-5', 'opencode/glm-5', 'zeta/kimi-k3', 'beta/kimi-k3'].join('\n'));
+  process.exit(0);
+}
+const { FAKE_LOG, FAKE_ANSWER, FAKE_FAIL, FAKE_HANG, FAKE_SLOW, FAKE_STEPS, FAKE_EXIT, FAKE_NO_USAGE, FAKE_UNFINISHED, OPENCODE_CONFIG_CONTENT } = process.env;
+const steps = Number(FAKE_STEPS || 1);
+const usage = FAKE_NO_USAGE ? {} : { cost: 0.002, tokens: { input: 50, output: 6, reasoning: 1, cache: { read: 10 } } };
+if (argv[0] === 'session' && argv[1] === 'export') {
+  const messages = Array.from({ length: steps }, (_, i) => ({ id: `msg_${i}`, type: 'assistant', ...usage }));
+  console.log(JSON.stringify({ info: { id: argv.at(-1) }, messages: [{ id: 'msg_user', type: 'user' }, ...messages] }));
+  process.exit(0);
+}
+const stdin = readFileSync(0, 'utf8');
+if (FAKE_LOG) {
+  const config = OPENCODE_CONFIG_CONTENT ? JSON.parse(OPENCODE_CONFIG_CONTENT) : null;
+  appendFileSync(FAKE_LOG, JSON.stringify({ pid: process.pid, argv, stdin, cwd: process.cwd(), config }) + '\n');
+}
+const matches = (needle) => needle && stdin.includes(needle);
+const emit = (event) => console.log(JSON.stringify({ sessionID: 'ses_fake', ...event }));
+
+if (matches(FAKE_HANG)) setInterval(() => {}, 1000);
+else {
+  if (matches(FAKE_SLOW)) await new Promise((resolve) => setTimeout(resolve, 300));
+  if (matches(FAKE_FAIL)) {
+    emit({ type: 'error', error: { message: 'opencode boom' } });
+    process.exitCode = 1;
+  } else {
+    for (let i = 0; i < steps; i++) {
+      const last = i === steps - 1;
+      emit({ type: 'step_start', part: { messageID: `msg_${i}` } });
+      if (last) emit({ type: 'text', part: { messageID: `msg_${i}`, text: FAKE_ANSWER ?? `opencode: ${stdin.trim().split('\n').pop()}` } });
+      if (!FAKE_NO_USAGE && !(last && FAKE_UNFINISHED)) emit({ type: 'step_finish', part: { messageID: `msg_${i}`, ...usage } });
+    }
+    if (process.env.FAKE_PAUSE) await new Promise((resolve) => setTimeout(resolve, Number(process.env.FAKE_PAUSE)));
+    process.exitCode = Number(FAKE_EXIT || 0);
+  }
+}

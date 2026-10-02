@@ -1,0 +1,222 @@
+/*
+ * Tests for the claude agent. Each runs agents/claude as ask does (prompt on stdin, ASK_* env,
+ * answer on stdout, report in $ASK_REPORT), driving the fake claude in ./bin. No network, no real
+ * models. Run: node --test
+ */
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { after as cleanup, afterEach, beforeEach, test } from 'node:test';
+import { fileURLToPath } from 'node:url';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const AGENT = join(HERE, '..', 'agents', 'claude');
+const FAKE = join(HERE, 'bin', 'claude');
+// A PATH directory holding only node, so no real CLI next to it can be found.
+const NODE_DIR = mkdtempSync(join(tmpdir(), 'agent-node-'));
+symlinkSync(process.execPath, join(NODE_DIR, 'node'));
+const PATH = `${join(HERE, 'bin')}:${NODE_DIR}`;
+let tmp;
+
+beforeEach(() => {
+  tmp = realpathSync(mkdtempSync(join(tmpdir(), 'agent-test-')));
+});
+afterEach(() => rmSync(tmp, { recursive: true, force: true }));
+cleanup(() => rmSync(NODE_DIR, { recursive: true, force: true }));
+
+/* Runs the agent with args and env; resolves with { code, stdout, stderr }. */
+function spawnAgent(args, env, { input = '', cwd = tmp } = {}) {
+  return new Promise((resolve) => {
+    const child = spawn(AGENT, args, { cwd, env });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (d) => (stdout += d));
+    child.stderr.on('data', (d) => (stderr += d));
+    child.on('close', (code) => resolve({ code, stdout, stderr }));
+    child.stdin.end(input);
+  });
+}
+
+/*
+ * Runs the agent on one prompt. Resolves with { code, stdout, stderr, report, calls }, where calls
+ * are the fake CLI's recorded invocations.
+ */
+async function run(prompt, { model = 'opus-5.5', effort = '', access = 'read', schema, extra = {} } = {}) {
+  const env = { PATH, HOME: tmp, FAKE_LOG: join(tmp, 'calls.jsonl'), ASK_MODEL: model, ASK_EFFORT: effort, ASK_ACCESS: access, ASK_REPORT: join(tmp, 'report.json'), ...extra };
+  if (schema) writeFileSync((env.ASK_SCHEMA = join(tmp, 'schema.json')), JSON.stringify(schema));
+  const r = await spawnAgent([], env, { input: prompt });
+  let report = null;
+  let calls = [];
+  try {
+    report = JSON.parse(readFileSync(env.ASK_REPORT, 'utf8'));
+  } catch {}
+  try {
+    calls = readFileSync(env.FAKE_LOG, 'utf8').trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
+  } catch {}
+  return { ...r, report, calls };
+}
+
+/* Runs `claude models` and resolves with its lines. */
+async function models(extra = {}) {
+  const r = await spawnAgent(['models'], { PATH, HOME: tmp, ...extra });
+  return r.stdout.trim().split('\n').filter(Boolean);
+}
+
+const after = (argv, flag) => argv[argv.indexOf(flag) + 1];
+const GROUNDING = 'Answer from the files in your working directory: search and read them before answering. Never guess file names, functions or facts; if you cannot find something, say so.\n\n';
+
+test('lists its models as family-version, with their names', async () => {
+  assert.deepEqual(await models(), ['fable-5.1\tFable 5.1', 'opus-5.5\tOpus 5.5', 'sonnet-5.5\tSonnet 5.5', 'haiku-4.5\tHaiku 4.5']);
+});
+
+test("runs family-version as Claude Code's id, and passes a full id through", async () => {
+  const [short] = (await run('hi', { model: 'sonnet-5.5' })).calls;
+  const full = (await run('hi', { model: 'claude-haiku-4-5-20251001' })).calls[1];
+  const major = (await run('hi', { model: 'sonnet-5' })).calls[2];
+  assert.equal(after(short.argv, '--model'), 'claude-sonnet-5-5');
+  assert.equal(after(major.argv, '--model'), 'claude-sonnet-5');
+  assert.equal(after(full.argv, '--model'), 'claude-haiku-4-5-20251001');
+});
+
+test('matches model names without regard to case', async () => {
+  const [call] = (await run('hi', { model: 'Sonnet-5.5' })).calls;
+  assert.equal(after(call.argv, '--model'), 'claude-sonnet-5-5');
+});
+
+test('refuses an alias, naming the exact model to use', async () => {
+  const r = await run('hi', { model: 'sonnet' });
+  assert.equal(r.code, 1);
+  assert.equal(r.calls.length, 0);
+  assert.match(r.stderr, /"sonnet" is an alias; name the exact model, like claude:sonnet-5.5/);
+});
+
+test('read runs get the read-only flags', async () => {
+  const r = await run('where is main?');
+  assert.equal(r.code, 0);
+  const [call] = r.calls;
+  assert.equal(after(call.argv, '--permission-mode'), 'default');
+  assert.match(after(call.argv, '--allowedTools'), /Read,Grep,Glob,Bash\(git diff:\*\)/);
+  assert.match(after(call.argv, '--disallowedTools'), /^Edit,Write,NotebookEdit,/);
+});
+
+test('read runs refuse writing options, quoting and escaping, and git grep', async () => {
+  const [call] = (await run('look')).calls;
+  const denied = after(call.argv, '--disallowedTools').split(',');
+  for (const token of ['>', '|', ';', '&', '`', '$', '--output', '--ext-diff', '--textconv', '--pre', '--hostname-bin', "'", '"', '{']) assert.ok(denied.includes(`Bash(*${token}*)`), token);
+  // Claude Code only matches a backslash written as four in its rule.
+  assert.ok(denied.includes('Bash(*\\\\\\\\*)'));
+  assert.ok(!after(call.argv, '--allowedTools').includes('git grep'));
+});
+
+test('a new read run is told to answer from the files; write runs and follow-ups get the prompt as is', async () => {
+  const read = (await run('where is main?')).calls[0];
+  const write = (await run('fix it', { access: 'write' })).calls[1];
+  const followUp = (await run('and then?', { extra: { ASK_SESSION: 'ses' } })).calls[2];
+  assert.equal(read.stdin, `${GROUNDING}where is main?`);
+  assert.equal(write.stdin, 'fix it');
+  assert.equal(followUp.stdin, 'and then?');
+});
+
+test('write runs bypass permissions', async () => {
+  const r = await run('fix it', { access: 'write' });
+  assert.equal(after(r.calls[0].argv, '--permission-mode'), 'bypassPermissions');
+  assert.ok(!r.calls[0].argv.includes('--allowedTools'));
+});
+
+test('passes an effort as --effort', async () => {
+  const [call] = (await run('hi', { effort: 'high' })).calls;
+  assert.equal(after(call.argv, '--effort'), 'high');
+});
+
+test('answers on stdout and reports usage', async () => {
+  const r = await run('hi');
+  assert.equal(r.code, 0);
+  assert.equal(r.stdout, 'claude: hi\n');
+  for (const [key, value] of Object.entries({ input: 35, output: 7, cached: 20, cost: 0.01 })) assert.equal(r.report[key], value, key);
+});
+
+test('reports usage while Claude Code is still running', async () => {
+  let done = false;
+  const finished = run('hi', { extra: { FAKE_PAUSE: '1500' } }).then(() => (done = true));
+  let live;
+  while (!done && !live?.input) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    try {
+      live = JSON.parse(readFileSync(join(tmp, 'report.json'), 'utf8'));
+    } catch {}
+  }
+  assert.equal(done, false);
+  assert.ok(live.input > 0);
+  await finished;
+});
+
+test('reports the model that did most of the work', async () => {
+  // The fake's haiku call did less, so the name is opus's whatever model was asked for.
+  assert.equal((await run('hi', { model: 'haiku-4.5' })).report.name, 'Opus 5.5');
+});
+
+test('fails a run whose Claude Code exited nonzero, with the reason last on stderr', async () => {
+  const r = await run('hi', { extra: { FAKE_EXIT: '1' } });
+  assert.equal(r.code, 1);
+  assert.match(r.stderr.trim().split('\n').pop(), /exit 1/);
+});
+
+test("a failing Claude Code's own message is the reason", async () => {
+  const r = await run('break', { extra: { FAKE_FAIL: 'break' } });
+  assert.equal(r.code, 1);
+  assert.equal(r.stderr.trim(), 'claude boom');
+});
+
+test('passes a schema natively and answers with the structured output', async () => {
+  const r = await run('go', { schema: { type: 'object' }, extra: { FAKE_ANSWER: '{"a": 1}' } });
+  assert.deepEqual(JSON.parse(r.stdout), { a: 1 });
+  assert.deepEqual(JSON.parse(after(r.calls[0].argv, '--json-schema')), { type: 'object' });
+});
+
+test('starts each run with a session id it reports at once, and resumes it on a follow-up', async () => {
+  const first = await run('hi');
+  const id = after(first.calls[0].argv, '--session-id');
+  assert.match(id, /^[0-9a-f-]{36}$/);
+  assert.equal(first.report.session, id);
+  const second = await run('more', { extra: { ASK_SESSION: id } });
+  assert.equal(after(second.calls[1].argv, '--resume'), id);
+  assert.ok(!second.calls[1].argv.includes('--session-id'));
+  assert.equal(second.report.session, id);
+});
+
+test('finds Claude Code off PATH through ASK_CLAUDE_BIN', async () => {
+  const r = await run('hi', { extra: { PATH: NODE_DIR, ASK_CLAUDE_BIN: FAKE } });
+  assert.equal(r.code, 0);
+  assert.equal(r.calls.length, 1);
+});
+
+test('finds Claude Code off PATH where its installer puts it', async () => {
+  mkdirSync(join(tmp, '.local', 'bin'), { recursive: true });
+  symlinkSync(FAKE, join(tmp, '.local', 'bin', 'claude'));
+  const r = await run('hi', { extra: { PATH: NODE_DIR } });
+  assert.equal(r.code, 0);
+  assert.equal(r.calls.length, 1);
+});
+
+test('without Claude Code, models and runs fail saying how to install it', async () => {
+  const extra = { ASK_CLAUDE_BIN: join(tmp, 'missing') };
+  const hint = /^Claude Code not found: install it from https:\/\/claude\.com\/claude-code, or set ASK_CLAUDE_BIN to its path\n$/;
+  const listed = await spawnAgent(['models'], { PATH, HOME: tmp, ...extra });
+  const ran = await run('hi', { extra });
+  assert.equal(listed.code, 1);
+  assert.match(listed.stderr, hint);
+  assert.equal(ran.code, 1);
+  assert.match(ran.stderr, hint);
+});
+
+// Node at a fixed location, as on CI runners, would be found whatever PATH says.
+const fixedNode = ['/opt/homebrew/bin/node', '/usr/local/bin/node', '/home/linuxbrew/.linuxbrew/bin/node'].some(existsSync);
+test('the launcher says how to get Node.js when it finds none', { skip: fixedNode && 'Node.js is installed at a fixed location' }, async () => {
+  const empty = join(tmp, 'empty');
+  mkdirSync(empty);
+  const r = await spawnAgent(['models'], { PATH: empty, HOME: empty });
+  assert.equal(r.code, 1);
+  assert.equal(r.stderr, 'claude needs Node.js 18 or newer: install it from https://nodejs.org (or set ASK_NODE)\n');
+});

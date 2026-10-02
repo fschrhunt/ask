@@ -17,7 +17,7 @@ import (
 // Agent is an official agent package and the CLI it runs.
 type Agent struct{ Name, CLI, Title string }
 
-// Agents are the official agents ask setup offers, installed as fschrhunt/ask-NAME.
+// Agents are the official agents ask setup offers, built into ask from packages/NAME.
 var Agents = []Agent{{"claude", "claude", "Claude Code"}, {"codex", "codex", "Codex"}, {"opencode", "opencode", "Opencode"}}
 
 // FindCLI returns where a CLI is installed, looking on PATH and where installers put it, or "".

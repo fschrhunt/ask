@@ -557,14 +557,12 @@ func chooseAgents(p home.Paths, t *tui.Prompter, m *machine) error {
 		return e
 	}
 	for i, a := range official {
-		_, dir, _ := packages.Locate(p, a.Name)
-		_, statErr := os.Stat(dir)
-		official := statErr == nil
+		_, statErr := os.Stat(packages.BuiltinDir(p, a.Name))
 		switch {
 		case picked[i]:
 			installAgent(p, t.Say, a.Name)
-		case official:
-			line, e := packages.Remove(p, strings.TrimPrefix(packages.Official, "fschrhunt/")+a.Name)
+		case statErr == nil:
+			line, e := packages.Remove(p, "ask/packages/"+a.Name)
 			if e != nil {
 				return e
 			}
