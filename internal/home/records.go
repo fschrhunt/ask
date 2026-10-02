@@ -26,7 +26,7 @@ type UsageRecord struct {
 	Cost   *float64 `json:"cost,omitempty"`
 }
 
-// ChangeRecord describes a content change relative to the beginning of a write run.
+// ChangeRecord describes a file content, mode or link change in a write run.
 type ChangeRecord struct {
 	Path   string `json:"path"`
 	Change string `json:"change"`
@@ -39,11 +39,12 @@ type WorktreeRecord struct {
 }
 
 // ResultRecord is a version 1 result, preserving the documented field order and raw JSON answer.
-// Answer is absent on failures; changes and commits are present only for tracked write runs.
+// Answer is absent on failures; write records effective access; changes and commits track write runs.
 type ResultRecord struct {
 	Run       string          `json:"run"`
 	ID        string          `json:"id"`
 	Model     string          `json:"model"`
+	Write     *bool           `json:"write,omitempty"`
 	Name      string          `json:"name"`
 	OK        bool            `json:"ok"`
 	Answer    json.RawMessage `json:"answer,omitempty"`

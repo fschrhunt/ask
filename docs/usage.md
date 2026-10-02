@@ -61,7 +61,7 @@ ask k3f9a2 · ok · Atlas 2.1 · 41.2s · 3 files changed, 1 commit · 52.1k in 
 "commits": 1
 ```
 
-Files that were already modified before the run are reported only if the run changed them again,
+File mode changes and symbolic links are included. Files that were already modified before the run are reported only if the run changed them again,
 so your own uncommitted work never shows up as the agent's.
 
 ## Working in a worktree
@@ -87,9 +87,10 @@ git -C ~/code/app merge ask/k3f9a2
 git -C ~/code/app worktree remove ~/.ask/worktrees/k3f9a2 && git -C ~/code/app branch -d ask/k3f9a2
 ```
 
-After all hook follow-ups, ask removes them only if no file changes or commits remain relative
-to the worktree's starting commit. An idle follow-up keeps earlier work. Uncommitted changes in your checkout are not in the
-worktree; ask says so when it starts.
+After all hook follow-ups, ask removes a worktree only when git reports it clean and its HEAD
+still points to the starting commit. An idle follow-up keeps earlier work. A read-only follow-up
+can use a kept worktree; recreating one requires write access. Uncommitted changes in your
+checkout are not in the worktree; ask says so when it starts.
 
 ## Where the agent works
 

@@ -5,10 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"math"
 	"os"
-	"os/exec"
 	"strings"
 	"sync"
 	"syscall"
@@ -410,6 +408,11 @@ func show(p home.Paths, opts home.Object, words []string) (int, error) {
 	if i < 0 {
 		fmt.Fprintln(os.Stderr, status.StyledLine(status.BatchSaved(r), os.Stderr))
 		fmt.Fprintln(os.Stdout, home.JSON(home.ResultRecords(r.Results), true))
+		for _, result := range r.Results {
+			if !result.B("ok") {
+				return 1, nil
+			}
+		}
 		return 0, nil
 	}
 	result := r.Results[i]
@@ -573,26 +576,13 @@ func remove(p home.Paths, words []string) (int, error) {
 	return 0, nil
 }
 
-// runCommand gives a user executable the terminal streams, arguments and contract environment.
+// runCommand replaces ask with a user command, preserving its streams and signal behavior.
 func runCommand(p home.Paths, path string, args []string) (int, error) {
-	cmd := exec.Command(path, args...)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Env = p.Env(nil)
-	e := cmd.Run()
-	if e == nil {
-		return 0, nil
+	if e := syscall.Exec(path, append([]string{path}, args...), p.Env(nil)); e != nil {
+		fmt.Fprintf(os.Stderr, "ask: cannot run %s: %s\n", path, e)
+		return 1, nil
 	}
-	if cmd.ProcessState != nil {
-		if status, ok := cmd.ProcessState.Sys().(syscall.WaitStatus); ok && status.Signaled() {
-			return 128 + int(status.Signal()), nil
-		}
-		return cmd.ProcessState.ExitCode(), nil
-	}
-
-	fmt.Fprintf(os.Stderr, "ask: cannot run %s: %s\n", path, e.Error())
-	return 1, nil
+	return 0, nil
 }
 
 // main selects built-in or user commands before parsing command-specific options.
@@ -680,7 +670,6 @@ func main(argv []string, version string) (int, error) {
 // Main runs one CLI invocation and reports errors with the original exit-status contract.
 func Main(argv []string, version string) int {
 	process.Listen()
-	defer finishStdin()
 	code, e := main(argv, version)
 	process.AwaitShutdown()
 	if e != nil {
@@ -707,17 +696,4 @@ func Main(argv []string, version string) int {
 		return 1
 	}
 	return code
-}
-
-// finishStdin lets pipe writers close cleanly before a fast command exits, without waiting on long-lived input.
-func finishStdin() {
-	if stdinTerminal() {
-		return
-	}
-	done := make(chan struct{})
-	go func() { _, _ = io.Copy(io.Discard, os.Stdin); close(done) }()
-	select {
-	case <-done:
-	case <-time.After(25 * time.Millisecond):
-	}
 }

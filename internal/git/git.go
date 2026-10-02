@@ -1,4 +1,4 @@
-// Package git compares working-file contents across write runs and manages isolated worktrees.
+// Package git compares files and modes across write runs and manages isolated worktrees.
 package git
 
 import (
@@ -17,6 +17,9 @@ import (
 func git(dir string, args []string, input string) (string, bool) {
 	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
 	cmd.Stdin = strings.NewReader(input)
+	if len(args) > 0 && args[0] != "worktree" && args[0] != "branch" {
+		cmd.Env = append(os.Environ(), "GIT_OPTIONAL_LOCKS=0")
+	}
 	b, e := cmd.Output()
 	return string(b), e == nil
 }
@@ -50,46 +53,58 @@ func dirtyPaths(root string) []string {
 	return paths
 }
 
-// hashFiles fingerprints present working files, retaining empty hashes for missing paths.
+// hashFiles fingerprints file mode and blob contents, including symlink targets.
 func hashFiles(root string, paths []string) map[string]string {
-	present := []string{}
-	hashes := []string{}
-	for _, path := range paths {
-		if _, e := os.Stat(filepath.Join(root, path)); e == nil {
-			present = append(present, path)
-		}
-	}
-	if len(present) > 0 {
-		out, _ := git(root, []string{"hash-object", "--stdin-paths"}, strings.Join(present, "\n")+"\n")
-		hashes = strings.Split(home.Trim(out), "\n")
-	}
 	m := map[string]string{}
 	for _, path := range paths {
-		m[path] = ""
-	}
-	for i, path := range present {
-		if i < len(hashes) {
-			m[path] = hashes[i]
+		full := filepath.Join(root, path)
+		info, err := os.Lstat(full)
+		if err != nil || info.IsDir() {
+			m[path] = ""
+			continue
+		}
+		mode := "100644"
+		var out string
+		var ok bool
+		if info.Mode()&os.ModeSymlink != 0 {
+			mode = "120000"
+			target, err := os.Readlink(full)
+			if err == nil {
+				out, ok = git(root, []string{"hash-object", "--stdin"}, target)
+			}
+		} else if info.Mode().IsRegular() {
+			if info.Mode()&0111 != 0 {
+				mode = "100755"
+			}
+			out, ok = git(root, []string{"hash-object", "--", path}, "")
+		}
+		if ok {
+			m[path] = mode + ":" + home.Trim(out)
+		} else {
+			m[path] = ""
 		}
 	}
 	return m
 }
 
-// hashAt resolves starting commit blobs for files that were initially clean.
+// hashAt reads starting tree modes and blob hashes without parsing path delimiters.
 func hashAt(root, commit string, paths []string) map[string]string {
 	m := map[string]string{}
 	for _, path := range paths {
 		m[path] = ""
-	}
-	if commit == "" || len(paths) == 0 {
-		return m
-	}
-	out, _ := git(root, append([]string{"ls-tree", "-z", commit, "--"}, paths...), "")
-	for _, entry := range strings.Split(out, "\x00") {
-		meta, path, ok := strings.Cut(entry, "\t")
-		bits := strings.Fields(meta)
-		if ok && len(bits) == 3 && bits[1] == "blob" {
-			m[path] = bits[2]
+		if commit == "" {
+			continue
+		}
+		out, ok := git(root, []string{"ls-tree", "-z", commit, "--", path}, "")
+		if !ok {
+			continue
+		}
+		for _, entry := range strings.Split(out, "\x00") {
+			meta, name, yes := strings.Cut(entry, "\t")
+			bits := strings.Fields(meta)
+			if yes && name == path && len(bits) == 3 && bits[1] == "blob" {
+				m[path] = bits[0] + ":" + bits[2]
+			}
 		}
 	}
 	return m
@@ -113,7 +128,7 @@ func Take(dir string) *Snapshot {
 	return &Snapshot{root, head(root), hashFiles(root, paths), paths}
 }
 
-// Changes returns content changes only, plus commits made on top of the starting HEAD.
+// Changes returns content and mode changes, plus commits made on top of the starting HEAD.
 func Changes(before *Snapshot) ([]any, int) {
 	h := head(before.Root)
 	paths := []string{}
@@ -182,7 +197,7 @@ func Add(p home.Paths, dir, name string) (*Worktree, error) {
 	path := filepath.Join(p.Worktrees, name)
 	branch := "ask/" + name
 	if _, e := os.Stat(path); e != nil {
-		if e = os.MkdirAll(p.Worktrees, 0777); e != nil {
+		if e = os.MkdirAll(p.Worktrees, 0700); e != nil {
 			return nil, e
 		}
 		_, exists := git(root, []string{"rev-parse", "--verify", "-q", "refs/heads/" + branch}, "")
@@ -194,7 +209,11 @@ func Add(p home.Paths, dir, name string) (*Worktree, error) {
 			return nil, fmt.Errorf("could not create a worktree for %s; does it have a commit?", root)
 		}
 	}
-	rel, _ := filepath.Rel(root, dir)
+	prefix, ok := git(dir, []string{"rev-parse", "--show-prefix"}, "")
+	if !ok {
+		return nil, fmt.Errorf("could not locate %s inside its repository", dir)
+	}
+	rel := strings.TrimSuffix(prefix, "\n")
 	history, _ := git(path, []string{"reflog", "show", "--format=%H", branch}, "")
 	entries := strings.Fields(history)
 	base, _ := git(path, []string{"merge-base", "HEAD", head(root)}, "")
@@ -205,12 +224,21 @@ func Add(p home.Paths, dir, name string) (*Worktree, error) {
 	return &Worktree{Path: path, Branch: branch, Dir: filepath.Join(path, rel), Base: base, Dirty: len(dirtyPaths(root)) > 0}, nil
 }
 
-// Remove removes an unchanged worktree and attempts to delete its branch.
-func Remove(w *Worktree) {
+// Unchanged trusts git status and HEAD when deciding whether removal is safe.
+func Unchanged(w *Worktree) bool {
+	status, ok := git(w.Path, []string{"status", "--porcelain=v1", "-z", "--untracked-files=all"}, "")
+	return ok && status == "" && head(w.Path) == w.Base && w.Base != ""
+}
+
+// Remove removes a proven unchanged worktree and its branch only when git accepts removal.
+func Remove(w *Worktree) bool {
 	root, _ := git(w.Path, []string{"rev-parse", "--git-common-dir"}, "")
 	root = home.Trim(root)
-	git(w.Path, []string{"worktree", "remove", "--force", w.Path}, "")
+	if _, ok := git(w.Path, []string{"worktree", "remove", w.Path}, ""); !ok {
+		return false
+	}
 	if root != "" {
 		git(filepath.Join(root, ".."), []string{"branch", "-D", w.Branch}, "")
 	}
+	return true
 }

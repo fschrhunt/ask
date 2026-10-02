@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Preserve caller stdin for argument prompts; keep worktrees whenever git sees changes or a
+  moved HEAD, and report mode, symlink and newline-named file changes. Worktrees preserve the
+  caller's subdirectory through symlinked paths, and batch tasks always get distinct branches.
+- Guard runs with an operating system lock, keep interrupted task slots empty, and write private
+  run records through unique temporary files. Read-only follow-ups can use kept worktrees;
+  follow-ups inherit the model and access selected by task hooks.
+- User commands replace ask so signals and exit status reach them directly. Bound output-pipe
+  waits after agent exit, clamp long timeouts, and describe signal deaths by signal name.
+- Match host titles to ask's command and batch-file parsing; failed saved batches exit 1.
+  Plain status removes control characters, empty task records are skipped, and terminal batch
+  views show total usage. Terminal width falls back to a positive `COLUMNS` value.
+
+
 - One compact help overview for `ask`, `ask help` and help flags; every command has a short
   `--help` page, and `-h` works throughout. `-V` aliases `--version`; near-miss options
   suggest a correction. Existing public names remain stable for scripts and run records.

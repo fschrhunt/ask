@@ -86,7 +86,10 @@ func (a *Registry) models(name string, config home.Object) listing {
 				if r.TimedOut {
 					own.error = "timed out"
 				} else {
-					own.error = fmt.Sprintf("exit %s", exitText(r.Code))
+					own.error = exitText(r)
+					if r.Signal == 0 && r.Code >= 0 {
+						own.error = "exit " + own.error
+					}
 				}
 			}
 		} else {
@@ -170,12 +173,15 @@ func (a *Registry) Name(m Model, reported string) string {
 	return name
 }
 
-// exitText renders a signal or start failure as the original null exit code.
-func exitText(code int) string {
-	if code < 0 {
-		return "null"
+// exitText describes a process exit, including termination by a signal.
+func exitText(r process.Result) string {
+	if r.Signal != 0 {
+		return "killed by " + process.SignalName(r.Signal)
 	}
-	return fmt.Sprint(code)
+	if r.Code < 0 {
+		return "could not start"
+	}
+	return fmt.Sprint(r.Code)
 }
 
 // Run sends the prompt on stdin and reads the optional report even after failure or timeout.
@@ -203,7 +209,7 @@ func (a *Registry) Run(m Model, prompt string, t home.Object) home.Object {
 	if timeout == 0 {
 		timeout = 900
 	}
-	r := process.Run(find.Path(a.Paths, "agents", m.Agent), nil, process.Options{Input: prompt, Dir: t.S("dir"), Env: a.Paths.Env(vars), Timeout: time.Duration(timeout * float64(time.Second))})
+	r := process.Run(find.Path(a.Paths, "agents", m.Agent), nil, process.Options{Input: prompt, Dir: t.S("dir"), Env: a.Paths.Env(vars), Timeout: process.Timeout(timeout)})
 
 	report := Report{}
 	if b, err := os.ReadFile(vars["ASK_REPORT"]); err == nil {
@@ -230,7 +236,10 @@ func (a *Registry) Run(m Model, prompt string, t home.Object) home.Object {
 	case r.Code != 0:
 		why := process.Reason(r.Stderr)
 		if why == "" {
-			why = "exit " + exitText(r.Code)
+			why = exitText(r)
+			if r.Signal == 0 && r.Code >= 0 {
+				why = "exit " + why
+			}
 		}
 		meta.Set("note", why)
 	case home.Trim(r.Stdout) == "":

@@ -9,7 +9,7 @@ they may change.
 | --- | --- |
 | The command line: commands, options, exit codes (0 ok, 1 a run failed, 2 a usage error), stdout carrying only answers | `ask --help`, [Usage](usage.md) |
 | Plain status lines start with `ask RUN · outcome ·`; terminals may redraw live state | [Runs](runs.md) |
-| Result fields (`run`, `id`, `model`, `name`, `ok`, `answer`/`error`, `seconds`, `usage`, `session`, `dir`, `changes`, `commits`, `worktree`, `followups`) | [Batches](batches.md) |
+| Result fields (`run`, `id`, `model`, `write`, `name`, `ok`, `answer`/`error`, `seconds`, `usage`, `session`, `dir`, `changes`, `commits`, `worktree`, `followups`) | [Batches](batches.md) |
 | Run records: `tasks.json` and `results.json` in `~/.ask/runs/` | [Runs](runs.md) |
 | The agent contract | [Agents](agents.md) |
 | The hook contract | [Hooks](hooks.md) |

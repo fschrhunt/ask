@@ -104,7 +104,7 @@ func Run(a *agent.Registry, t home.Object, started func(Started)) home.Object {
 	if m.Agent != "" {
 		name = a.Name(m, r.S("name"))
 	}
-	out := home.O("id", t.Get("id"), "model", t.Get("model"), "name", name, "ok", r.B("ok"))
+	out := home.O("id", t.Get("id"), "model", t.Get("model"), "write", t.B("write"), "name", name, "ok", r.B("ok"))
 	if r.B("ok") {
 		out.Set("answer", r.Get("answer"))
 		if r.B("note") {

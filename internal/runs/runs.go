@@ -5,7 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"math"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -21,6 +21,7 @@ import (
 	"github.com/fschrhunt/ask/internal/git"
 	"github.com/fschrhunt/ask/internal/home"
 	"github.com/fschrhunt/ask/internal/hooks"
+	"github.com/fschrhunt/ask/internal/process"
 	"github.com/fschrhunt/ask/internal/task"
 )
 
@@ -55,21 +56,11 @@ func Ref(r *Run, index int) string {
 	return r.ID + "/" + r.Tasks[index].S("id")
 }
 
-// readJSON returns nil for missing or unreadable records; load distinguishes damaged results.
-func readJSON(path string) any {
-	b, e := os.ReadFile(path)
-	if e != nil {
-		return nil
-	}
-	v, _ := home.ParseJSON(home.UTF8(b))
-	return v
-}
-
 // load reads task-position results and refuses damaged results instead of silently rerunning them.
 func load(dir string) (*Run, error) {
 	b, err := os.ReadFile(filepath.Join(dir, "tasks.json"))
 	var records []home.TaskRecord
-	if err != nil || json.Unmarshal(b, &records) != nil || records == nil {
+	if err != nil || json.Unmarshal(b, &records) != nil || len(records) == 0 {
 		return nil, home.Usage("%s is not a readable run", dir)
 	}
 	tasks := make([]home.Object, len(records))
@@ -107,7 +98,7 @@ func Create(p home.Paths, id string, tasks []home.Object) (*Run, error) {
 	stamp := time.Now().UTC().Format("20060102T150405.000")
 	stamp = strings.ReplaceAll(stamp, ".", "")
 	dir := filepath.Join(p.Runs, stamp+"-"+id)
-	if e := os.MkdirAll(dir, 0777); e != nil {
+	if e := os.MkdirAll(dir, 0700); e != nil {
 		return nil, e
 	}
 	if e := home.WriteJSON(filepath.Join(dir, "tasks.json"), home.TaskRecords(tasks)); e != nil {
@@ -190,25 +181,54 @@ func Alive(pid int) bool {
 	return e == nil || e == syscall.EPERM
 }
 
-// Owner returns a live lock owner, or zero if a run is not currently running.
+// Owner reports a run owner only while the operating system lock is held.
 func Owner(r *Run) int {
-	n := home.Number(readJSON(filepath.Join(r.Dir, "lock")))
-	if math.IsNaN(n) || math.IsInf(n, 0) || n != math.Trunc(n) || n > math.MaxInt32 {
+	f, err := os.OpenFile(filepath.Join(r.Dir, "lock"), os.O_RDONLY, 0)
+	if err != nil {
 		return 0
 	}
-	pid := int(n)
-	if Alive(pid) {
-		return pid
+	defer f.Close()
+	err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+	if err == nil {
+		syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+		return 0
 	}
-	return 0
+	if err != syscall.EWOULDBLOCK && err != syscall.EAGAIN {
+		return 0
+	}
+	b, err := io.ReadAll(f)
+	if err != nil {
+		return 0
+	}
+	pid, err := strconv.Atoi(strings.TrimSpace(string(b)))
+	if err != nil || pid <= 0 {
+		return 0
+	}
+	return pid
 }
 
-// lock refuses a live owner and takes over a lock whose owner is gone.
-func lock(r *Run) error {
-	if pid := Owner(r); pid != 0 && pid != os.Getpid() {
-		return home.Usage("run %s is running (pid %d); stop it with `ask stop %s`", r.ID, pid, r.ID)
+// lock takes an exclusive kernel lock for the complete execution of a run.
+func lock(r *Run) (*os.File, error) {
+	f, err := os.OpenFile(filepath.Join(r.Dir, "lock"), os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		return nil, err
 	}
-	return os.WriteFile(filepath.Join(r.Dir, "lock"), []byte(strconv.Itoa(os.Getpid())), 0666)
+	if err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		f.Close()
+		return nil, home.Usage("run %s is running (pid %d); stop it with `ask stop %s`", r.ID, Owner(r), r.ID)
+	}
+	if err = f.Chmod(0600); err != nil {
+		f.Close()
+		return nil, err
+	}
+	if err = f.Truncate(0); err == nil {
+		_, err = f.WriteString(strconv.Itoa(os.Getpid()))
+	}
+	if err != nil {
+		f.Close()
+		return nil, err
+	}
+	return f, nil
 }
 
 // Prepare validates task fields and inherits a followed-up task's agent, access and location.
@@ -286,21 +306,25 @@ func Prepare(p home.Paths, items []any, defaults home.Object, id string, single 
 				return nil, home.Usage("%s cannot be continued: its agent reported no session", t.S("continue"))
 			}
 			if x.Get("model") == nil {
-				x.Set("model", old.Get("model"))
+				x.Set("model", result.Get("model"))
 			}
 			m, e := agent.Parse(p, x.S("model"))
 			if e != nil {
 				return nil, e
 			}
-			prior, e := agent.Parse(p, old.S("model"))
+			prior, e := agent.Parse(p, result.S("model"))
 			if e != nil {
 				return nil, e
 			}
 			if m.Agent != prior.Agent {
-				return nil, home.Usage("%s ran on %s; a follow-up must use the same agent", t.S("continue"), old.S("model"))
+				return nil, home.Usage("%s ran on %s; a follow-up must use the same agent", t.S("continue"), result.S("model"))
 			}
 			if x.Get("write") == nil {
-				x.Set("write", old.Get("write"))
+				if result.Has("write") {
+					x.Set("write", result.Get("write"))
+				} else {
+					x.Set("write", old.Get("write"))
+				}
 			}
 			x.Set("dir", old.Get("dir"))
 			if old.Has("worktree") {
@@ -311,7 +335,7 @@ func Prepare(p home.Paths, items []any, defaults home.Object, id string, single 
 		} else if t.B("worktree") {
 			name := id
 			if !single {
-				name += "-" + safeWorktreeID(taskID)
+				name += "-" + strconv.Itoa(i+1) + "-" + safeWorktreeID(taskID)
 			}
 			x.Set("worktree", name)
 		}
@@ -323,7 +347,10 @@ func Prepare(p home.Paths, items []any, defaults home.Object, id string, single 
 		}
 		x.Set("write", x.B("write"))
 		if x.B("worktree") && !x.B("write") {
-			return nil, home.Usage("%s: a worktree is for write runs; add -w", where)
+			info, err := os.Stat(filepath.Join(p.Worktrees, x.S("worktree")))
+			if !x.B("continues") || err != nil || !info.IsDir() {
+				return nil, home.Usage("%s: a worktree is for write runs; add -w", where)
+			}
 		}
 		if _, e := os.Stat(x.S("dir")); e != nil {
 			return nil, home.Usage("%s: no directory %s", where, x.S("dir"))
@@ -431,9 +458,7 @@ func withHooks(a *agent.Registry, h *hooks.Hooks, t home.Object, ref string, rep
 		if worktree == nil {
 			return
 		}
-		files, commits := git.Changes(&git.Snapshot{Root: worktree.Path, Head: worktree.Base})
-		if len(files) == 0 && commits == 0 {
-			git.Remove(worktree)
+		if git.Unchanged(worktree) && git.Remove(worktree) {
 			final.Delete("worktree")
 		} else if final != nil {
 			final.Set("worktree", home.O("path", worktree.Path, "branch", worktree.Branch))
@@ -451,12 +476,21 @@ func withHooks(a *agent.Registry, h *hooks.Hooks, t home.Object, ref string, rep
 	}
 	started := func(info task.Started) { worktree = info.Worktree; report(Event{Kind: "start", Started: info}) }
 	result := task.Run(a, t, started)
+	if process.Stopping() {
+		return nil
+	}
 	for round := 0; h != nil; round++ {
+		if process.Stopping() {
+			return nil
+		}
 		x := home.O("run", ref)
 		for key, val := range result {
 			x.Set(key, val)
 		}
 		followup, fail, notes := h.After(t, x, ref)
+		if process.Stopping() {
+			return nil
+		}
 		for _, n := range notes {
 			report(Event{Kind: "note", Note: n})
 		}
@@ -483,17 +517,22 @@ func withHooks(a *agent.Registry, h *hooks.Hooks, t home.Object, ref string, rep
 		next := t.Clone()
 		next.Set("prompt", followup.Text)
 		next.Set("session", result.Get("session"))
-		result = combine(result, task.Run(a, next, started))
+		nextResult := task.Run(a, next, started)
+		if process.Stopping() {
+			return nil
+		}
+		result = combine(result, nextResult)
 	}
 	return result
 }
 
 // Execute runs unfinished tasks up to jobs at once and atomically saves each completed result.
 func Execute(a *agent.Registry, r *Run, jobs int, enabled bool, report func(Event)) ([]home.Object, error) {
-	if e := lock(r); e != nil {
+	owner, e := lock(r)
+	if e != nil {
 		return nil, e
 	}
-	defer os.Remove(filepath.Join(r.Dir, "lock"))
+	defer owner.Close()
 	var h *hooks.Hooks
 	if enabled {
 		h = hooks.New(a.Paths)
@@ -538,13 +577,18 @@ func Execute(a *agent.Registry, r *Run, jobs int, enabled bool, report func(Even
 				}
 				result := withHooks(a, h, r.Tasks[i], Ref(r, i), func(e Event) {
 					e.Index = i
-					report(e)
+					if !process.Stopping() {
+						report(e)
+					}
 					if e.Kind == "start" {
 						release()
 					}
 				})
 				release()
 
+				if process.Stopping() || result == nil {
+					return
+				}
 				x := home.O("run", Ref(r, i))
 				for key, val := range result {
 					x.Set(key, val)

@@ -45,7 +45,11 @@ func (h *Hooks) forEvent(event string) []find.Executable {
 					reason = "timed out"
 				}
 				if reason == "" {
-					reason = fmt.Sprintf("exit %d", r.Code)
+					if r.Signal != 0 {
+						reason = "killed by " + process.SignalName(r.Signal)
+					} else {
+						reason = fmt.Sprintf("exit %d", r.Code)
+					}
 				}
 				h.failures[x.Path] = reason
 			}
@@ -77,11 +81,11 @@ func (h *Hooks) call(path, event string, input any, dir, ref string) home.Object
 	if r.Code != 0 {
 		why := process.Reason(r.Stderr)
 		if why == "" {
-			code := "null"
-			if r.Code >= 0 {
-				code = fmt.Sprint(r.Code)
+			if r.Signal != 0 {
+				why = "killed by " + process.SignalName(r.Signal)
+			} else {
+				why = fmt.Sprintf("exit %d", r.Code)
 			}
-			why = "exit " + code
 		}
 		return home.O("error", why)
 	}
