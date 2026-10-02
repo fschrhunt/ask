@@ -75,8 +75,10 @@ Commands
   setup      Set up agents, defaults and your apps
   batch      Run many tasks in parallel
   show       Print a saved answer
+  wait       Wait for runs to finish, then print them
   runs       List recent runs
   stop       Stop a running run
+  clean      Remove finished worktrees and old runs
   models     List available models
   title      Name a command for a host
   install    Install or update packages
@@ -95,6 +97,9 @@ Commands
 				if m := commandDescription.FindStringSubmatch(text); m != nil {
 					desc = home.Trim(m[1])
 				}
+			}
+			if _, builtin := options[c.Name]; builtin {
+				desc = "(hidden: ask's own " + c.Name + " wins; rename yours)"
 			}
 			own = append(own, fmt.Sprintf("  %-10s %s", c.Name, desc))
 		}
@@ -216,6 +221,43 @@ Output
 Examples
   ask runs
   ask runs --all -n 50` + "\n\ndocs  " + docsURL + "/runs.md"
+	case "wait":
+		return `ask wait · wait for runs to finish, then print them
+
+Usage
+  ask wait RUN [RUN...] [-t S] [--json]
+
+Options
+  -t S     Give up after S seconds (exit 1)
+  --json   One run's whole result, as with ask show
+
+Output
+  one run     Its answer on stdout, its status line on stderr, like ask show
+  several     Their results as one JSON array on stdout
+  exit        0 all ok · 1 one failed, stopped or still running · 2 usage error
+
+Examples
+  ask wait login-test-fail
+  ask wait fix-api fix-tests -t 1800` + "\n\ndocs  " + docsURL + "/runs.md"
+	case "clean":
+		return `ask clean · remove worktrees whose work has landed, and old runs
+
+Usage
+  ask clean [--days N] [--dry-run] [--yes]
+
+Removes
+  worktrees   Left by write runs, once clean and their changes are on main
+              (merged or squash-merged), or when they changed nothing
+  runs        Records older than N days (default 30) without a kept worktree
+
+Options
+  --days N    Age of runs to remove (default: 30)
+  --dry-run   Show what would go, change nothing
+  --yes       Remove without asking (needed without a terminal)
+
+Examples
+  ask clean
+  ask clean --dry-run --days 7` + "\n\ndocs  " + docsURL + "/runs.md"
 	case "stop":
 		return `ask stop · stop a run and its agents
 

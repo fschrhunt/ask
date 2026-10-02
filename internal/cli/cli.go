@@ -30,10 +30,10 @@ var options = map[string][]string{
 	"batch": {"-m", "-r", "-w", "--worktree", "--json", "--schema", "-C", "-t", "-j", "--resume", "--no-hooks"},
 	"title": {"--command", "--description", "--hook"},
 	"setup": {"--check", "--json", "--yes", "--agents", "-m", "-t", "-j", "--worktrees", "--branches", "--skills", "--hook", "--no-hook"},
-	"show":  {"--json"}, "runs": {"-n", "--all"}, "stop": {}, "models": {"--names"}, "help": {}, "install": {}, "packages": {}, "remove": {},
+	"show":  {"--json"}, "runs": {"-n", "--all"}, "wait": {"-t", "--json"}, "clean": {"--days", "--dry-run", "--yes"}, "stop": {}, "models": {"--names"}, "help": {}, "install": {}, "packages": {}, "remove": {},
 }
 var long = map[string]string{"--model": "-m", "--read": "-r", "--write": "-w", "--continue": "-c", "--dir": "-C", "--timeout": "-t", "--jobs": "-j"}
-var value = map[string]bool{"-m": true, "-c": true, "--schema": true, "-C": true, "-t": true, "-j": true, "-n": true, "--resume": true, "--command": true, "--description": true, "--agents": true, "--worktrees": true, "--branches": true, "--skills": true}
+var value = map[string]bool{"-m": true, "-c": true, "--schema": true, "-C": true, "-t": true, "-j": true, "-n": true, "--resume": true, "--command": true, "--description": true, "--agents": true, "--days": true, "--worktrees": true, "--branches": true, "--skills": true}
 
 // suggestion returns a valid option only when the spelling is one edit away.
 func suggestion(command, wrong string) string {
@@ -767,6 +767,13 @@ func main(argv []string, version string) (int, error) {
 		return setupCommand(p, opts)
 	case "show":
 		return show(p, opts, words)
+	case "wait":
+		return wait(p, opts, words)
+	case "clean":
+		if len(words) != 0 {
+			return 0, home.Usage("ask clean takes no arguments; see ask clean --help")
+		}
+		return clean(p, opts)
 	case "stop":
 		return stop(p, words)
 	case "runs":

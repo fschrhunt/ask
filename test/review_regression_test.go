@@ -180,8 +180,8 @@ func TestEmptyTasksRunIsUnreadable(t *testing.T) {
 // TestUserCommandReceivesSignal directly requires a command to replace ask's process.
 func TestUserCommandReceivesSignal(t *testing.T) {
 	s := fresh(t)
-	s.script("commands", "wait", `echo $$ > "$HOME/command-pid"; exec sleep 30`)
-	run := s.start([]string{"wait"}, "", nil)
+	s.script("commands", "hold", `echo $$ > "$HOME/command-pid"; exec sleep 30`)
+	run := s.start([]string{"hold"}, "", nil)
 	until(t, func() bool { return exists(filepath.Join(s.tmp, "command-pid")) })
 	if e := run.cmd.Process.Signal(syscall.SIGTERM); e != nil {
 		t.Fatal(e)
