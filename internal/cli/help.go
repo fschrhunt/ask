@@ -265,7 +265,7 @@ Usage
 Source
   OWNER/REPO   A GitHub repository
   URL          Any git repository
-  PATH         A local git repository
+  PATH         A local git repository, like ./tools or ~/code/tools
 
 Examples
   ask install owner/repo

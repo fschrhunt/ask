@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+- `ask install` refuses sources whose host, owner or repository is `.`, `..` or starts with `-`,
+  and SCP-style sources whose user part hides another host, so a package always lands in
+  `~/.ask/packages/HOST/OWNER/REPO`. `OWNER/REPO` always means GitHub, even beside a folder of that
+  name; installing a different source where a package is installed fails instead of updating it.
+  Installing the same source again updates it even when a git `insteadOf` rule rewrites its URL,
+  and a local folder whose name is only dots and `.git` (like `...git`) is refused.
+- A task hook's `refuse` or a result hook's `fail` that is not a string is noted instead of
+  silently ignored.
+- Follow-ups and runs fixed: `-c RUN --worktree` (or `"worktree": true` with `"continue"`) is
+  refused for a run in your checkout instead of writing there; a batch task's follow-up never takes
+  the batch's or another run's name; `-c` accepts a single run's folder and says when a run has
+  not finished; a timeout above 2000000 seconds says so. A follow-up of a worktree task whose
+  worktree was removed claims a fresh one instead of running in another run's worktree of that
+  name. `ask show DIR` of a single run's folder prints its answer, like `ask show RUN`.
+- Worktrees: parallel runs with the same name each claim their own worktree and branch, and task
+  ids with dots (`v1..v2`, `api.lock`) give valid branch names. ask's own git calls ignore a
+  `core.fsmonitor` a write run sets.
+- `ask stop` fails when the run is still going after 10 seconds instead of saying `stopped`.
+  Checking whether a run is running no longer takes its lock, so `ask runs` or `ask stop` can't
+  make a concurrent `--resume` fail; the lock file no longer holds a pid, as the kernel reports it.
+  A run started outside a sandbox or container shows as running inside one, and `ask stop` there
+  says it cannot signal it. Usage sums keep only the counts an agent reported, so a cost-only
+  agent's records hold no zero token counts.
+  **Before upgrading, let running asks finish or stop them:** the run lock moved from `flock` to
+  `fcntl` locks, and older and newer binaries do not see each other's locks.
+- Stopping a batch (Ctrl-C or `ask stop`) no longer prints `[null]` results or a `0/1 ok` summary;
+  it ends with the stopped line, like a single run. A batch's usage total leaves out cost when
+  only some tasks reported one. A JSON line that does not parse is reported by its line in the
+  input, counting leading blank lines, and `-t` above 2000000 seconds is rejected by name.
+||||||| bb4d816
 - Host titles read batch tasks from heredocs: piped to `ask batch -`, or written by `cat > FILE`
   earlier in the same command, so a batch started that way is titled `Batch of N · Model · …`.
 - The live view shows tokens and cost while agents run, and a batch's footer keeps a running

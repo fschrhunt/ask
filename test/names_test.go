@@ -27,6 +27,12 @@ func TestNames(t *testing.T) {
 		eq(t, s.ask("show", id).stdout, "fake: remember PELICAN\n")
 		eq(t, len(s.dirs()), 3)
 	})
+	t.Run("a batch task's follow-up never takes the batch's name, even when the task id has no usable words", func(t *testing.T) {
+		s := fresh(t)
+		s.run([]string{"batch", "-m", "fake:small", "-"}, `[{"id":"ü","prompt":"fix bug"},{"prompt":"fix bug two"}]`, nil)
+		eq(t, runID(t, s.ask("-c", "fix-bug/1", "more").stderr), "fix-bug-2")
+		eq(t, s.ask("show", "fix-bug/2").stdout, "fake: fix bug two\n")
+	})
 	t.Run("a name hook can rename a run from its prompts; a failing one keeps the prompt's name", func(t *testing.T) {
 		s := fresh(t)
 		s.hook("namer", []string{"name"}, `echo '{"name":"Login Throttle"}'`)

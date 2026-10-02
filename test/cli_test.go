@@ -156,15 +156,18 @@ func TestCLI(t *testing.T) {
 		eq(t, r.code, 0)
 		eq(t, s.calls()[0].s("cwd"), filepath.Join(s.tmp, "work"))
 	})
-	t.Run("numbers are checked: -t, -j and a task timeout must be above 0", func(t *testing.T) {
+	t.Run("numbers are checked: -t, -j and a task timeout must be above 0, and -t at most 2000000", func(t *testing.T) {
 		s := fresh(t)
 		for _, args := range [][]string{{"-m", "fake:small", "-t", "abc", "hi"}, {"batch", "-j", "0", "-m", "fake:small", "-"}} {
 			r := s.run(args, `[{"prompt": "a"}]`, nil)
 			eq(t, r.code, 2)
 			match(t, r.stderr, `needs a (whole )?number above 0`)
 		}
+		long := s.ask("-m", "fake:small", "-t", "inf", "hi")
+		eq(t, long.code, 2)
+		match(t, long.stderr, `-t needs at most 2000000 seconds, not "inf"`)
 		task := s.run([]string{"batch", "-m", "fake:small", "-"}, `[{"prompt": "a", "timeout": "soon"}]`, nil)
-		match(t, task.stderr, `task 1: timeout must be a number of seconds above 0`)
+		match(t, task.stderr, `task 1: timeout must be a number of seconds above 0, at most 2000000`)
 		eq(t, len(s.calls()), 0)
 	})
 	t.Run("words after -- are the prompt, even ones that look like options", func(t *testing.T) {

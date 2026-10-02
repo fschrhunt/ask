@@ -58,7 +58,8 @@ func Listen() {
 // Stopping reports whether signal shutdown has begun.
 func Stopping() bool { groups.Lock(); defer groups.Unlock(); return groups.stopping }
 
-// AwaitShutdown keeps the entry point alive until a signal handler has stopped every group.
+// AwaitShutdown blocks once signal shutdown has begun, so the handler stops every group,
+// runs the OnStop cleanup and exits 130 before a caller can report a stopped run as finished.
 func AwaitShutdown() {
 	groups.Lock()
 	stopping := groups.stopping

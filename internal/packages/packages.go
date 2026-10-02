@@ -33,21 +33,32 @@ func git(args []string, dir string) (string, error) {
 	return string(b), nil
 }
 
-var shorthand = regexp.MustCompile(`^[\w.-]+/[\w.-]+$`)
-var sourcePattern = regexp.MustCompile(`^(?:[a-z+]+://(?:[^@/]+@)?|[^@/]+@)?([^/:]+)[/:]([^/]+)/([^/]+?)(?:\.git)?/?$`)
+var shorthand = regexp.MustCompile(`^\w[\w-]*/[\w.-]+$`)
+var sourcePattern = regexp.MustCompile(`^(?:[a-z][a-z0-9+.-]*://(?:[^@/]+@)?|[\w.-]+@)?([\w.-]+)[/:]([\w.-]+)/([\w.-]+?)(?:\.git)?/?$`)
 
-// Locate resolves a local path, GitHub shorthand or git URL to its installation directory.
+// Locate resolves GitHub shorthand, a git URL or a local path to its installation directory.
+// OWNER/REPO always means GitHub; any other source that exists on disk is a local repository.
+// A URL's host, owner and repository become the directory's three names, so none may be
+// empty, "." or "..", or start with "-", and the directory always stays inside packages.
 func Locate(p home.Paths, source string) (string, string, error) {
-	if _, e := os.Stat(source); e == nil {
-		path, _ := filepath.Abs(source)
-		return path, filepath.Join(p.Packages, "local", filepath.Base(filepath.Dir(path)), strings.TrimSuffix(filepath.Base(path), ".git")), nil
-	}
 	if shorthand.MatchString(source) {
 		source = "https://github.com/" + source
+	} else if _, e := os.Stat(source); e == nil {
+		path, _ := filepath.Abs(source)
+		name := strings.TrimSuffix(filepath.Base(path), ".git")
+		if name == "" || name == "." || name == ".." {
+			return "", "", home.Usage("cannot install %s: its folder name leaves no package name", source)
+		}
+		return path, filepath.Join(p.Packages, "local", filepath.Base(filepath.Dir(path)), name), nil
 	}
 	m := sourcePattern.FindStringSubmatch(source)
-	if m == nil {
+	if m == nil || strings.HasPrefix(source, "-") {
 		return "", "", home.Usage("cannot tell where %s lives; give OWNER/REPO or a git URL", source)
+	}
+	for _, part := range m[1:] {
+		if part == "." || part == ".." || strings.HasPrefix(part, "-") {
+			return "", "", home.Usage("cannot tell where %s lives; give OWNER/REPO or a git URL", source)
+		}
 	}
 	return source, filepath.Join(p.Packages, m[1], m[2], m[3]), nil
 }
@@ -98,23 +109,34 @@ func Update(p home.Paths, dir string) (string, error) {
 	return name + ": " + status, nil
 }
 
-// Install clones a package or updates the existing installation.
+// Install clones a package, or updates the installation in its place when that came from the
+// same source; a different source there is a usage error, since only one fits.
 func Install(p home.Paths, source string) (string, error) {
 	url, dir, e := Locate(p, source)
 	if e != nil {
 		return "", e
 	}
 	if _, e := os.Stat(dir); e == nil {
+		origin, _ := git([]string{"config", "--get", "remote.origin.url"}, dir)
+		if plain(origin) != plain(url) {
+			name, _ := filepath.Rel(p.Packages, dir)
+			return "", home.Usage("%s is installed from %s; remove it first", name, home.Trim(origin))
+		}
 		return Update(p, dir)
 	}
 	if e = os.MkdirAll(filepath.Dir(dir), 0777); e != nil {
 		return "", e
 	}
-	if _, e = git([]string{"clone", "--quiet", url, dir}, ""); e != nil {
+	if _, e = git([]string{"clone", "--quiet", "--", url, dir}, ""); e != nil {
 		return "", e
 	}
 	name, _ := filepath.Rel(p.Packages, dir)
 	return "installed " + name + ": " + Contents(dir), nil
+}
+
+// plain drops what may differ between two spellings of one source: spaces, a trailing "/" or ".git".
+func plain(source string) string {
+	return strings.TrimSuffix(strings.TrimSuffix(home.Trim(source), "/"), ".git")
 }
 
 // Remove removes exactly one full or suffix-matched package, rejecting ambiguous names.

@@ -99,7 +99,7 @@ func TestBatchWorktreeNamesUsePosition(t *testing.T) {
 	}
 }
 
-// TestStoppedTaskHasEmptyResult lets a stopped run resume without a failure result or result hook.
+// TestStoppedTaskHasEmptyResult lets a stopped run resume without a failure result, result hook or printed results.
 func TestStoppedTaskHasEmptyResult(t *testing.T) {
 	s := fresh(t)
 	s.hook("observe", []string{"result"}, `echo '{}'`)
@@ -107,7 +107,9 @@ func TestStoppedTaskHasEmptyResult(t *testing.T) {
 	until(t, func() bool { return len(s.calls()) == 1 })
 	id := strings.TrimPrefix(s.latest()[strings.LastIndex(s.latest(), "-"):], "-")
 	eq(t, s.ask("stop", id).code, 0)
-	eq(t, run.wait(t).code, 130)
+	out := run.wait(t)
+	eq(t, out.code, 130)
+	eq(t, out.stdout, "")
 	path := filepath.Join(s.home, "runs", s.latest(), "results.json")
 	if exists(path) && strings.Contains(s.read(path), `"ok": false`) {
 		t.Fatal("stopped task saved as failed")
@@ -291,7 +293,8 @@ func TestPrivateWorktreeParent(t *testing.T) {
 	}
 }
 
-// TestRunLockIsKernelExclusive refuses a second writer while an OS lock is held.
+// TestRunLockIsKernelExclusive refuses a second writer while an OS lock is held, naming the
+// holder the kernel reports rather than whatever the lock file contains.
 func TestRunLockIsKernelExclusive(t *testing.T) {
 	s := fresh(t)
 	first := s.run([]string{"batch", "-m", "fake:small", "-"}, `[{"prompt":"fail"}]`, map[string]string{"FAKE_FAIL": "fail"})
@@ -305,11 +308,56 @@ func TestRunLockIsKernelExclusive(t *testing.T) {
 	if e := f.Truncate(0); e != nil {
 		t.Fatal(e)
 	}
-	if e := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); e != nil {
+	if e := syscall.FcntlFlock(f.Fd(), syscall.F_SETLK, &syscall.Flock_t{Type: syscall.F_WRLCK}); e != nil {
 		t.Fatal(e)
 	}
-	defer syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
 	r := s.ask("batch", "--resume", runID(t, first.stderr))
 	eq(t, r.code, 2)
-	match(t, r.stderr, `is running`)
+	match(t, r.stderr, `is running \(pid `+strconv.Itoa(os.Getpid())+`\)`)
+}
+
+// TestFollowupCannotMoveIntoWorktree refuses --worktree for a follow-up of a run in the checkout.
+func TestFollowupCannotMoveIntoWorktree(t *testing.T) {
+	s := fresh(t)
+	dir, _ := s.repo()
+	first := s.ask("-m", "fake:small", "-C", dir, "look")
+	r := s.run([]string{"-c", runID(t, first.stderr), "-w", "--worktree", "edit"}, "", map[string]string{"FAKE_WRITE": "a.txt=changed\n"})
+	eq(t, r.code, 2)
+	match(t, r.stderr, `not a worktree; drop --worktree`)
+	eq(t, s.read(filepath.Join(dir, "a.txt")), "one\n")
+}
+
+// TestDottedTaskIDWorktree turns task ids git refuses in branch names, like v1..v2, into valid ones.
+func TestDottedTaskIDWorktree(t *testing.T) {
+	s := fresh(t)
+	dir, _ := s.repo()
+	r := s.run([]string{"batch", "-m", "fake:small", "-w", "--worktree", "-C", dir, "-"}, `[{"id":"v1..v2","prompt":"a"},{"id":"api.lock","prompt":"b"}]`, nil)
+	eq(t, r.code, 0)
+}
+
+// TestContinueByDirectory continues a single-task run named by its folder.
+func TestContinueByDirectory(t *testing.T) {
+	s := fresh(t)
+	s.ask("-m", "fake:small", "hello")
+	eq(t, s.ask("-c", filepath.Join(s.home, "runs", s.latest()), "more").code, 0)
+}
+
+// TestContinueUnfinished says a run without a result has not finished, not that it lacks a session.
+func TestContinueUnfinished(t *testing.T) {
+	s := fresh(t)
+	s.json(filepath.Join(s.home, "runs", "20260101T000000000-abc123-hung", "tasks.json"), []object{{"id": "1", "prompt": "x", "model": "fake:small", "write": false, "json": false, "dir": s.tmp, "timeout": 900}})
+	r := s.ask("-c", "hung", "more")
+	eq(t, r.code, 2)
+	match(t, r.stderr, `hung cannot be continued: it has not finished`)
+}
+
+// TestWriteRunCannotPlantFsmonitor keeps ask's own git calls from running a core.fsmonitor an agent set.
+func TestWriteRunCannotPlantFsmonitor(t *testing.T) {
+	s := fresh(t)
+	dir, _ := s.repo()
+	planted := filepath.Join(s.tmp, "planted")
+	s.localAgent("plant", `cat >/dev/null; git config core.fsmonitor "touch `+planted+`; false"; echo two >> a.txt; echo fine`)
+	r := s.ask("-m", "plant:small", "-w", "-C", dir, "go")
+	eq(t, r.code, 0)
+	eq(t, exists(planted), false)
 }

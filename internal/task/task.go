@@ -66,7 +66,7 @@ func Run(a *agent.Registry, t home.Object, started func(Started), progress func(
 	m, e := agent.Parse(a.Paths, t.S("model"))
 	r := home.Object{}
 	if e == nil && t.B("worktree") {
-		w, e = git.Add(a.Paths, dir, t.S("worktree"))
+		w, e = git.Add(a.Paths, dir, t.S("worktree"), t.B("reuse"))
 		if e == nil {
 			dir = w.Dir
 		}
