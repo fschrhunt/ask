@@ -5,7 +5,7 @@ Opencode, or anything else. ask itself knows nothing about any of them. Everythi
 from its flags to how it reports usage, lives in its agent, which is how ask supports any of them.
 
 Agents are local. ask ships none; you keep yours in `~/.ask/agents/`, one executable per coding
-agent, named for it. An agent named `mycli` gives you models `mycli:...`.
+agent, named for it. An agent named `claude` gives you models `claude:...`.
 
 ## The contract
 
@@ -16,8 +16,8 @@ An agent is any executable: a shell script, Node, Python, a binary.
 Print one model per line, as `id` or `id<TAB>name`. The name is what status lines show.
 
 ```text
-atlas-2.1	Atlas 2.1
-atlas-2.1-mini	Atlas 2.1 Mini
+sonnet-5.5	Sonnet 5.5
+haiku-4.5	Haiku 4.5
 ```
 
 Print nothing if the CLI has too many models to list; users add the ones they use to
@@ -46,7 +46,7 @@ ask runs the agent with no arguments, in the directory the agent should work in 
 | Input | |
 | --- | --- |
 | stdin | The prompt, complete. ask has already added any read-run or JSON instructions. |
-| `ASK_MODEL` | The model id, without the agent or effort: `atlas-2.1`. |
+| `ASK_MODEL` | The model id, without the agent or effort: `sonnet-5.5`. |
 | `ASK_EFFORT` | The effort from `#effort`, or empty. |
 | `ASK_ACCESS` | `read` or `write`. |
 | `ASK_SCHEMA` | Set only with `--schema`: a file holding the JSON Schema, for CLIs that enforce one. |
@@ -61,7 +61,7 @@ ask runs the agent with no arguments, in the directory the agent should work in 
 | `$ASK_REPORT` | Optional JSON: `{"session", "name", "input", "output", "cached", "cost", "note"}`. |
 
 In the report, `session` is the agent session the run used, `name` is the model that actually ran
-(`Atlas 2.1`), the counts are tokens, `cost` is in USD, and `note` is a short remark ask adds to
+(`Sonnet 5.5`), the counts are tokens, `cost` is in USD, and `note` is a short remark ask adds to
 the status line (`hit step cap; answer may be partial`). Every field is optional. ask reads the
 report even when the run fails or times out, so write it as early as you know something, above all
 the session, and rewrite it whole as you learn more.
@@ -95,59 +95,105 @@ CLI:
   command text, so they are weaker than a sandbox.
 - **Neither**: refuse read runs. Exit 1 with a reason rather than run with write access.
 
-## Example: an agent in shell
+## Example: Claude Code in shell
 
-An agent for a made-up CLI, `mycli`, that takes a prompt with `-p`, a model with `--model`, and
-has a `--readonly` flag:
+The smallest useful agent. It maps ask's model names to Claude Code's (`sonnet-5.5` becomes
+`claude-sonnet-5-5`), gives read runs only Claude Code's reading and search tools, and lets write
+runs edit and run commands:
 
 ```sh
 #!/bin/sh
-# ~/.ask/agents/mycli: runs mycli for ask.
+# ~/.ask/agents/claude: runs Claude Code for ask.
 if [ "$1" = models ]; then
-  printf 'atlas-2.1\tAtlas 2.1\natlas-2.1-mini\tAtlas 2.1 Mini\n'
+  printf 'sonnet-5.5\tSonnet 5.5\nhaiku-4.5\tHaiku 4.5\n'
   exit 0
 fi
 
-set -- --model "$ASK_MODEL"
+# ask names models sonnet-5.5; Claude Code calls them claude-sonnet-5-5.
+set -- -p --model "claude-$(printf '%s' "$ASK_MODEL" | tr . -)"
 [ -n "$ASK_EFFORT" ] && set -- "$@" --effort "$ASK_EFFORT"
-[ "$ASK_ACCESS" = read ] && set -- "$@" --readonly
+if [ "$ASK_ACCESS" = write ]; then
+  set -- "$@" --permission-mode bypassPermissions
+else
+  set -- "$@" --permission-mode default --allowedTools Read,Grep,Glob --disallowedTools Edit,Write,Bash
+fi
 
-exec mycli "$@" -p "$(cat)"
+exec claude "$@"   # the prompt arrives on stdin
 ```
 
 ```sh
-chmod +x ~/.ask/agents/mycli
+chmod +x ~/.ask/agents/claude
 ask models
-ask -m mycli:atlas-2.1 "What does this project do?"
+ask -m claude:sonnet-5.5 "What does this project do?"
+ask -m claude:haiku-4.5 -w "Add a .editorconfig with 2-space indents."
 ```
 
-## Example: sessions and usage
+A read run asked to change something answers that it can't; a write run makes the change.
 
-If the CLI prints JSON with its answer, session and token counts, an agent in any language can
-split them. In Node:
+## Example: Claude Code with sessions and usage
+
+The same agent in Node, using Claude Code's JSON output to report the session, so `ask -c` can
+follow up in the same conversation, and the tokens and cost for status lines:
 
 ```js
 #!/usr/bin/env node
-// ~/.ask/agents/othercli: runs othercli for ask, with sessions and usage.
+// ~/.ask/agents/claude: runs Claude Code for ask, with sessions (for ask -c) and usage.
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 if (process.argv[2] === 'models') {
-  console.log('nova-4\tNova 4');
+  console.log('sonnet-5.5\tSonnet 5.5\nhaiku-4.5\tHaiku 4.5');
   process.exit(0);
 }
-const args = ['run', '--json', '--model', process.env.ASK_MODEL];
-if (process.env.ASK_ACCESS === 'read') args.push('--sandbox', 'read-only');
-if (process.env.ASK_SESSION) args.push('--resume', process.env.ASK_SESSION);
+const { ASK_MODEL, ASK_EFFORT, ASK_ACCESS, ASK_SESSION, ASK_REPORT } = process.env;
+const args = ['-p', '--output-format', 'json', '--model', `claude-${ASK_MODEL.replaceAll('.', '-')}`];
+if (ASK_EFFORT) args.push('--effort', ASK_EFFORT);
+if (ASK_SESSION) args.push('--resume', ASK_SESSION);
+if (ASK_ACCESS === 'write') args.push('--permission-mode', 'bypassPermissions');
+else args.push('--permission-mode', 'default', '--allowedTools', 'Read,Grep,Glob', '--disallowedTools', 'Edit,Write,Bash');
+
+let out;
 try {
-  const out = JSON.parse(execFileSync('othercli', args, { input: readFileSync(0) }));
-  writeFileSync(process.env.ASK_REPORT, JSON.stringify({ session: out.session, input: out.tokens.in, output: out.tokens.out }));
-  console.log(out.answer);
+  out = JSON.parse(execFileSync('claude', args, { input: readFileSync(0), encoding: 'utf8' }));
 } catch (error) {
-  console.error(error.stderr?.toString().trim().split('\n').pop() || error.message);
+  console.error(error.stderr?.trim().split('\n').pop() || error.message);
   process.exit(1);
 }
+const u = out.usage || {};
+writeFileSync(ASK_REPORT, JSON.stringify({
+  session: out.session_id,
+  input: (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0),
+  output: u.output_tokens,
+  cached: u.cache_read_input_tokens,
+  cost: out.total_cost_usd,
+}));
+if (out.is_error) {
+  console.error(out.result);
+  process.exit(1);
+}
+console.log(out.result);
 ```
+
+```text
+$ ask -m claude:haiku-4.5 "Read TOKEN.txt and reply with only its word."
+ask vtqxl4 · ok · Haiku 4.5 · 4.9s · 51.6k in · 159 out · $0.02
+PELICAN
+$ ask -c vtqxl4 "What word did you read? Reply with it in lowercase."
+ask qx6v99 · ok · Haiku 4.5 · 3.2s · 26.0k in · 52 out · $0.02
+pelican
+```
+
+## Other agents
+
+The same shape works for any coding agent with a non-interactive mode. The pieces to map:
+
+| | Codex | Opencode |
+| --- | --- | --- |
+| Run one prompt from stdin | `codex exec -m MODEL -` | `opencode run -m PROVIDER/MODEL` |
+| Read-only | `--sandbox read-only` (an OS sandbox) | an agent with only read tools allowed |
+| Write | `--sandbox workspace-write` | `--agent build` |
+| Session for `ask -c` | `codex exec resume SESSION -` | `opencode run --session SESSION` |
+| Machine-readable output | `--json` | `--format json` |
 
 ## Keeping agents in sync
 
@@ -155,6 +201,6 @@ try {
 to every machine. Test an agent by running it the way ask does:
 
 ```sh
-echo "say hi" | ASK_MODEL=atlas-2.1-mini ASK_ACCESS=read ASK_REPORT=/tmp/r.json ~/.ask/agents/mycli
+echo "say hi" | ASK_MODEL=haiku-4.5 ASK_ACCESS=read ASK_REPORT=/tmp/r.json ~/.ask/agents/claude
 cat /tmp/r.json
 ```

@@ -3,9 +3,9 @@
 A model id is `agent:id`, with an optional `#effort`:
 
 ```text
-mycli:atlas-2.1
-mycli:atlas-2.1-mini#high
-othercli:nova-4
+claude:sonnet-5.5
+claude:haiku-4.5#high
+codex:gpt-6.1-sol
 ```
 
 - **agent** is the executable in `~/.ask/agents/` that ask runs (see
@@ -22,9 +22,9 @@ ask models
 ```
 
 ```text
-mycli:atlas-2.1
-mycli:atlas-2.1-mini
-othercli:nova-4
+claude:sonnet-5.5
+claude:haiku-4.5
+codex:gpt-6.1-sol
 ```
 
 `ask models --names` prints `agent:id<TAB>Display Name`. `ask --help` groups available ids
@@ -41,8 +41,8 @@ lists none, and you name the ones you use.
 
 ```json
 {
-  "mycli": ["atlas-2.0"],
-  "othercli": ["nova-4-mini", "nova-3"]
+  "opencode": ["deepseek-4.1-flash", "glm-5.3-flash"],
+  "claude": ["sonnet-5"]
 }
 ```
 
@@ -53,8 +53,8 @@ listed or not. The list is for you and for agents that pick from `ask models`.
 
 Status lines and results use the model's own name, not its id. ask takes the first of:
 
-1. the name the agent reports for the run (the model an alias resolved to, say `Atlas 2.1`);
-2. the name the agent lists next to the id (`Atlas 2.1`);
-3. the id in title case (`nova-4-mini` becomes `Nova 4 Mini`).
+1. the name the agent reports for the run (`Opus 5.5`, from what Claude Code says it ran);
+2. the name the agent lists next to the id (`GPT-6.1 Sol`, from Codex's model list);
+3. the id in title case (`glm-5.3-flash` becomes `Glm 5.3 Flash`).
 
-Effort is appended: `Atlas 2.1 (high)`.
+Effort is appended: `Sonnet 5.5 (high)`.

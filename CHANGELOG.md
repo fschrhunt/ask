@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Docs use real agents and models throughout (Claude Code, Codex, Opencode) instead of made-up ones,
+  and the agents page has two tested Claude Code agents: a minimal one in shell, and one in Node
+  that reports sessions for `ask -c` and usage.
 - Built with Go 1.27; building from source needs Go 1.26 or newer.
 - Preserve caller stdin for argument prompts; keep worktrees whenever git sees changes or a
   moved HEAD, and report mode, symlink and newline-named file changes. Worktrees preserve the

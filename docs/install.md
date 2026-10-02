@@ -53,14 +53,14 @@ ask models
 ```
 
 ```text
-mycli:atlas-2.1-mini
-mycli:atlas-2.1
+claude:haiku-4.5
+claude:sonnet-5.5
 ```
 
 And try a first run:
 
 ```sh
-ask -m mycli:atlas-2.1-mini "What is in this directory?"
+ask -m claude:haiku-4.5 "What is in this directory?"
 ```
 
 ## Update
