@@ -19,7 +19,6 @@
   Checking whether a run is running no longer takes its lock, so `ask runs` or `ask stop` can't
   make a concurrent `--resume` fail; the lock file no longer holds a pid, as the kernel reports it.
   Usage sums keep only the counts an agent reported, so a cost-only agent shows no zero tokens.
-
 - Stopping a batch (Ctrl-C or `ask stop`) no longer prints `[null]` results or a `0/1 ok` summary;
   it ends with the stopped line, like a single run. A batch's usage total leaves out cost when
   only some tasks reported one. A JSON line that does not parse is reported by its line in the

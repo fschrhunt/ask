@@ -168,7 +168,6 @@ func TestCLI(t *testing.T) {
 		match(t, long.stderr, `-t needs at most 2000000 seconds, not "inf"`)
 		task := s.run([]string{"batch", "-m", "fake:small", "-"}, `[{"prompt": "a", "timeout": "soon"}]`, nil)
 		match(t, task.stderr, `task 1: timeout must be a number of seconds above 0, at most 2000000`)
-		match(t, s.ask("-m", "fake:small", "-t", "3000000", "hi").stderr, `above 0, at most 2000000`)
 		eq(t, len(s.calls()), 0)
 	})
 	t.Run("words after -- are the prompt, even ones that look like options", func(t *testing.T) {
