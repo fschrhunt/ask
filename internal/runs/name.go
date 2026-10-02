@@ -82,7 +82,9 @@ func Unique(p home.Paths, name string) string {
 }
 
 // Inherit returns the name a follow-up of ref takes over, so the name keeps reaching
-// the latest turn: the run's name, plus -TASK for a batch task. Unnamed runs pass none on.
+// the latest turn: the run's name. A batch task's follow-up starts its own line of turns,
+// named RUN-TASK, made unique so it never takes the batch's or another run's name.
+// Unnamed runs pass none on.
 func Inherit(p home.Paths, ref string) string {
 	prev, at, e := Open(p, ref)
 	if e != nil || at < 0 || prev.Name == "" {
@@ -91,5 +93,5 @@ func Inherit(p home.Paths, ref string) string {
 	if len(prev.Tasks) == 1 {
 		return prev.Name
 	}
-	return Clean(prev.Name + "-" + prev.Tasks[at].S("id"))
+	return Unique(p, Clean(prev.Name+"-"+prev.Tasks[at].S("id")))
 }

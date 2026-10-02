@@ -115,7 +115,8 @@ gh issue list --label bug --limit 5 --json number,title,body |
 ```
 
 Each issue becomes a task with its own branch (`ask/RUN-1-issue-12`, where RUN is the batch's
-name), so you review and merge them one by one.
+name, and characters git refuses in branch names, dots included, become `_`), so you review and
+merge them one by one.
 
 **Follow up on every task of a batch:**
 
