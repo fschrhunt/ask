@@ -38,4 +38,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
-        run: gh release create "$TAG" dist/*.tar.gz dist/checksums.txt --verify-tag --generate-notes
+        # The notes are the tag's section of CHANGELOG.md, from its heading to the next.
+        run: |
+          awk -v tag="$TAG" '/^## /{on = index($0, "## " tag) == 1; next} on' CHANGELOG.md > notes.md
+          test -s notes.md
+          gh release create "$TAG" dist/*.tar.gz dist/checksums.txt --verify-tag --title "$TAG" --notes-file notes.md

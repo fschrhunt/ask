@@ -124,7 +124,7 @@ ask -m claude:opus-5.5 --max-cost 25 "Port the parser to Rust."   # this run onl
 ```
 
 The run's own `--max-cost` wins, then the model's limit in models.json, then the setting; `0`
-means no limit. When a task passes its limit, the agent is stopped and nothing is lost: its
+means no limit. A follow-up keeps the limit of the run it continues unless you give it one. When a task passes its limit, the agent is stopped and nothing is lost: its
 conversation is kept, so you decide whether it's worth more.
 
 ```text

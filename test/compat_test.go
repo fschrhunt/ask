@@ -22,4 +22,20 @@ func TestCompat(t *testing.T) {
 		eq(t, s.calls()[0].s("session"), "s-fixture")
 		eq(t, s.calls()[0].s("access"), "write")
 	})
+	t.Run("a v0.1.0 run record, named and stopped at its cost limit, can be shown, listed and continued", func(t *testing.T) {
+		s := fresh(t)
+		dir := filepath.Join(s.home, "runs", "20261002T120000000-k3f9a2-port-parser-rust")
+		for _, name := range []string{"tasks.json", "results.json"} {
+			s.write(filepath.Join(dir, name), s.read(filepath.Join(root, "test", "fixtures", "run-v0.1.0", name)))
+		}
+		shown := s.ask("show", "port-parser-rust")
+		eq(t, shown.code, 1)
+		match(t, shown.stderr, `(?m)^ask port-parser-rust · failed · Fake 1\.0 · 6:12 · 412\.0k in · 9\.1k out · \$25\.31 · stopped at the \$25 cost limit; ask -c port-parser-rust continues it$`)
+		eq(t, s.ask("show", "k3f9a2").stderr, shown.stderr)
+		match(t, s.ask("runs", "--all").stdout, `(?m)^port-parser-rust +k3f9a2 .* failed +Fake 1\.0 +6:12 +Port the parser to Rust\.$`)
+		followup := s.ask("-c", "port-parser-rust", "Go on.")
+		eq(t, followup.code, 0)
+		eq(t, s.calls()[0].s("session"), "s-fixture-2")
+		eq(t, s.calls()[0].s("max_cost"), "25")
+	})
 }

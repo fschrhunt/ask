@@ -254,7 +254,8 @@ func lock(r *Run) (*os.File, error) {
 // Prepare validates task fields and inherits a followed-up task's agent, access and location.
 // New worktrees are named after label, the run's name or ID. The model and timeout settings
 // fill in what neither the task nor its defaults give. A task's cost limit is its own max_cost,
-// else its model's in models.json, else the max_cost setting; 0 means none. A model that
+// else the limit of the run it follows up, else its model's in models.json, else the max_cost
+// setting; 0 means none. A model that
 // models.json turns off is refused.
 func Prepare(p home.Paths, items []any, defaults home.Object, label string, single bool, missing func(string) error) ([]home.Object, error) {
 	settings, e := p.ReadSettings()
@@ -376,6 +377,9 @@ func Prepare(p home.Paths, items []any, defaults home.Object, label string, sing
 				return nil, home.Usage("%s: a follow-up runs where %s ran, which is not a worktree; drop --worktree", where, t.S("continue"))
 			}
 			x.Set("session", result.Get("session"))
+			if !t.Has("max_cost") && old.N("max_cost") > 0 {
+				t.Set("max_cost", old.Get("max_cost"))
+			}
 			x.Set("continues", Ref(prev, at))
 		} else if t.B("worktree") {
 			name := label
