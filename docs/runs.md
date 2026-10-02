@@ -4,8 +4,8 @@ Every time ask starts agents, that is a run, with a short id like `k3f9a2`. Stat
 with it:
 
 ```text
-ask k3f9a2 · started · Atlas 2.1 · read · ~/code/app
-ask k3f9a2 · ok · Atlas 2.1 · 14.2s · 31.0k in · 812 out · $0.09
+ask k3f9a2 · started · Sonnet 5.5 · read · ~/code/app
+ask k3f9a2 · ok · Sonnet 5.5 · 14.2s · 31.0k in · 812 out · $0.09
 ```
 
 A task in a batch is `RUN/TASK`, using the task's id (or its position, from 1): `p81c0d/api`.
@@ -15,8 +15,8 @@ A task in a batch is `RUN/TASK`, using the task's id (or its position, from 1): 
 `-c RUN` continues that run's agent conversation: the agent remembers what it read, said and did.
 
 ```sh
-ask -m mycli:atlas-2.1 "Why does the login test fail?"
-# ask k3f9a2 · ok · Atlas 2.1 · 48.0s · ...
+ask -m claude:sonnet-5.5 "Why does the login test fail?"
+# ask k3f9a2 · ok · Sonnet 5.5 · 48.0s · ...
 ask -c k3f9a2 -w "Fix it, then run the test."
 ask -c b7x01q "Now add a test for the expired-token case."
 ```
@@ -25,7 +25,7 @@ A follow-up:
 
 - runs where the first run ran: the same directory, or the same worktree if it is still present;
 - keeps the model and access (`-r`/`-w`) unless you give new ones. The model may change within
-  the same agent (`-c k3f9a2 -m mycli:atlas-2.1-mini`), but not to another agent;
+  the same agent (`-c k3f9a2 -m claude:haiku-4.5`), but not to another agent;
 - can continue a run that failed or timed out, so the agent can finish what it started;
 - gets your prompt as it is, without the read-run preamble, since the agent already has its bearings.
 
@@ -43,8 +43,8 @@ ask runs -n 50
 
 ```text
 RUN     STARTED  STATUS   MODEL        TIME    TASK
-b7x01q  2m ago   ok       Atlas 2.1   2:31  ↪ k3f9a2 Fix it, then run the test.
-k3f9a2  5m ago   ok       Atlas 2.1   48.0s   Why does the login test fail?
+b7x01q  2m ago   ok       Sonnet 5.5   2:31  ↪ k3f9a2 Fix it, then run the test.
+k3f9a2  5m ago   ok       Sonnet 5.5   48.0s   Why does the login test fail?
 p81c0d  24m ago  2/3 ok   3 tasks              Summarize the public API in src/.
 x7d2e1  Sep 30   stopped  5 tasks              resume: ask batch --resume x7d2e1
 ```

@@ -15,7 +15,7 @@ A batch is a JSON array, or one JSON object per line:
 ```json
 [
   { "id": "api", "prompt": "Summarize the public API in src/." },
-  { "id": "tests", "prompt": "Which tests are flaky, and why?", "model": "othercli:nova-4" },
+  { "id": "tests", "prompt": "Which tests are flaky, and why?", "model": "codex:gpt-6.1-sol" },
   { "id": "fix", "prompt": "Fix the typo in README.md.", "write": true }
 ]
 ```
@@ -37,7 +37,7 @@ Options given to `ask batch` are defaults; a task's own fields win.
 ## Running
 
 ```sh
-ask batch -j 4 -m mycli:atlas-2.1-mini tasks.json
+ask batch -j 4 -m claude:haiku-4.5 tasks.json
 ```
 
 `-j` is how many tasks run at once (default 4). In a terminal, stderr shows live task rows (queued, running with elapsed time, ok or failed),
@@ -45,12 +45,12 @@ then a summary with total usage and cost. In pipes, the same status lines go to 
 
 ```text
 ask p81c0d · started · batch of 3 · 3 at a time
-ask p81c0d/api · started · Atlas 2.1 Mini · read · ~/code/app
-ask p81c0d/tests · started · Nova 4 · read · ~/code/app
-ask p81c0d/fix · started · Atlas 2.1 Mini · write · ~/code/app
-ask p81c0d/api · ok · Atlas 2.1 Mini · 18.1s · 22.4k in · 640 out · $0.07
-ask p81c0d/fix · ok · Atlas 2.1 Mini · 25.3s · 1 file changed · 30.2k in · 410 out · $0.03
-ask p81c0d/tests · failed · Nova 4 · 15:00 · timed out
+ask p81c0d/api · started · Haiku 4.5 · read · ~/code/app
+ask p81c0d/tests · started · GPT-6.1 Sol · read · ~/code/app
+ask p81c0d/fix · started · Haiku 4.5 · write · ~/code/app
+ask p81c0d/api · ok · Haiku 4.5 · 18.1s · 22.4k in · 640 out · $0.07
+ask p81c0d/fix · ok · Haiku 4.5 · 25.3s · 1 file changed · 30.2k in · 410 out · $0.03
+ask p81c0d/tests · failed · GPT-6.1 Sol · 15:00 · timed out
 ask p81c0d · 2/3 ok · 15:00 · 52.6k in · 1.1k out · $0.11
 ```
 
@@ -63,9 +63,9 @@ stdout gets one JSON array, in task order, whatever order the tasks finished in:
   {
     "run": "p81c0d/api",
     "id": "api",
-    "model": "mycli:atlas-2.1-mini",
+    "model": "claude:haiku-4.5",
     "write": false,
-    "name": "Atlas 2.1 Mini",
+    "name": "Haiku 4.5",
     "ok": true,
     "answer": "The public API is...",
     "seconds": 18.1,
@@ -76,9 +76,9 @@ stdout gets one JSON array, in task order, whatever order the tasks finished in:
   {
     "run": "p81c0d/tests",
     "id": "tests",
-    "model": "othercli:nova-4",
+    "model": "codex:gpt-6.1-sol",
     "write": false,
-    "name": "Nova 4",
+    "name": "GPT-6.1 Sol",
     "ok": false,
     "error": "timed out",
     "seconds": 900,
@@ -101,7 +101,7 @@ ask batch tasks.json | jq -r '.[] | select(.ok) | "\(.id): \(.answer)"'
 **The same question to several models:**
 
 ```sh
-for m in mycli:atlas-2.1 mycli:atlas-2.1-mini othercli:nova-4; do
+for m in claude:sonnet-5.5 codex:gpt-6.1-sol opencode:deepseek-4.1-flash; do
   echo "{\"id\": \"$m\", \"model\": \"$m\", \"prompt\": \"Is there a race in src/queue.js?\"}"
 done | ask batch -
 ```
@@ -109,7 +109,7 @@ done | ask batch -
 **Parallel fixes that can't collide:** give each task its own worktree, then review each branch.
 
 ```sh
-ask batch -w --worktree -m mycli:atlas-2.1 issues.json
+ask batch -w --worktree -m claude:sonnet-5.5 issues.json
 ```
 
 **Follow up on every task of a batch:**

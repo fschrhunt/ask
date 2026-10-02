@@ -45,10 +45,10 @@ is on your `PATH`. See [Install](docs/install.md) for checksums and updates.
 
 ```sh
 ask models                                          # what you can run here
-ask -m mycli:atlas-2.1 "Why does the login test fail?"  # read-only, the default
+ask -m claude:sonnet-5.5 "Why does the login test fail?"  # read-only, the default
 ask -c k3f9a2 -w "Fix it, then run the test."       # follow up: same agent, same conversation
-ask -m mycli:atlas-2.1 -w --worktree "Add rate limits." # its own git worktree and branch
-ask batch -j 4 -m mycli:atlas-2.1-mini tasks.json             # many tasks in parallel
+ask -m claude:sonnet-5.5 -w --worktree "Add rate limits." # its own git worktree and branch
+ask batch -j 4 -m claude:haiku-4.5 tasks.json             # many tasks in parallel
 ```
 
 The answer goes to stdout. A terminal shows live task state; pipes get concise status lines
@@ -56,8 +56,8 @@ on stderr naming the run, the model that ran, and what it
 changed and cost:
 
 ```text
-ask k3f9a2 · started · Atlas 2.1 · read · ~/code/app
-ask k3f9a2 · ok · Atlas 2.1 · 48.0s · 31.0k in · 812 out · $0.09
+ask k3f9a2 · started · Sonnet 5.5 · read · ~/code/app
+ask k3f9a2 · ok · Sonnet 5.5 · 48.0s · 31.0k in · 812 out · $0.09
 ```
 
 Every run is recorded: `ask runs` lists them, `ask show RUN` prints one again, and `ask stop RUN`

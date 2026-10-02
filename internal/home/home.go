@@ -149,7 +149,7 @@ func (p Paths) ReadModels() (Object, error) {
 		}
 	}
 	if !ok {
-		return nil, Usage(`%s must map agent names to lists of model ids, like {"mycli": ["atlas-2.1"]}`, path)
+		return nil, Usage(`%s must map agent names to lists of model ids, like {"opencode": ["deepseek-4.1-flash"]}`, path)
 	}
 	return o, nil
 }

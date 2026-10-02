@@ -11,8 +11,8 @@ Every run names its model. ask never picks one for you, the same way you name a 
 start a subagent.
 
 ```sh
-ask -m mycli:atlas-2.1 "Where is the retry logic, and what are its limits?"
-ask -m othercli:nova-4#high "Review the last commit for bugs."
+ask -m claude:sonnet-5.5 "Where is the retry logic, and what are its limits?"
+ask -m codex:gpt-6.1-sol#high "Review the last commit for bugs."
 ```
 
 ## The prompt
@@ -21,9 +21,9 @@ Give it as arguments, or on stdin with `-` or no prompt at all. Words after `--`
 prompt, even ones that look like options:
 
 ```sh
-ask -m mycli:atlas-2.1 "Summarize src/"
-git diff | ask -m othercli:nova-4 -
-ask -m mycli:atlas-2.1 < task.md
+ask -m claude:sonnet-5.5 "Summarize src/"
+git diff | ask -m codex:gpt-6.1-sol -
+ask -m claude:sonnet-5.5 < task.md
 ```
 
 ## Read or write
@@ -34,8 +34,8 @@ ask -m mycli:atlas-2.1 < task.md
 | `-w`, `--write` | Read and write: the agent may edit files and run commands, as you. |
 
 ```sh
-ask -m mycli:atlas-2.1 "Which functions have no tests?"           # read
-ask -m mycli:atlas-2.1 -w "Add tests for parseFlags, then run them" # write
+ask -m claude:sonnet-5.5 "Which functions have no tests?"           # read
+ask -m claude:sonnet-5.5 -w "Add tests for parseFlags, then run them" # write
 ```
 
 Read runs start with a short instruction to search and read the files before answering, so the
@@ -50,7 +50,7 @@ When a write run's directory is in a git repository, ask compares the repository
 and reports what the run changed: in the status line, and in full with `ask show RUN --json`.
 
 ```text
-ask k3f9a2 · ok · Atlas 2.1 · 41.2s · 3 files changed, 1 commit · 52.1k in · 2.0k out · $0.31
+ask k3f9a2 · ok · Sonnet 5.5 · 41.2s · 3 files changed, 1 commit · 52.1k in · 2.0k out · $0.31
 ```
 
 ```json
@@ -70,12 +70,12 @@ so your own uncommitted work never shows up as the agent's.
 checkout and several write runs can go in parallel:
 
 ```sh
-ask -m mycli:atlas-2.1 -w --worktree -C ~/code/app "Add rate limiting to the login route."
+ask -m claude:sonnet-5.5 -w --worktree -C ~/code/app "Add rate limiting to the login route."
 ```
 
 ```text
-ask k3f9a2 · started · Atlas 2.1 · write · worktree ~/.ask/worktrees/k3f9a2
-ask k3f9a2 · ok · Atlas 2.1 · 3:05 · 4 files changed · branch ask/k3f9a2 · 120.4k in · 6.2k out
+ask k3f9a2 · started · Sonnet 5.5 · write · worktree ~/.ask/worktrees/k3f9a2
+ask k3f9a2 · ok · Sonnet 5.5 · 3:05 · 4 files changed · branch ask/k3f9a2 · 120.4k in · 6.2k out
 ```
 
 The worktree starts from the repository's `HEAD`, at `~/.ask/worktrees/RUN`, on branch `ask/RUN`.
@@ -97,7 +97,7 @@ checkout are not in the worktree; ask says so when it starts.
 `-C DIR` sets the directory the agent works in (default: where you run ask):
 
 ```sh
-ask -m mycli:atlas-2.1 -C ~/code/app "How does login work?"
+ask -m claude:sonnet-5.5 -C ~/code/app "How does login work?"
 ```
 
 ## Time limit
@@ -106,7 +106,7 @@ ask -m mycli:atlas-2.1 -C ~/code/app "How does login work?"
 everything the agent started is stopped.
 
 ```sh
-ask -m othercli:nova-4 -w -t 3600 "Upgrade the project to Node 24 and fix what breaks."
+ask -m codex:gpt-6.1-sol -w -t 3600 "Upgrade the project to Node 24 and fix what breaks."
 ```
 
 ## JSON answers
@@ -137,14 +137,14 @@ cat > findings.json <<'EOF'
   "required": ["bugs"]
 }
 EOF
-ask -m mycli:atlas-2.1 --schema findings.json "Find bugs in src/parser.js" | jq '.bugs[].file'
+ask -m claude:sonnet-5.5 --schema findings.json "Find bugs in src/parser.js" | jq '.bugs[].file'
 ```
 
 ask honors boolean schemas (`false` rejects every answer) and checks `type`, `enum`, `const`, `properties`, `required`, `additionalProperties: false` and `items` (including `items: false`). An
 answer that is not JSON, or does not match, fails the run with the reason:
 
 ```text
-ask k3f9a2 · failed · Atlas 2.1 · 12.3s · answer does not match the schema: $.bugs[0]: missing "file"
+ask k3f9a2 · failed · Sonnet 5.5 · 12.3s · answer does not match the schema: $.bugs[0]: missing "file"
 ```
 
 ## Follow-ups
@@ -152,7 +152,7 @@ ask k3f9a2 · failed · Atlas 2.1 · 12.3s · answer does not match the schema: 
 Every run gets an id. Continue the same agent conversation with `-c`; see [Runs](runs.md).
 
 ```sh
-ask -m mycli:atlas-2.1 "Why does the login test fail?"
+ask -m claude:sonnet-5.5 "Why does the login test fail?"
 ask -c k3f9a2 -w "Fix it."
 ```
 
@@ -164,8 +164,8 @@ ask -c k3f9a2 -w "Fix it."
   what changed and usage when the agent reports it.
 
 ```text
-ask k3f9a2 · started · Atlas 2.1 · read · ~/code/app
-ask k3f9a2 · ok · Atlas 2.1 · 14.2s · 31.0k in · 812 out · $0.09
+ask k3f9a2 · started · Sonnet 5.5 · read · ~/code/app
+ask k3f9a2 · ok · Sonnet 5.5 · 14.2s · 31.0k in · 812 out · $0.09
 ```
 
 - **Exit code**: 0 on success, 1 when the run failed, 2 when ask was called wrong (the message says
