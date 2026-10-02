@@ -34,30 +34,44 @@ second line'`, "", "Small One · First line\n"},
 	id := runID(t, first.stderr)
 	eq(t, s.ask("title", "--command", "ask -c "+id+" 'go again'").stdout, "Small One (high) · Go again · write\n")
 	eq(t, s.ask("title", "--command", "ask -c "+id+" -m fake:big -r 'look'").stdout, "Big · Look\n")
-}
-
-// TestTitleNonRuns leaves host input alone for commands that do not start tasks or cannot be parsed.
-func TestTitleNonRuns(t *testing.T) {
-	s := fresh(t)
-	s.script("commands", "review", "echo fine")
-	for _, command := range []string{"echo ask -m fake:small hi", "ask", "ask --help", "ask -m fake:small --help hi", "ask review", `ask -m fake:small "bad`, "ask -m fake:small hi |", "ask title --command hi", "ask help batch", "ask show x", "ask runs", "ask models", "ask stop x", "ask install", "ask packages", "ask remove x"} {
-		r := s.ask("title", "--command", command)
-		eq(t, r.code, 0)
-		eq(t, r.stdout, "")
-	}
-	eq(t, s.ask("title").code, 2)
-	eq(t, s.ask("title", "--command", "ask", "extra").code, 2)
-	eq(t, len(s.calls()), 0)
-}
-
-// TestTitleHook passes the parsed invocation to declared hooks and honors --no-hooks.
-func TestTitleHook(t *testing.T) {
-	s := fresh(t)
-	s.hook("host", []string{"title"}, `echo '{"title":"A better title"}'`)
-	r := s.ask("title", "--command", `A=1 ask -m fake:small 'go now' 2>&1`, "--description", "do it")
-	eq(t, r.stdout, "A better title\n")
-	input := s.hookCalls()[0]["input"].(map[string]any)
-	jsonEqual(t, input, object{"title": "Small One · Do it", "command": []string{"ask", "-m", "fake:small", "go now"}, "description": "do it"})
-	eq(t, s.ask("title", "--command", "ask -m fake:small --no-hooks hi").stdout, "Small One · Hi\n")
-	eq(t, len(s.hookCalls()), 1)
+	t.Run("ask title --hook answers a PreToolUse event for ask commands and stays silent otherwise", func(t *testing.T) {
+		s := fresh(t)
+		event := `{"tool_name":"Bash","tool_input":{"command":"ask -m fake:small hi","description":"Say hi","timeout":5}}`
+		eq(t, s.run([]string{"title", "--hook"}, event, nil).stdout, `{"hookSpecificOutput":{"hookEventName":"PreToolUse","updatedInput":{"command":"ask -m fake:small hi","description":"Small One · Say hi","run_in_background":true,"timeout":5}}}`+"\n")
+		other := s.run([]string{"title", "--hook"}, `{"tool_name":"Bash","tool_input":{"command":"ls","description":"List"}}`, nil)
+		eq(t, other.stdout+other.stderr, "")
+		eq(t, other.code, 0)
+	})
+	t.Run("commands that start no task, or cannot be parsed, are left alone", func(t *testing.T) {
+		s := fresh(t)
+		s.script("commands", "review", "echo fine")
+		for _, command := range []string{"echo ask -m fake:small hi", "ask", "ask --help", "ask -m fake:small --help hi", "ask review", `ask -m fake:small "bad`, "ask -m fake:small hi |", "ask title --command hi", "ask help batch", "ask show x", "ask runs", "ask models", "ask stop x", "ask install", "ask packages", "ask remove x"} {
+			r := s.ask("title", "--command", command)
+			eq(t, r.code, 0)
+			eq(t, r.stdout, "")
+		}
+		eq(t, s.ask("title").code, 2)
+		eq(t, s.ask("title", "--command", "ask", "extra").code, 2)
+		eq(t, len(s.calls()), 0)
+	})
+	t.Run("the parsed invocation goes to hooks that declare it, unless --no-hooks", func(t *testing.T) {
+		s := fresh(t)
+		s.hook("host", []string{"title"}, `echo '{"title":"A better title"}'`)
+		r := s.ask("title", "--command", `A=1 ask -m fake:small 'go now' 2>&1`, "--description", "do it")
+		eq(t, r.stdout, "A better title\n")
+		input := s.hookCalls()[0]["input"].(map[string]any)
+		jsonEqual(t, input, object{"title": "Small One · Do it", "command": []string{"ask", "-m", "fake:small", "go now"}, "description": "do it"})
+		eq(t, s.ask("title", "--command", "ask -m fake:small --no-hooks hi").stdout, "Small One · Hi\n")
+		eq(t, len(s.hookCalls()), 1)
+	})
+	t.Run("an explicit run word is parsed the way ask parses it", func(t *testing.T) {
+		s := fresh(t)
+		eq(t, s.ask("title", "--command", `ask run -m fake:small fix`).stdout, "Small One · Run fix\n")
+	})
+	t.Run("a batch file is found before -C applies", func(t *testing.T) {
+		s := fresh(t)
+		s.mkdir(filepath.Join(s.tmp, "other"))
+		s.write(filepath.Join(s.tmp, "jobs.json"), `[{"prompt":"fix","model":"fake:small"}]`)
+		eq(t, s.ask("title", "--command", `ask batch -C other jobs.json`).stdout, "Batch of 1 · Small One · Fix\n")
+	})
 }

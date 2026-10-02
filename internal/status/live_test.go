@@ -1,6 +1,8 @@
 package status
 
 import (
+	"io"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -57,5 +59,23 @@ func TestFrameClipping(t *testing.T) {
 	s := LiveState{Batch: true, Header: "batch", Rows: make([]LiveRow, 30)}
 	if got := Frame(s, time.Time{}, 0, 80, 5, false, true); len(got) > 4 || !strings.Contains(got[len(got)-1], "more lines") {
 		t.Fatalf("height: %#v", got)
+	}
+}
+
+// TestLiveBatchFinishPrintsTotals prints the same batch summary on a terminal.
+func TestLiveBatchFinishPrintsTotals(t *testing.T) {
+	old := os.Stderr
+	r, w, e := os.Pipe()
+	if e != nil {
+		t.Fatal(e)
+	}
+	os.Stderr = w
+	defer func() { os.Stderr = old }()
+	l := &Live{state: LiveState{Batch: true}, stop: make(chan struct{})}
+	l.Finish("ask run · 2/2 ok · 10 in · 5 out · $0.02", false)
+	w.Close()
+	b, _ := io.ReadAll(r)
+	if !strings.Contains(string(b), "10 in · 5 out · $0.02") {
+		t.Fatalf("missing totals: %q", b)
 	}
 }

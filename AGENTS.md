@@ -3,57 +3,32 @@
 Hands tasks to coding agents, one task or a batch in parallel. Each coding agent is reached through
 an agent: an executable in `~/.ask/agents` or a package. ask's core (`internal/`) knows nothing about
 any of them; the official agents live in `packages/` and are built into the binary. Go 1.26 or
-newer, standard library only. ask runs as one binary; agents may use any language (the official
-ones use Node.js 18+, standard library only).
+newer, standard library only; the official agents use Node.js 18+, built-ins only.
 
 ## Commands
 
-- `go test ./...`: the whole suite; hermetic and offline.
-- `go test ./test -run 'TestCLI/no_arguments'`: one named behavior.
-- `gofmt -l .`: must be empty; `go vet ./...`: must pass.
-- `go build -o ask ./cmd/ask`: build the binary; `./ask --help` is the contract for flags and output.
-- `cd packages/claude && node --test`: one official agent's tests, against a fake CLI in `test/bin`.
-- `scripts/release.sh vX.Y.Z`: release, in two runs (see CONTRIBUTING.md); `install.sh` is the
-  installer people run, `ask.rb` the formula each release regenerates.
+```sh
+./x check                          # what a pull request must pass: fmt, vet, tests, node, shellcheck, guard
+./x test ./test -run 'TestRuns'    # one feature; add /subtest_name for one behavior
+./x dev runs                       # build this checkout and run it
+./x hooks                          # once per clone: gofmt and vet before each commit
+```
 
-## Code map
+`ask --help` is the contract for flags and output.
 
-- `cmd/ask/main.go`: entry point only; calls `internal/cli` and holds the release version.
-- `internal/`: ask itself, which knows no particular agent. Packages by purpose:
-  - `cli`: help text, options per command, the commands, exit codes; `settings.go` holds the
-    settings draft (nothing is written until its review is saved), `setup.go` the first run,
-    `docs.go` `ask docs`.
-  - `runs`: runs on disk (ids, `RUN/TASK` references, lock, results), preparing tasks
-    (validation, follow-ups), running them in parallel, stopping.
-  - `task`: one task: worktree, prompt, agent run, what changed, JSON checks.
-  - `agent`: finding agents, listing their models, running one under the contract, model
-    names.
-  - `hooks`: running hooks before and after each task; they fail open.
-  - `packages`: installing, updating and removing packages from git; official agent names.
-  - `find`: finding agents, hooks and commands in `~/.ask`, then in packages; yours win.
-  - `git`: what a write run changed, and worktrees.
-  - `process`: process groups, timeouts, stopping everything on SIGINT/SIGTERM; Linux parent-death signals.
-  - `status`: status lines and the `ask runs` table.
-  - `setup`: what `ask setup` offers: official agents and their CLIs, the ask skill per app,
-    Claude Code's title hook.
-  - `tui`: terminal prompts (confirm, select, multi-select, input, all filterable), raw mode, and
-    the review diff. Black, white and greys; color only means something: diffs and outcomes.
-  - `schema`: the `--schema` check.
-  - `home`: `~/.ask` paths, the contract environment, `models.json` and `settings.json`, atomic JSON writes,
-    typed JSON records and readable encoding, `UsageError`.
-- `test/`: `cli`, `batch`, `subagent` (follow-ups, changes, worktrees, show, stop), `extend`
-  (hooks, commands, packages), `compat` (released run records, pinned in `fixtures/`), `contracts` (raw JSON, streams and process guarantees) and `local`
-  (the agent contract, with shell agents) black-box Go tests, `helpers_test.go`, and `fake/`,
-  the Go fake agent every test installs. `TestMain` builds ask and fake once. `FAKE_LOG` records
-  runs; `FAKE_FAIL`, `FAKE_HANG`, `FAKE_SLOW` and `FAKE_SPEND` (reports $3 spent, then waits) match the prompt; `FAKE_WRITE` and `FAKE_COMMIT`
-  change the repository.
-- `packages/`: the official agent packages, `claude`, `codex` and `opencode`, each `agents/NAME`
-  (a sh launcher that finds Node.js), `lib/NAME.mjs` (the agent), `test/` and `README.md`.
-  `packages.go` embeds them; `ask install NAME` writes one to `~/.ask/packages/ask/packages/NAME`,
-  and ask rewrites an installed copy whenever its build differs.
-- `docs/`: user docs with examples, built into ask by `docs.go` for `ask docs`. Update them with
-  any user-visible change; every help topic's footer names its page.
-- `assets/`: the logo, wordmark and lockup SVGs in black and white; see `assets/README.md`.
+## Where things live
+
+- `cmd/ask/main.go`: entry point only; holds the release version.
+- `internal/`: ask itself, one package per purpose. The map and the layering rules are in
+  [docs/contributing/architecture.md](docs/contributing/architecture.md).
+- `test/`: black-box tests of the binary against a fake agent, one file per feature. How they work
+  and which file covers what: [test/README.md](test/README.md).
+- `packages/`: the official agents ([packages/README.md](packages/README.md)).
+- `docs/`: user docs, built into ask for `ask docs`. `docs/contributing/` is for people working on
+  ask and is not built in.
+- `scripts/`: `guard.sh` (the rules below that grep can check) and the release scripts
+  ([docs/contributing/releases.md](docs/contributing/releases.md)). `install.sh` is the installer
+  people run; `ask.rb` is the Homebrew formula each release regenerates.
 
 ## Conventions
 
@@ -63,10 +38,12 @@ ones use Node.js 18+, standard library only).
   command contracts change only as `docs/compatibility.md` says: additions are free, a breaking
   change bumps `ASK_CONTRACT`. Files in `test/fixtures/` are never rewritten.
 - Grow by need: a new hook event or contract field only when a real use needs it.
-- Comments state purpose and contract, on packages and functions; exported identifiers have doc comments.
-  No line-by-line comments. Update the
-  comments and docs a change touches.
-- One test per behavior change. Never call a network or a real model in a test.
+- Names say what a thing covers: a file is named for its feature or command, never for how it came
+  about (no `bugs_test.go`, no `misc.go`).
+- Comments state purpose and contract, on packages and functions; exported identifiers have doc
+  comments. No line-by-line comments. Update the comments and docs a change touches.
+- One test per behavior change, as a subtest in its feature's file. Never call a network or a real
+  model in a test.
 - A user-visible change gets a `CHANGELOG.md` entry under `## Unreleased` at the top (add the
-  heading when it's missing). `scripts/release.sh` turns it into `## vX.Y.Z · DATE`; a release that
-  changed the run record format pins one in `test/fixtures/run-vX.Y.Z/`.
+  heading when it's missing) and an update to `docs/`; every help topic's footer names its page.
+  A release that changed the run record format pins one in `test/fixtures/run-vX.Y.Z/`.

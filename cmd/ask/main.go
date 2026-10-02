@@ -1,4 +1,4 @@
-// ask hands tasks to local coding agents and records their answers.
+// Command ask hands tasks to local coding agents and records their answers.
 package main
 
 import (

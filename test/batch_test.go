@@ -2,7 +2,6 @@ package test
 
 import (
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -88,22 +87,5 @@ func TestBatch(t *testing.T) {
 		r := s.ask("batch", "--resume", filepath.Join(s.tmp, "nope"))
 		eq(t, r.code, 2)
 		match(t, r.stderr, `no run at`)
-	})
-	t.Run("runs lists recorded runs, newest first, with their outcome and model", func(t *testing.T) {
-		s := fresh(t)
-		s.ask("-m", "fake:small", "first question")
-		s.run([]string{"batch", "-m", "fake:small"}, `[{"prompt":"fine"},{"prompt":"break"}]`, map[string]string{"FAKE_FAIL": "break"})
-		rows := strings.Split(strings.TrimSpace(s.ask("runs").stdout), "\n")
-		eq(t, len(rows), 3)
-		match(t, rows[0], `^RUN +ID +STARTED +STATUS +MODEL +TIME +TASK$`)
-		match(t, rows[1], `^fine +\w{6} .* 1/2 ok +2 tasks +fine$`)
-		match(t, rows[2], `^first-question +\w{6} .* ok +Fake 1\.0 +[\d.]+s +first question$`)
-	})
-	t.Run("runs shows an unfinished run whose ask is gone as stopped, with how to resume", func(t *testing.T) {
-		s := fresh(t)
-		dir := filepath.Join(s.home, "runs", "20260101T000000-zzzzzz")
-		s.json(filepath.Join(dir, "tasks.json"), []object{{"id": "1", "model": "fake:small", "prompt": "p"}, {"id": "2", "model": "fake:small", "prompt": "p"}})
-		s.json(filepath.Join(dir, "results.json"), []any{object{"id": "1", "ok": true}, nil})
-		match(t, s.ask("runs").stdout, `(?m)^zzzzzz .* stopped .* resume: ask batch --resume zzzzzz$`)
 	})
 }

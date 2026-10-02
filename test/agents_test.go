@@ -6,14 +6,8 @@ import (
 	"testing"
 )
 
-// localAgent installs a shell agent whose models are named, without a fake report.
-func (s *setup) localAgent(name, body string) {
-	s.t.Helper()
-	s.script("agents", name, "PATH=/usr/bin:/bin:$PATH\nif [ \"$1\" = models ]; then printf 'small\\tSmall One\\nbig\\n'; exit 0; fi\n"+body)
-}
-
-// TestLocal pins agent stdin, environment, schema files and optional report handling.
-func TestLocal(t *testing.T) {
+// TestAgents pins agent stdin, environment, schema files and optional report handling.
+func TestAgents(t *testing.T) {
 	t.Run("an agent is listed with its models.json ids, next to the others", func(t *testing.T) {
 		s := fresh(t)
 		s.localAgent("echo", "cat")
@@ -58,5 +52,22 @@ func TestLocal(t *testing.T) {
 		r := s.ask("-m", "echo:big", "go")
 		eq(t, r.code, 1)
 		match(t, r.stderr, `(?m) · failed · .* · quota exceeded$`)
+	})
+	t.Run("an agent inherits no contract variable from an ask further up", func(t *testing.T) {
+		s := fresh(t)
+		path := filepath.Join(s.tmp, "s.json")
+		s.json(path, object{"type": "object"})
+		s.run([]string{"-m", "fake:small", "hi"}, "", map[string]string{"ASK_SCHEMA": path, "ASK_SESSION": "leaked"})
+		_, hasSchema := s.calls()[0]["schema"]
+		_, hasSession := s.calls()[0]["session"]
+		eq(t, hasSchema, false)
+		eq(t, hasSession, false)
+	})
+	t.Run("output split mid-character decodes, and a truncated character is replaced", func(t *testing.T) {
+		s := fresh(t)
+		s.localAgent("stream", `cat >/dev/null; printf '\360\237'; sleep .01; printf '\220\247\342\202'`)
+		r := s.ask("-m", "stream:small", "go")
+		eq(t, r.code, 0)
+		eq(t, r.stdout, "🐧�\n")
 	})
 }
