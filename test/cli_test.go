@@ -107,15 +107,13 @@ func TestCLI(t *testing.T) {
 		eq(t, run.wait(t).code, 130)
 		eq(t, alive(pid), false)
 	})
-	t.Run("read runs start with the grounding preamble; write runs get the prompt as given", func(t *testing.T) {
+	t.Run("agents get the prompt as given, with the access in ASK_ACCESS", func(t *testing.T) {
 		s := fresh(t)
 		s.ask("-m", "fake:small", "where is main?")
 		s.ask("-m", "fake:small", "-w", "fix it")
 		calls := s.calls()
-		match(t, calls[0].s("stdin"), `^Answer from the files in your working directory`)
-		match(t, calls[0].s("stdin"), `where is main\?$`)
+		eq(t, calls[0].s("stdin")+","+calls[1].s("stdin"), "where is main?,fix it")
 		eq(t, calls[0].s("access")+","+calls[1].s("access"), "read,write")
-		eq(t, calls[1].s("stdin"), "fix it")
 	})
 	t.Run("the answer goes to stdout and a status line with usage to stderr", func(t *testing.T) {
 		s := fresh(t)

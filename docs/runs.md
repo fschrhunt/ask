@@ -38,7 +38,6 @@ A follow-up:
 - keeps the model and access (`-r`/`-w`) unless you give new ones. The model may change within
   the same agent (`-c login-test-fail -m claude:haiku-4.5`), but not to another agent;
 - can continue a run that failed or timed out, so the agent can finish what it started;
-- gets your prompt as it is, without the read-run preamble, since the agent already has its bearings.
 
 A batch task can be a follow-up too, with `"continue": "RUN"` (see [Batches](batches.md)).
 
@@ -48,9 +47,13 @@ has finished; ask says so when either is missing.
 ## Listing
 
 ```sh
-ask runs          # the last 20
+ask runs          # the last 20 in this repository
 ask runs -n 50
+ask runs --all    # every run, wherever it worked
 ```
+
+In a git repository, `ask runs` lists the runs that worked in it: in its main checkout or any of
+its worktrees. Elsewhere it lists every run.
 
 ```text
 RUN                       ID      STARTED  STATUS   MODEL       TIME   TASK

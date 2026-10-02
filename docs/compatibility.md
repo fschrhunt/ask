@@ -11,6 +11,8 @@ they may change.
 | Plain status lines start with `ask RUN · outcome ·`, where RUN is the run's name, or its id when it has none; terminals may redraw live state | [Runs](runs.md) |
 | Result fields (`run`, `id`, `model`, `write`, `name`, `ok`, `answer`/`error`, `seconds`, `usage`, `session`, `dir`, `changes`, `commits`, `worktree`, `followups`) | [Batches](batches.md) |
 | Run records: `tasks.json` and `results.json` in `~/.ask/runs/STAMP-ID[-NAME]/` | [Runs](runs.md) |
+| `settings.json` keys and their meaning | [Settings](settings.md) |
+| `ask title --hook` output: Claude Code's `PreToolUse` `hookSpecificOutput` | [Hosts](hosts.md) |
 | The agent contract | [Agents](agents.md) |
 | The hook contract | [Hooks](hooks.md) |
 | The command contract | [Commands](commands.md) |

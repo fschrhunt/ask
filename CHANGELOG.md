@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- `ask install claude`, `codex` or `opencode` installs the official agent package for that CLI
+  (`fschrhunt/ask-NAME`), and `ask install` takes several sources at once. After installing, ask
+  checks every agent a package brings and says whether it is ready, or why not, like a missing
+  CLI; it exits 1 when one is not ready.
+- `~/.ask/settings.json` holds your defaults: `model` (so `-m` is optional), `timeout`, `jobs`,
+  `worktrees` (where `--worktree` works, like `~/code/worktrees/ask-{name}`) and `branches`
+  (`ask/{name}` by default). Unknown keys and bad values are errors that name the key.
+- `ask runs` lists the runs of the repository you are in, from any of its checkouts; `--all`
+  lists every run.
+- ask passes prompts to agents exactly as given. The read-run instruction to search and read the
+  files first moved into the official agents; your own agents can add their own.
+- `ask title --hook` answers Claude Code's `PreToolUse` hook directly: register
+  `ask title --hook` as the command, with no script or `jq`.
+- The agents page no longer suggests syncing agents with dotfiles; packages are how agents move
+  between machines.
 - Host titles drop a model the description repeats, so `Sonnet 5.5 · Mine sessions` titles as
   `Sonnet 5.5 · Mine sessions`, not `Sonnet 5.5 · Sonnet 5.5 · Mine sessions`.
 - `ask install` refuses sources whose host, owner or repository is `.`, `..` or starts with `-`,

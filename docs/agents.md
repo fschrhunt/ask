@@ -97,6 +97,12 @@ CLI:
   command text, so they are weaker than a sandbox.
 - **Neither**: refuse read runs. Exit 1 with a reason rather than run with write access.
 
+ask sends the prompt exactly as given. A read run is usually a question about the code, so an
+agent does well to tell its model to answer from the files: the official agents start a read run
+that is not a follow-up with "Answer from the files in your working directory: search and read
+them before answering. Never guess file names, functions or facts; if you cannot find something,
+say so."
+
 ## Example: Claude Code in shell
 
 The smallest useful agent. It maps ask's model names to Claude Code's (`sonnet-5.5` becomes
@@ -205,12 +211,13 @@ The same shape works for any coding agent with a non-interactive mode. The piece
 | Session for `ask -c` | `codex exec resume SESSION -` | `opencode run --session SESSION` |
 | Machine-readable output | `--json` | `--format json` |
 
-## Keeping agents in sync
+## Testing an agent
 
-`~/.ask/agents/` is plain files, so keep it wherever you keep your dotfiles and it follows you
-to every machine. Test an agent by running it the way ask does:
+Run it the way ask does:
 
 ```sh
 echo "say hi" | ASK_MODEL=haiku-4.5 ASK_ACCESS=read ASK_REPORT=/tmp/r.json ~/.ask/agents/claude
 cat /tmp/r.json
 ```
+
+To use an agent on another machine, or to share it, put it in a [package](packages.md).

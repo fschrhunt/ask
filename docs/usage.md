@@ -38,9 +38,9 @@ ask -m claude:sonnet-5.5 "Which functions have no tests?"           # read
 ask -m claude:sonnet-5.5 -w "Add tests for parseFlags, then run them" # write
 ```
 
-Read runs start with a short instruction to search and read the files before answering, so the
-agent answers from the code rather than from memory. The agent enforces read-only in its CLI's
-own way; see [Agents](agents.md#read-only).
+ask passes your prompt to the agent as you wrote it, with the access in `ASK_ACCESS`. The agent
+enforces read-only in its CLI's own way, and may add its own guidance for read runs, like
+"search and read the files before answering"; see [Agents](agents.md#read-only).
 
 Running tests or builds writes files, so it needs `-w`.
 
@@ -80,6 +80,8 @@ ask add-rate-limiting-login · ok · Sonnet 5.5 · 3:05 · 4 files changed · br
 
 The worktree starts from the repository's `HEAD`, at `~/.ask/worktrees/RUN`, on branch `ask/RUN`
 (`RUN-2` and so on if another run's worktree has that name, so parallel runs never share one).
+The `worktrees` and `branches` [settings](settings.md) put them elsewhere, like
+`~/code/worktrees/ask-RUN`.
 If the run changed something, both are kept for you to review and merge:
 
 ```sh

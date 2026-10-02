@@ -22,13 +22,13 @@ Go 1.26 or newer, standard library only. ask runs as one binary; agents may use 
   - `agent`: finding agents, listing their models, running one under the contract, model
     names.
   - `hooks`: running hooks before and after each task; they fail open.
-  - `packages`: installing, updating and removing packages from git.
+  - `packages`: installing, updating and removing packages from git; official agent names.
   - `find`: finding agents, hooks and commands in `~/.ask`, then in packages; yours win.
   - `git`: what a write run changed, and worktrees.
   - `process`: process groups, timeouts, stopping everything on SIGINT/SIGTERM; Linux parent-death signals.
   - `status`: status lines and the `ask runs` table.
   - `schema`: the `--schema` check.
-  - `home`: `~/.ask` paths, the contract environment, `models.json`, atomic JSON writes,
+  - `home`: `~/.ask` paths, the contract environment, `models.json` and `settings.json`, atomic JSON writes,
     typed JSON records and readable encoding, `UsageError`.
 - `test/`: `cli`, `batch`, `subagent` (follow-ups, changes, worktrees, show, stop), `extend`
   (hooks, commands, packages), `compat` (released run records, pinned in `fixtures/`), `contracts` (raw JSON, streams and process guarantees) and `local`

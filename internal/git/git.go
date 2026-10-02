@@ -188,25 +188,35 @@ type Worktree struct {
 	Dirty                   bool
 }
 
-// Add creates a worktree on branch ask/NAME from HEAD at name, or at name-2, name-3 and so on when
-// another task already has that folder; it claims the folder atomically, so parallel tasks never
-// share one. reuse is for follow-ups of a kept worktree: they continue the one at name, recreating it if removed.
+// Add creates a worktree on the branches setting's branch (ask/NAME) from HEAD where the worktrees setting puts name, or
+// name-2, name-3 and so on when another task already has that folder; it claims the folder
+// atomically, so parallel tasks never share one. reuse is for follow-ups of a kept worktree: they
+// continue the one at name, recreating it if removed.
 func Add(p home.Paths, dir, name string, reuse bool) (*Worktree, error) {
 	root, ok := git(dir, []string{"rev-parse", "--show-toplevel"}, "")
 	root = home.Trim(root)
 	if !ok || root == "" {
 		return nil, fmt.Errorf("--worktree needs a git repository; %s is not in one", dir)
 	}
-	if e := os.MkdirAll(p.Worktrees, 0700); e != nil {
+	used := name
+	path, e := p.Worktree(used)
+	if e != nil {
 		return nil, e
 	}
-	path := filepath.Join(p.Worktrees, name)
-	e := os.Mkdir(path, 0700)
-	for i := 2; os.IsExist(e) && !reuse; i++ {
-		path = filepath.Join(p.Worktrees, name+"-"+strconv.Itoa(i))
-		e = os.Mkdir(path, 0700)
+	if e := os.MkdirAll(filepath.Dir(path), 0700); e != nil {
+		return nil, e
 	}
-	branch := "ask/" + filepath.Base(path)
+	e = os.Mkdir(path, 0700)
+	for i := 2; os.IsExist(e) && !reuse; i++ {
+		used = name + "-" + strconv.Itoa(i)
+		if path, e = p.Worktree(used); e == nil {
+			e = os.Mkdir(path, 0700)
+		}
+	}
+	branch, e2 := p.Branch(used)
+	if e2 != nil {
+		return nil, e2
+	}
 	if e == nil {
 		_, exists := git(root, []string{"rev-parse", "--verify", "-q", "refs/heads/" + branch}, "")
 		args := []string{"worktree", "add", path, branch}
@@ -252,4 +262,23 @@ func Remove(w *Worktree) bool {
 		git(filepath.Join(root, ".."), []string{"branch", "-D", w.Branch}, "")
 	}
 	return true
+}
+
+// Checkouts returns the main checkout and every worktree of the repository holding dir, as
+// physical paths, or nil when dir is not in a git repository.
+func Checkouts(dir string) []string {
+	out, ok := git(dir, []string{"worktree", "list", "--porcelain", "-z"}, "")
+	if !ok {
+		return nil
+	}
+	paths := []string{}
+	for _, record := range strings.Split(out, "\x00") {
+		if path, found := strings.CutPrefix(record, "worktree "); found {
+			if real, e := filepath.EvalSymlinks(path); e == nil {
+				path = real
+			}
+			paths = append(paths, path)
+		}
+	}
+	return paths
 }

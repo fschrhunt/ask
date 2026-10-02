@@ -252,8 +252,13 @@ func lock(r *Run) (*os.File, error) {
 }
 
 // Prepare validates task fields and inherits a followed-up task's agent, access and location.
-// New worktrees are named after label, the run's name or ID.
+// New worktrees are named after label, the run's name or ID. The model and timeout settings
+// fill in what neither the task nor its defaults give.
 func Prepare(p home.Paths, items []any, defaults home.Object, label string, single bool, missing func(string) error) ([]home.Object, error) {
+	settings, e := p.ReadSettings()
+	if e != nil {
+		return nil, e
+	}
 	out := []home.Object{}
 	for i, item := range items {
 		where := fmt.Sprintf("task %d", i+1)
@@ -291,6 +296,9 @@ func Prepare(p home.Paths, items []any, defaults home.Object, label string, sing
 			return nil, home.Usage("%s: \"schema\" must be a JSON Schema object", where)
 		}
 		timeout := 900.0
+		if settings.Has("timeout") {
+			timeout = settings.N("timeout")
+		}
 		if t.Has("timeout") {
 			n, ok := t.Get("timeout").(float64)
 			if !ok || !(n > 0 && n <= 2000000) {
@@ -370,6 +378,9 @@ func Prepare(p home.Paths, items []any, defaults home.Object, label string, sing
 			}
 			x.Set("worktree", name)
 		}
+		if !x.B("model") && settings.Has("model") {
+			x.Set("model", settings.S("model"))
+		}
 		if !x.B("model") {
 			return nil, missing(where)
 		}
@@ -378,7 +389,11 @@ func Prepare(p home.Paths, items []any, defaults home.Object, label string, sing
 		}
 		x.Set("write", x.B("write"))
 		if x.B("worktree") && !x.B("write") {
-			info, err := os.Stat(filepath.Join(p.Worktrees, x.S("worktree")))
+			path, err := p.Worktree(x.S("worktree"))
+			if err != nil {
+				return nil, err
+			}
+			info, err := os.Stat(path)
 			if !x.B("reuse") || err != nil || !info.IsDir() {
 				return nil, home.Usage("%s: a worktree is for write runs; add -w", where)
 			}
@@ -656,8 +671,8 @@ func Execute(a *agent.Registry, r *Run, jobs int, enabled bool, report func(Even
 	return r.Results, failure
 }
 
-// Recent returns readable runs newest first, considering at most limit folders.
-func Recent(p home.Paths, limit int) []*Run {
+// Recent returns up to limit readable runs newest first, only those keep accepts when it is not nil.
+func Recent(p home.Paths, limit int, keep func(*Run) bool) []*Run {
 	names := []string{}
 	for _, name := range find.List(p.Runs) {
 		if strings.Contains(name, "-") {
@@ -665,16 +680,32 @@ func Recent(p home.Paths, limit int) []*Run {
 		}
 	}
 	sort.Sort(sort.Reverse(sort.StringSlice(names)))
-	if len(names) > limit {
-		names = names[:limit]
-	}
 	out := []*Run{}
 	for _, name := range names {
-		if r, e := load(filepath.Join(p.Runs, name)); e == nil {
+		if len(out) == limit {
+			break
+		}
+		if r, e := load(filepath.Join(p.Runs, name)); e == nil && (keep == nil || keep(r)) {
 			out = append(out, r)
 		}
 	}
 	return out
+}
+
+// In reports whether any of the run's tasks worked inside one of the given checkouts.
+func In(r *Run, checkouts []string) bool {
+	for _, t := range r.Tasks {
+		dir := t.S("dir")
+		if real, e := filepath.EvalSymlinks(dir); e == nil {
+			dir = real
+		}
+		for _, c := range checkouts {
+			if dir == c || strings.HasPrefix(dir, c+string(filepath.Separator)) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // Stop sends SIGTERM to the live run owner and waits up to ten seconds for it to release the run;

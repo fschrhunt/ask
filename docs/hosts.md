@@ -1,6 +1,7 @@
 # Host titles
 
-A host can label background tasks without guessing the model or parsing ask flags:
+A host, like Claude Code, can label the ask commands its agents run, without guessing the model
+or parsing ask flags:
 
 ```sh
 ask title --command "$command" --description "$description"
@@ -28,45 +29,36 @@ Non-task commands, user commands, help and unparseable commands print nothing. B
 exit 0; misuse of `ask title` exits 2. Title hooks can replace the title; `--no-hooks` in the
 inner invocation skips them. Only model-listing agent processes can start.
 
-## Claude Code PreToolUse
+## Claude Code
 
-See Claude Code's [hook reference](https://code.claude.com/docs/en/hooks#pretooluse-decision-control)
-for the host output contract. Configure a `PreToolUse` command hook matching `Bash`. The hook below reads Claude's input,
-asks for a title and returns `updatedInput` only when one is available:
-
-```sh
-#!/bin/sh
-# ~/.claude/hooks/ask-title: name every ask run in Claude Code's task list and run it in the background.
-input=$(cat)
-case "$input" in *ask*) ;; *) exit 0 ;; esac   # most Bash calls never mention ask
-command=$(printf '%s' "$input" | jq -r '.tool_input.command // ""')
-description=$(printf '%s' "$input" | jq -r '.tool_input.description // ""')
-title=$(ask title --command "$command" --description "$description")
-[ -n "$title" ] || exit 0
-printf '%s' "$input" | jq --arg title "$title" '{
-  hookSpecificOutput: {
-    hookEventName: "PreToolUse",
-    updatedInput: (.tool_input + {description: $title, run_in_background: true})
-  }
-}'
-```
-
-The original command stays in `updatedInput`; the host description becomes the title and the
-command runs in the background. See [Hooks](hooks.md) for ask's own `title` event.
-
-Save it as `~/.claude/hooks/ask-title`, make it executable, and register it in
-`~/.claude/settings.json` with its full path (it needs `jq`):
+Claude Code shows each background command in its task list by the command's description. Let ask
+write that description: add a `PreToolUse` hook for `Bash` to `~/.claude/settings.json`:
 
 ```json
 {
   "hooks": {
     "PreToolUse": [
-      { "matcher": "Bash", "hooks": [{ "type": "command", "command": "/Users/you/.claude/hooks/ask-title" }] }
+      { "matcher": "Bash", "hooks": [{ "type": "command", "command": "ask title --hook" }] }
     ]
   }
 }
 ```
 
-From then on an agent's `ask -m claude:sonnet-5.5 -w "Fix the login test"` shows in Claude Code's
-task list as `Sonnet 5.5 · Fix the login test · write`, running in the background, whatever
-description the agent wrote. Other Bash calls are left alone.
+`ask title --hook` reads Claude Code's hook event on stdin. For a command that runs ask, it answers
+with the same tool input, the title as its description, and `run_in_background` set, so every ask
+run shows as `Sonnet 5.5 · Fix the login test · write` and runs in the background, whatever the
+agent wrote. For any other command it prints nothing and Claude Code carries on. It never blocks
+a command: unreadable input prints nothing and exits 0. The original command is never changed.
+
+## Other hosts
+
+Any host that can relabel a shell command before running it can use the same title:
+
+```sh
+ask title --command "$command" --description "$description"
+```
+
+It prints the title, or nothing when the command isn't an ask task. Hosts that speak Claude Code's
+hook format can use `ask title --hook` as it is. Codex accepts that format, but its shell tool has
+no description to show, so there is nothing to title there. See [Hooks](hooks.md) for ask's own
+`title` event, which can change any title.

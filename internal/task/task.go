@@ -12,15 +12,11 @@ import (
 	"github.com/fschrhunt/ask/internal/schema"
 )
 
-const grounding = "Answer from the files in your working directory: search and read them before answering. Never guess file names, functions or facts; if you cannot find something, say so.\n\n"
-
 var fence = regexp.MustCompile("(?is)^\\s*```[a-z]*\\s*\\n(.*?)\\n\\s*```\\s*$")
 
+// fullPrompt is the prompt as given, plus the JSON answer instruction for --json or --schema.
 func fullPrompt(t home.Object) string {
 	prompt := t.S("prompt")
-	if !t.B("write") && !t.B("session") {
-		prompt = grounding + prompt
-	}
 	if t.Has("schema") && t.Get("schema") != nil {
 		prompt += "\n\nAnswer ONLY with JSON matching this JSON Schema, no prose and no code fences:\n" + home.JSON(t.Get("schema"), false)
 	} else if t.B("json") {
