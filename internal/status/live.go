@@ -17,6 +17,7 @@ type LiveRow struct {
 	Ref, Name, Access, Dir, State, Reason, Final string
 	Started                                      time.Time
 	Notes                                        []string
+	Usage                                        any // usage so far while running, then the result's
 }
 
 // LiveState is a terminal frame's data, independent of processes and terminal I/O.
@@ -110,6 +111,9 @@ func Frame(s LiveState, now time.Time, tick, width, height int, color, utf8 bool
 				mark = string([]rune("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")[tick%10])
 			}
 			text = r.Access + " · " + r.Dir + " · " + Clock(now.Sub(r.Started))
+			if u := Usage(r.Usage); u != "" {
+				text += " · " + u
+			}
 		case "ok", "failed":
 			if state == "ok" {
 				style = "32"
@@ -163,6 +167,13 @@ func Frame(s LiveState, now time.Time, tick, width, height int, color, utf8 bool
 			footer += fmt.Sprintf(" · %d failed", failed)
 		}
 		footer += " · " + Clock(now.Sub(s.Started))
+		all := []any{}
+		for _, r := range s.Rows {
+			all = append(all, r.Usage)
+		}
+		if u := Usage(runs.AddUsage(all...)); u != "" {
+			footer += " · " + u
+		}
 		lines = append(lines, ClipLine(footer, width-1))
 	}
 	if height > 1 && len(lines) >= height {
@@ -194,6 +205,7 @@ func NewLive(r *runs.Run, header string, batch bool) *Live {
 			row.Name = result.S("name")
 			row.State = "ok"
 			row.Final = Done(result)
+			row.Usage = result.Get("usage")
 		}
 		l.state.Rows = append(l.state.Rows, row)
 	}
@@ -267,7 +279,10 @@ func (l *Live) Update(e runs.Event, name, note string) {
 		if _, extra, ok := strings.Cut(note, "\n"); ok {
 			row.Notes = append(row.Notes, strings.TrimPrefix(extra, "ask "+row.Ref+" · note · "))
 		}
+	case "usage":
+		row.Usage = e.Result
 	case "done":
+		row.Usage = e.Result.Get("usage")
 		row.Name = e.Result.S("name")
 		row.State = "failed"
 		if e.Result.B("ok") {

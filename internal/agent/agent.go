@@ -185,7 +185,8 @@ func exitText(r process.Result) string {
 }
 
 // Run sends the prompt on stdin and reads the optional report even after failure or timeout.
-func (a *Registry) Run(m Model, prompt string, t home.Object) home.Object {
+// While the agent runs, progress (if not nil) gets each new usage the agent rewrites its report with.
+func (a *Registry) Run(m Model, prompt string, t home.Object, progress func(home.Object)) home.Object {
 	work, err := os.MkdirTemp("", "ask-")
 	if err != nil {
 		return home.O("ok", false, "note", err.Error())
@@ -209,7 +210,36 @@ func (a *Registry) Run(m Model, prompt string, t home.Object) home.Object {
 	if timeout == 0 {
 		timeout = 900
 	}
+	done := make(chan struct{})
+	watched := make(chan struct{})
+	go func() {
+		defer close(watched)
+		if progress == nil {
+			return
+		}
+		tick := time.NewTicker(500 * time.Millisecond)
+		defer tick.Stop()
+		last := ""
+		for {
+			select {
+			case <-done:
+				return
+			case <-tick.C:
+			}
+			if b, err := os.ReadFile(vars["ASK_REPORT"]); err == nil && string(b) != last {
+				var report Report
+				if json.Unmarshal(b, &report) == nil {
+					last = string(b)
+					if usage := report.usage(); usage != nil {
+						progress(usage)
+					}
+				}
+			}
+		}
+	}()
 	r := process.Run(find.Path(a.Paths, "agents", m.Agent), nil, process.Options{Input: prompt, Dir: t.S("dir"), Env: a.Paths.Env(vars), Timeout: process.Timeout(timeout)})
+	close(done)
+	<-watched
 
 	report := Report{}
 	if b, err := os.ReadFile(vars["ASK_REPORT"]); err == nil {
@@ -219,13 +249,7 @@ func (a *Registry) Run(m Model, prompt string, t home.Object) home.Object {
 	if !meta.B("session") {
 		meta.Set("session", t.Get("session"))
 	}
-	usage := home.Object{}
-	for key, n := range map[string]*float64{"input": report.Input, "output": report.Output, "cached": report.Cached, "cost": report.Cost} {
-		if n != nil && *n >= 0 && !math.IsInf(*n, 0) && !math.IsNaN(*n) {
-			usage.Set(key, *n)
-		}
-	}
-	if len(usage) > 0 {
+	if usage := report.usage(); usage != nil {
 		meta.Set("usage", usage)
 	}
 
@@ -262,4 +286,18 @@ type Report struct {
 	Cached  *float64 `json:"cached"`
 	Cost    *float64 `json:"cost"`
 	Note    string   `json:"note"`
+}
+
+// usage returns the report's valid counts and cost, or nil when it has none.
+func (report Report) usage() home.Object {
+	usage := home.Object{}
+	for key, n := range map[string]*float64{"input": report.Input, "output": report.Output, "cached": report.Cached, "cost": report.Cost} {
+		if n != nil && *n >= 0 && !math.IsInf(*n, 0) && !math.IsNaN(*n) {
+			usage.Set(key, *n)
+		}
+	}
+	if len(usage) == 0 {
+		return nil
+	}
+	return usage
 }

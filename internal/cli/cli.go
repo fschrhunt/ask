@@ -263,7 +263,9 @@ func reporter(a *agent.Registry, r *runs.Run, live *status.Live) func(runs.Event
 		mu.Lock()
 		defer mu.Unlock()
 		if live == nil {
-			fmt.Fprintln(os.Stderr, status.StyledLine(status.EventLine(r, e), os.Stderr))
+			if e.Kind != "usage" { // plain status lines report usage once, at the end
+				fmt.Fprintln(os.Stderr, status.StyledLine(status.EventLine(r, e), os.Stderr))
+			}
 			return
 		}
 		name := ""

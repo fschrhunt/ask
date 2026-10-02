@@ -55,7 +55,8 @@ type Started struct {
 }
 
 // Run returns one complete result, converting task errors into failed results.
-func Run(a *agent.Registry, t home.Object, started func(Started)) home.Object {
+// progress (if not nil) gets the agent's usage so far while it runs.
+func Run(a *agent.Registry, t home.Object, started func(Started), progress func(home.Object)) home.Object {
 	begin := time.Now()
 	dir := t.S("dir")
 	var w *git.Worktree
@@ -78,7 +79,7 @@ func Run(a *agent.Registry, t home.Object, started func(Started)) home.Object {
 		}
 		runTask := t.Clone()
 		runTask.Set("dir", dir)
-		r = a.Run(m, fullPrompt(t), runTask)
+		r = a.Run(m, fullPrompt(t), runTask, progress)
 		if before != nil {
 			files, commits = git.Changes(before)
 			diff = true
