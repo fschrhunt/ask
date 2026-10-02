@@ -9,6 +9,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -26,14 +27,14 @@ import (
 )
 
 var options = map[string][]string{
-	"run":   {"-m", "-r", "-w", "--worktree", "-c", "--json", "--schema", "-C", "-t", "--no-hooks"},
-	"batch": {"-m", "-r", "-w", "--worktree", "--json", "--schema", "-C", "-t", "-j", "--resume", "--no-hooks"},
+	"run":   {"-m", "-r", "-w", "--worktree", "-c", "--json", "--schema", "-C", "-t", "--max-cost", "--no-hooks"},
+	"batch": {"-m", "-r", "-w", "--worktree", "--json", "--schema", "-C", "-t", "--max-cost", "-j", "--resume", "--no-hooks"},
 	"title": {"--command", "--description", "--hook"},
-	"setup": {"--check", "--json", "--yes", "--agents", "-m", "-t", "-j", "--worktrees", "--branches", "--skills", "--hook", "--no-hook"},
-	"show":  {"--json"}, "runs": {"-n", "--all"}, "wait": {"-t", "--json"}, "clean": {"--days", "--dry-run", "--yes"}, "stop": {}, "models": {"--names"}, "help": {}, "install": {}, "packages": {}, "remove": {},
+	"setup": {"--check", "--json", "--yes", "--agents", "-m", "-t", "-j", "--max-cost", "--worktrees", "--branches", "--skills", "--hook", "--no-hook"},
+	"show":  {"--json"}, "runs": {"-n", "--all"}, "wait": {"-t", "--json"}, "clean": {"--days", "--dry-run", "--yes"}, "stop": {}, "models": {"--names", "--all", "--enable", "--disable", "--max-cost"}, "help": {}, "install": {}, "packages": {}, "remove": {},
 }
 var long = map[string]string{"--model": "-m", "--read": "-r", "--write": "-w", "--continue": "-c", "--dir": "-C", "--timeout": "-t", "--jobs": "-j"}
-var value = map[string]bool{"-m": true, "-c": true, "--schema": true, "-C": true, "-t": true, "-j": true, "-n": true, "--resume": true, "--command": true, "--description": true, "--agents": true, "--days": true, "--worktrees": true, "--branches": true, "--skills": true}
+var value = map[string]bool{"-m": true, "-c": true, "--schema": true, "-C": true, "-t": true, "-j": true, "-n": true, "--resume": true, "--command": true, "--description": true, "--agents": true, "--days": true, "--max-cost": true, "--worktrees": true, "--branches": true, "--skills": true}
 
 // suggestion returns a valid option only when the spelling is one edit away.
 func suggestion(command, wrong string) string {
@@ -175,6 +176,13 @@ func taskOptions(opts home.Object) (home.Object, error) {
 	}
 	if opts.B("-C") {
 		t.Set("dir", opts.Get("-C"))
+	}
+	if opts.Has("--max-cost") {
+		n, e := strconv.ParseFloat(strings.TrimPrefix(opts.S("--max-cost"), "$"), 64)
+		if e != nil || n < 0 {
+			return nil, home.Usage("--max-cost takes dollars, like 2.50 (0 for no limit), not %q", opts.S("--max-cost"))
+		}
+		t.Set("max_cost", n)
 	}
 	if opts.B("-t") {
 		n, e := number("-t", opts.S("-t"), false)
@@ -541,48 +549,138 @@ func listRuns(p home.Paths, opts home.Object) (int, error) {
 	return 0, nil
 }
 
-// models lists installed model ids and reports declaration failures without failing the command.
-func models(a *agent.Registry, names bool) (int, error) {
+// models lists the models that are on, or with --all every model and whether it is on, and
+// reports listing failures without failing the command. Given models, it turns them on or off
+// or sets their cost limit in models.json instead.
+func models(a *agent.Registry, opts home.Object, words []string) (int, error) {
 	config, e := a.Paths.ReadModels()
 	if e != nil {
 		return 0, e
 	}
-	ids, errors := a.List(config)
+	if len(words) > 0 {
+		return changeModels(a, config, opts, words)
+	}
+	if opts.B("--enable") || opts.B("--disable") || opts.Has("--max-cost") {
+		return 0, home.Usage("say which models, like ask models codex:gpt-5.6-sol --disable")
+	}
+	entries, errors := a.Catalog(config)
 	for _, e := range errors {
 		fmt.Fprintln(os.Stderr, "ask: could not list the models of "+e)
 	}
-	if len(ids) == 0 {
+	shown := []agent.Entry{}
+	for _, x := range entries {
+		if !x.Off || opts.B("--all") {
+			shown = append(shown, x)
+		}
+	}
+	if len(entries) == 0 {
 		fmt.Fprintln(os.Stderr, "ask: no models; run ask setup to connect your coding agents")
 	}
+	terminal, color := status.IsTerminal(os.Stdout), status.CanStyle(os.Stdout)
+	dim := func(s string) string {
+		if color && s != "" {
+			return "\x1b[2m" + s + "\x1b[0m"
+		}
+		return s
+	}
 	previous := ""
-	for _, id := range ids {
-		if names {
-			m, _ := agent.Parse(a.Paths, id)
-			fmt.Fprintf(os.Stdout, "%s\t%s\n", id, a.Name(m, ""))
-		} else if status.IsTerminal(os.Stdout) {
-			owner, model, _ := strings.Cut(id, ":")
+	for _, x := range shown {
+		owner, model, _ := strings.Cut(x.ID, ":")
+		m, _ := agent.Parse(a.Paths, x.ID)
+		state, limit := "on", ""
+		if x.Off {
+			state = "off"
+		}
+		if c, _ := config.Get(owner, model); c.MaxCost > 0 {
+			limit = "max $" + home.Dollars(c.MaxCost)
+		}
+		switch {
+		case opts.B("--names"):
+			fmt.Fprintf(os.Stdout, "%s\t%s\n", x.ID, a.Name(m, ""))
+		case terminal:
 			if owner != previous {
 				if previous != "" {
 					fmt.Fprintln(os.Stdout)
 				}
-				if status.CanStyle(os.Stdout) {
+				if color {
 					fmt.Fprintf(os.Stdout, "\x1b[1m%s\x1b[0m\n", owner)
 				} else {
 					fmt.Fprintln(os.Stdout, owner)
 				}
 				previous = owner
 			}
-			m, _ := agent.Parse(a.Paths, id)
-			label := fmt.Sprintf("  %-24s %s", model, a.Name(m, ""))
-			if status.CanStyle(os.Stdout) {
-				label = fmt.Sprintf("  %-24s \x1b[2m%s\x1b[0m", model, a.Name(m, ""))
+			notes := strings.TrimSpace(a.Name(m, "") + "  " + limit)
+			if x.Off {
+				notes = "off  " + notes
 			}
-			fmt.Fprintln(os.Stdout, label)
-		} else {
-			fmt.Fprintln(os.Stdout, id)
+			fmt.Fprintf(os.Stdout, "  %-24s %s\n", model, dim(notes))
+		case opts.B("--all"):
+			fmt.Fprintf(os.Stdout, "%s\t%s\n", x.ID, state)
+		default:
+			fmt.Fprintln(os.Stdout, x.ID)
 		}
 	}
 	return 0, nil
+}
+
+// keep records a model's entry in models.json only when it says something: off, a cost limit, or
+// on for a model its agent doesn't list. Everything else is the default, so the file holds only
+// your choices and never keeps a model its agent stopped offering.
+func keep(config home.Models, agentName, id string, x home.Model, listed bool) {
+	if !x.Off && x.MaxCost == 0 && listed {
+		config.Delete(agentName, id)
+	} else {
+		config.Set(agentName, id, x)
+	}
+}
+
+// changeModels turns models on or off, or sets or clears (0) their cost limit, in models.json.
+func changeModels(a *agent.Registry, config home.Models, opts home.Object, words []string) (int, error) {
+	if opts.B("--enable") && opts.B("--disable") {
+		return 0, home.Usage("ask models takes --enable or --disable, not both")
+	}
+	if !opts.B("--enable") && !opts.B("--disable") && !opts.Has("--max-cost") {
+		return 0, home.Usage("say what to change: --enable, --disable or --max-cost DOLLARS")
+	}
+	limit := -1.0
+	if opts.Has("--max-cost") {
+		n, e := strconv.ParseFloat(strings.TrimPrefix(opts.S("--max-cost"), "$"), 64)
+		if e != nil || n < 0 {
+			return 0, home.Usage("--max-cost takes dollars, like 10 (0 for none), not %q", opts.S("--max-cost"))
+		}
+		limit = n
+	}
+	listed := map[string]bool{}
+	entries, _ := a.Catalog(config)
+	for _, x := range entries {
+		listed[x.ID] = x.Listed
+	}
+	for _, id := range words {
+		m, e := agent.Parse(a.Paths, id)
+		if e != nil {
+			return 0, e
+		}
+		x, _ := config.Get(m.Agent, m.ID)
+		if opts.B("--enable") {
+			x.Off = false
+		}
+		if opts.B("--disable") {
+			x.Off = true
+		}
+		if limit >= 0 {
+			x.MaxCost = limit
+		}
+		keep(config, m.Agent, m.ID, x, listed[m.Agent+":"+m.ID])
+		state := "on"
+		if x.Off {
+			state = "off"
+		}
+		if x.MaxCost > 0 {
+			state += ", at most $" + home.Dollars(x.MaxCost) + " a run"
+		}
+		fmt.Fprintf(os.Stderr, "ask: %s:%s is %s\n", m.Agent, m.ID, state)
+	}
+	return 0, a.Paths.WriteModels(config)
 }
 
 // install clones or updates each named source and checks the agents it brings, or with no
@@ -742,7 +840,7 @@ func main(argv []string, version string) (int, error) {
 		printHelp(topicHelp(topic))
 		return 0, nil
 	}
-	if has([]string{"models", "runs", "packages"}, command) && len(words) != 0 {
+	if has([]string{"runs", "packages"}, command) && len(words) != 0 {
 		return 0, home.Usage("ask %s takes no arguments", command)
 	}
 	a := agent.New(p)
@@ -761,8 +859,11 @@ func main(argv []string, version string) (int, error) {
 	case "batch":
 		return batch(a, opts, words)
 	case "setup":
-		if len(words) != 0 {
-			return 0, home.Usage("ask setup takes no arguments; see ask setup --help")
+		if len(words) > 1 {
+			return 0, home.Usage("ask setup takes at most one agent, like ask setup opencode")
+		}
+		if len(words) == 1 {
+			return setupAgent(p, words[0])
 		}
 		return setupCommand(p, opts)
 	case "show":
@@ -779,7 +880,7 @@ func main(argv []string, version string) (int, error) {
 	case "runs":
 		return listRuns(p, opts)
 	case "models":
-		return models(a, opts.B("--names"))
+		return models(a, opts, words)
 	case "help":
 		if len(words) != 1 {
 			return 0, home.Usage("ask help takes one command")

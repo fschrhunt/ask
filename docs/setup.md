@@ -34,8 +34,8 @@ ask is set up. Try it in a project:
   Opencode, Cursor and pi. It tells their agents that ask exists and how to hand it work.
 - **Task titles** register `ask title --hook` in Claude Code (see [Hosts](hosts.md)).
 
-Arrow keys (or `j` and `k`) move, space selects, `a` selects all, enter confirms, and Ctrl-C stops
-at any point; what was answered so far is kept.
+Arrow keys move, typing filters a list, space selects, ctrl-a selects everything shown, enter
+confirms, and Ctrl-C stops at any point; what was answered so far is kept.
 
 ## Later
 
@@ -49,12 +49,30 @@ Run `ask setup` again for your settings, with their current values:
   Branches                    ask/{name} (default)
   Timeout                     900 seconds (default)
   Batch jobs                  4 at once (default)
+  Models and cost limits      by agent
+  Cost limit                  none (default)
   The ask skill               Claude Code, Codex
   Task titles in Claude Code  on
   Done
 ```
 
 Each change is saved as you make it. Unpicking an official agent removes its package.
+
+## One agent
+
+`ask setup NAME` opens one agent: which of its models ask uses, and their cost limits.
+
+```text
+? opencode: what do you want to change?
+> Models       148 of 148 on
+  Cost limits  the default for every model
+  Done
+```
+
+Models is a list of everything the agent offers, with the ones that are on checked. Type to
+filter it, space to turn one on or off, ctrl-a for everything shown. The ones you turn off go to
+[models.json](models.md#modelsjson). Cost limits sets a model's own limit, which replaces your
+default for its runs. The settings screen reaches the same place through Models and cost limits.
 
 ## For scripts and agents
 
@@ -75,6 +93,7 @@ ask setup --check --json
 | `-m`, `--model M` | The default model |
 | `-t`, `--timeout S` | Seconds per task |
 | `-j`, `--jobs N` | Batch tasks at once |
+| `--max-cost USD` | Dollars a task may spend |
 | `--worktrees T` | Where `--worktree` works, with `{name}` |
 | `--branches T` | A worktree's branch, with `{name}` |
 | `--skills LIST` | Add the ask skill to `claude-code`, `codex`, `opencode`, `cursor`, `pi`, or `all` installed |

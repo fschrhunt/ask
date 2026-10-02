@@ -105,6 +105,7 @@ type Options struct {
 	Input, Dir string
 	Env        []string
 	Timeout    time.Duration
+	Stop       <-chan struct{} // closing it stops the command as a timeout does, without marking one
 }
 
 // Result contains decoded output, exit code (-1 for signals/spawn errors), and timeout state.
@@ -248,6 +249,9 @@ func Run(command string, args []string, o Options) Result {
 		stopGroups([]int{cmd.Process.Pid})
 		r = <-waited
 		r.TimedOut = true
+	case <-o.Stop:
+		stopGroups([]int{cmd.Process.Pid})
+		r = <-waited
 	}
 	deadline := time.AfterFunc(time.Second, func() { outR.Close(); errR.Close() })
 	r.Stdout = <-outDone

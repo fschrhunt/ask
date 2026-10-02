@@ -123,6 +123,7 @@ async function adapter({ models, run }) {
     write: ASK_ACCESS === 'write',
     schema: ASK_SCHEMA ? JSON.parse(readFileSync(ASK_SCHEMA, 'utf8')) : undefined,
     session: ASK_SESSION || undefined,
+    maxCost: Number(process.env.ASK_MAX_COST) || undefined,
     dir: process.cwd(),
     report,
   });
@@ -143,13 +144,15 @@ if (!CLI) {
 await adapter({
   models: () => MODELS.map((id) => [id, displayName(claudeId(id))]),
 
-  async run({ prompt, model, effort, write, schema, session, report }) {
+  async run({ prompt, model, effort, write, schema, session, maxCost, report }) {
     if (ALIASES.includes(model.toLowerCase()))
       return { ok: false, error: `"${model}" is an alias; name the exact model, like claude:${MODELS.find((m) => m.startsWith(model.toLowerCase())) || MODELS[1]} (see ask models)` };
     const id = session || randomUUID();
     report({ session: id });
     const args = ['-p', '--model', claudeId(model), '--output-format', 'stream-json', '--verbose', '--include-partial-messages', ...(session ? ['--resume', session] : ['--session-id', id])];
     if (effort) args.push('--effort', effort);
+    // Claude Code reports cost only when it ends, so it enforces ask's limit itself.
+    if (maxCost) args.push('--max-budget-usd', String(maxCost));
     if (schema) args.push('--json-schema', JSON.stringify(schema));
     // Claude Code matches rules against the command text, and only a pattern with four backslashes matches one.
     if (write) args.push('--permission-mode', 'bypassPermissions');
@@ -165,6 +168,7 @@ await adapter({
     const calls = new Map();
     let call;
     let result;
+    let so = { input: 0, output: 0, cached: 0 };
     const onLine = (line) => {
       let event;
       try {
@@ -178,16 +182,19 @@ await adapter({
       const u = e.type === 'message_start' ? e.message?.usage : e.type === 'message_delta' ? e.usage : undefined;
       if (!u || !call) return;
       calls.set(call, u);
-      const so = { input: 0, output: 0, cached: 0 };
+      so = { input: 0, output: 0, cached: 0 };
       for (const u of calls.values()) for (const [key, n] of Object.entries(tokens(u))) so[key] += n;
       report(so);
     };
     const r = await exec(CLI, args, { input: prompt, onLine });
     if (!result) return { ok: false, error: r.stderr.trim().split('\n').pop() || `unreadable output (exit ${r.code})` };
-    const usage = { ...tokens(result.usage || {}), cost: typeof result.total_cost_usd === 'number' ? result.total_cost_usd : undefined };
+    // A run stopped at its budget ends with empty usage; the streamed counts are the real ones then.
+    const final = tokens(result.usage || {});
+    const usage = { ...(final.input || final.output ? final : so), cost: typeof result.total_cost_usd === 'number' ? result.total_cost_usd : undefined };
     // The model that did most of the work, so an alias like opus shows as the version it resolved to.
     const ran = Object.entries(result.modelUsage || {}).sort((a, b) => (b[1].outputTokens || 0) - (a[1].outputTokens || 0))[0]?.[0];
     const name = displayName(ran);
+    if (result.subtype === 'error_max_budget_usd') return { ok: false, error: `stopped at the $${maxCost >= 0.01 ? maxCost.toFixed(2) : maxCost} cost limit`, usage, name };
     if (result.is_error || r.code !== 0) return { ok: false, error: result.is_error ? result.result || result.subtype || 'error' : `exit ${r.code}`, usage, name };
     const text = result.structured_output !== undefined ? JSON.stringify(result.structured_output) : result.result;
     return text ? { ok: true, text, usage, name } : { ok: false, error: 'no answer', usage, name };

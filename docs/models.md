@@ -18,7 +18,8 @@ codex:gpt-6.1-sol
 ## Listing
 
 ```sh
-ask models
+ask models          # the models that are on
+ask models --all    # every model, on or off
 ```
 
 ```text
@@ -27,27 +28,52 @@ claude:haiku-4.5
 codex:gpt-6.1-sol
 ```
 
-`ask models --names` prints `agent:id<TAB>Display Name`. `ask --help` groups available ids
-on one line per agent, including listing failures.
-At a terminal, `ask models` groups each agent's ids with a dim display-name column. In
-a pipe it keeps the one-`agent:id`-per-line form for scripts. `NO_COLOR` removes styling.
+Each agent lists every model its CLI offers with `NAME models`: Claude Code's current models,
+Codex's model list, and every model of the providers you have set up in Opencode. Every model is
+on until you turn it off.
 
-Each agent lists its own models with `NAME models`. An agent whose CLI offers too many to list
-lists none, and you name the ones you use.
+`ask models --names` prints `agent:id<TAB>Display Name`, and `--all` in a pipe prints
+`agent:id<TAB>on` or `off`. At a terminal, `ask models` groups each agent's ids with their names
+and cost limits. `ask --help` shows each agent's models on a line, or how many when there are
+more than a dozen, including listing failures. `NO_COLOR` removes styling.
 
-## Adding model ids
+## Turning models on and off
 
-`~/.ask/models.json` adds ids to any agent's list, by agent name:
+Turn off what you don't use, so `ask models`, help and the agents that pick from them see only
+the rest:
+
+```sh
+ask setup opencode                                  # pick in a list you can filter
+ask models codex:gpt-5.6-sol opencode:gpt-4o --disable
+ask models codex:gpt-5.6-sol --enable
+```
+
+A model that is off is refused: `-m codex:gpt-5.6-sol` says it is off and how to turn it on.
+
+## models.json
+
+Your choices are in `~/.ask/models.json`, by agent: the models you turned off, the ones you added,
+and the ones with their own cost limit. Everything else is on, so the file stays short and never
+keeps a model an agent stopped offering; `ask models --all` is always the full list.
 
 ```json
 {
-  "opencode": ["deepseek-4.1-flash", "glm-5.3-flash"],
-  "claude": ["sonnet-5"]
+  "claude": {
+    "opus-5.5": { "enabled": true, "max_cost": 10 },
+    "sonnet-5": true
+  },
+  "opencode": {
+    "gpt-4o": false,
+    "gpt-4o-mini": false
+  }
 }
 ```
 
-The file is optional, but if it exists it must be valid JSON. ask still runs any id you give it,
-listed or not. The list is for you and for agents that pick from `ask models`.
+`false` turns a model off. `true` adds a model the agent doesn't list, like `sonnet-5`, an older
+Claude model. An object sets `enabled` and `max_cost`, its own [cost limit](usage.md#cost-limits).
+`ask setup NAME` and `ask models MODEL --enable|--disable|--max-cost` write the file for you, or
+edit it. The older form, a list of ids per agent (`{"opencode": ["glm-5.3-flash"]}`), still works
+and adds those models. If the file exists it must be valid JSON; mistakes name the agent and model.
 
 ## Names in output
 

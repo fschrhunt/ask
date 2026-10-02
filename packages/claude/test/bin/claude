@@ -18,6 +18,8 @@ if (matches(FAKE_HANG)) setInterval(() => {}, 1000);
 else {
   if (matches(FAKE_SLOW)) await new Promise((resolve) => setTimeout(resolve, 300));
   const failed = matches(FAKE_FAIL);
+  // Over a --max-budget-usd below its cost of $0.01, Claude Code ends as error_max_budget_usd.
+  const budget = argv.includes('--max-budget-usd') && Number(argv[argv.indexOf('--max-budget-usd') + 1]) < 0.01;
   const answer = FAKE_ANSWER ?? `claude: ${stdin.trim().split('\n').pop()}`;
   const schema = argv.includes('--json-schema');
   const usage = { input_tokens: 10, cache_creation_input_tokens: 5, cache_read_input_tokens: 20 };
@@ -28,14 +30,14 @@ else {
   console.log(
     JSON.stringify({
       type: 'result',
-      subtype: failed ? 'error_during_execution' : 'success',
-      is_error: failed,
-      result: failed ? 'claude boom' : schema ? '' : answer,
+      subtype: budget ? 'error_max_budget_usd' : failed ? 'error_during_execution' : 'success',
+      is_error: failed || budget,
+      result: budget ? null : failed ? 'claude boom' : schema ? '' : answer,
       ...(schema && !failed && { structured_output: JSON.parse(answer) }),
       total_cost_usd: 0.01,
       modelUsage: { 'claude-opus-5-5': { outputTokens: 7 }, 'claude-haiku-4-5': { outputTokens: 1 } },
-      usage: { input_tokens: 10, cache_creation_input_tokens: 5, cache_read_input_tokens: 20, output_tokens: 7 },
+      usage: budget ? {} : { input_tokens: 10, cache_creation_input_tokens: 5, cache_read_input_tokens: 20, output_tokens: 7 },
     }),
   );
-  process.exitCode = failed ? 1 : Number(FAKE_EXIT || 0);
+  process.exitCode = failed || budget ? 1 : Number(FAKE_EXIT || 0);
 }

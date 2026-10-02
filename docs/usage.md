@@ -113,6 +113,29 @@ everything the agent started is stopped.
 ask -m codex:gpt-6.1-sol -w -t 3600 "Upgrade the project to Node 24 and fix what breaks."
 ```
 
+## Cost limits
+
+A cost limit stops a task that spends more than you meant to. It is off unless you set one:
+
+```sh
+ask setup --max-cost 2                            # every task: at most $2 (the max_cost setting)
+ask models claude:opus-5.5 --max-cost 10          # this model: its own limit, instead
+ask -m claude:opus-5.5 --max-cost 25 "Port the parser to Rust."   # this run only
+```
+
+The run's own `--max-cost` wins, then the model's limit in models.json, then the setting; `0`
+means no limit. When a task passes its limit, the agent is stopped and nothing is lost: its
+conversation is kept, so you decide whether it's worth more.
+
+```text
+ask port-parser-rust · failed · Opus 5.5 · 6:12 · 412.0k in · 9.1k out · $25.31 · stopped at the $25.00 cost limit; ask -c port-parser-rust continues it
+```
+
+How closely a limit holds depends on what the agent's CLI reports. Opencode reports cost after
+every step, so ask stops it within a step of the limit. Claude Code reports cost only when it
+ends, so its agent hands the limit to Claude Code's own budget, which stops after the model call
+that passes it. Codex reports no cost, so limits don't apply to it; use `-t` to bound its time.
+
 ## JSON answers
 
 `--json` requires the answer to be JSON. `--schema FILE` requires JSON that matches a JSON Schema.

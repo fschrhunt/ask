@@ -40,7 +40,7 @@ ones use Node.js 18+, standard library only).
   (hooks, commands, packages), `compat` (released run records, pinned in `fixtures/`), `contracts` (raw JSON, streams and process guarantees) and `local`
   (the agent contract, with shell agents) black-box Go tests, `helpers_test.go`, and `fake/`,
   the Go fake agent every test installs. `TestMain` builds ask and fake once. `FAKE_LOG` records
-  runs; `FAKE_FAIL`, `FAKE_HANG` and `FAKE_SLOW` match the prompt; `FAKE_WRITE` and `FAKE_COMMIT`
+  runs; `FAKE_FAIL`, `FAKE_HANG`, `FAKE_SLOW` and `FAKE_SPEND` (reports $3 spent, then waits) match the prompt; `FAKE_WRITE` and `FAKE_COMMIT`
   change the repository.
 - `packages/`: the official agent packages, `claude`, `codex` and `opencode`, each `agents/NAME`
   (a sh launcher that finds Node.js), `lib/NAME.mjs` (the agent), `test/` and `README.md`.

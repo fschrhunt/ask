@@ -49,6 +49,13 @@ The agent streams Claude Code's events and rewrites ask's report as each model c
 finishes, so token counts show live; the cost arrives with the result. The report names the model
 that did most of the work (`Opus 5.5`).
 
+## Cost limits
+
+Claude Code reports cost only when it ends, so ask can't stop it on cost itself. The agent passes
+ask's limit (`ASK_MAX_COST`, from `--max-cost`, models.json or the `max_cost` setting) to Claude
+Code as `--max-budget-usd`, which stops after the model call that passes it. The run fails as
+`stopped at the $2.00 cost limit`, keeps its session, and `ask -c RUN` continues it.
+
 ## Environment
 
 | Variable | |

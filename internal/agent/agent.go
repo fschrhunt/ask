@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -69,7 +71,7 @@ type Registry struct {
 func New(p home.Paths) *Registry { return &Registry{Paths: p, listed: map[string]*listing{}} }
 
 // models caches one agent's declaration without serializing different agents' listings.
-func (a *Registry) models(name string, config home.Object) listing {
+func (a *Registry) models(name string) listing {
 	a.mu.Lock()
 	own, ok := a.listed[name]
 	if !ok {
@@ -108,34 +110,61 @@ func (a *Registry) models(name string, config home.Object) listing {
 		close(own.ready)
 	}
 	<-own.ready
-	out := listing{models: append([]listedModel{}, own.models...), error: own.error}
-	if extra, ok := config.Get(name).([]any); ok {
-		for _, id := range extra {
-			out.models = append(out.models, listedModel{id: home.String(id)})
-		}
-	}
-	return out
+	return listing{models: append([]listedModel{}, own.models...), error: own.error}
 }
 
 // List returns model ids in agent order and each listing failure as "agent: reason".
-// Failed declarations are reported per agent, including executable start errors.
-func (a *Registry) List(config home.Object) ([]string, []string) {
+// Entry is a model ask can reach, as agent:id, with its listed name and whether models.json
+// turns it off.
+type Entry struct {
+	ID, Name string
+	Off      bool
+	Listed   bool // the agent lists it, rather than models.json adding it
+}
+
+// Catalog lists every model each agent offers, then the ones models.json adds that it doesn't,
+// with each agent's listing failure as "name: reason".
+func (a *Registry) Catalog(config home.Models) ([]Entry, []string) {
 	names := find.Sorted(a.Paths, "agents")
 	all := make([]listing, len(names))
 	var wg sync.WaitGroup
 	for i, x := range names {
 		wg.Add(1)
-		go func(i int, name string) { defer wg.Done(); all[i] = a.models(name, config) }(i, x.Name)
+		go func(i int, name string) { defer wg.Done(); all[i] = a.models(name) }(i, x.Name)
 	}
 	wg.Wait()
-	ids, errors := []string{}, []string{}
+	entries, errors := []Entry{}, []string{}
 	for i, x := range names {
-
+		seen := map[string]bool{}
 		for _, m := range all[i].models {
-			ids = append(ids, x.Name+":"+m.id)
+			seen[m.id] = true
+			c, _ := config.Get(x.Name, m.id)
+			entries = append(entries, Entry{x.Name + ":" + m.id, m.name, c.Off, true})
+		}
+		extra := []string{}
+		for id, c := range config[x.Name] {
+			if !seen[id] && !c.Off {
+				extra = append(extra, id)
+			}
+		}
+		sort.Strings(extra)
+		for _, id := range extra {
+			entries = append(entries, Entry{ID: x.Name + ":" + id})
 		}
 		if all[i].error != "" {
 			errors = append(errors, x.Name+": "+all[i].error)
+		}
+	}
+	return entries, errors
+}
+
+// List returns the ids of the models that are on, and listing failures.
+func (a *Registry) List(config home.Models) ([]string, []string) {
+	entries, errors := a.Catalog(config)
+	ids := []string{}
+	for _, e := range entries {
+		if !e.Off {
+			ids = append(ids, e.ID)
 		}
 	}
 	return ids, errors
@@ -145,7 +174,7 @@ func (a *Registry) List(config home.Object) ([]string, []string) {
 func (a *Registry) Name(m Model, reported string) string {
 	name := reported
 	if name == "" {
-		listed := a.models(m.Agent, nil)
+		listed := a.models(m.Agent)
 
 		for _, x := range listed.models {
 			if strings.EqualFold(x.id, m.ID) {
@@ -185,7 +214,9 @@ func exitText(r process.Result) string {
 }
 
 // Run sends the prompt on stdin and reads the optional report even after failure or timeout.
-// While the agent runs, progress (if not nil) gets each new usage the agent rewrites its report with.
+// While the agent runs, progress (if not nil) gets each new usage the agent rewrites its report
+// with. A task's max_cost goes to the agent as ASK_MAX_COST, and ask stops the agent once its
+// reported cost passes it; the session survives, so a follow-up continues the work.
 func (a *Registry) Run(m Model, prompt string, t home.Object, progress func(home.Object)) home.Object {
 	work, err := os.MkdirTemp("", "ask-")
 	if err != nil {
@@ -210,11 +241,16 @@ func (a *Registry) Run(m Model, prompt string, t home.Object, progress func(home
 	if timeout == 0 {
 		timeout = 900
 	}
-	done := make(chan struct{})
+	limit := t.N("max_cost")
+	if limit > 0 {
+		vars["ASK_MAX_COST"] = strconv.FormatFloat(limit, 'f', -1, 64)
+	}
+	done, stop := make(chan struct{}), make(chan struct{})
 	watched := make(chan struct{})
+	overLimit := false
 	go func() {
 		defer close(watched)
-		if progress == nil {
+		if progress == nil && limit <= 0 {
 			return
 		}
 		tick := time.NewTicker(500 * time.Millisecond)
@@ -231,13 +267,19 @@ func (a *Registry) Run(m Model, prompt string, t home.Object, progress func(home
 				if json.Unmarshal(b, &report) == nil {
 					last = string(b)
 					if usage := report.usage(); usage != nil {
-						progress(usage)
+						if progress != nil {
+							progress(usage)
+						}
+						if limit > 0 && usage.Has("cost") && usage.N("cost") > limit && !overLimit {
+							overLimit = true
+							close(stop)
+						}
 					}
 				}
 			}
 		}
 	}()
-	r := process.Run(find.Path(a.Paths, "agents", m.Agent), nil, process.Options{Input: prompt, Dir: t.S("dir"), Env: a.Paths.Env(vars), Timeout: process.Timeout(timeout)})
+	r := process.Run(find.Path(a.Paths, "agents", m.Agent), nil, process.Options{Input: prompt, Dir: t.S("dir"), Env: a.Paths.Env(vars), Timeout: process.Timeout(timeout), Stop: stop})
 	close(done)
 	<-watched
 
@@ -257,6 +299,8 @@ func (a *Registry) Run(m Model, prompt string, t home.Object, progress func(home
 	switch {
 	case r.TimedOut:
 		meta.Set("note", "timed out")
+	case overLimit:
+		meta.Set("note", "stopped at the $"+home.Dollars(limit)+" cost limit")
 	case r.Code != 0:
 		why := process.Reason(r.Stderr)
 		if why == "" {
@@ -272,6 +316,11 @@ func (a *Registry) Run(m Model, prompt string, t home.Object, progress func(home
 		meta.Set("ok", true)
 		meta.Set("text", r.Stdout)
 		meta.Set("note", home.Trim(report.Note))
+		// An agent that reports cost only at the end can't be stopped on it; its answer stands, noted.
+		if u, _ := meta.Get("usage").(home.Object); limit > 0 && u.N("cost") > limit {
+			over := "spent $" + home.Dollars(u.N("cost")) + ", over the $" + home.Dollars(limit) + " cost limit"
+			meta.Set("note", strings.TrimPrefix(home.Trim(report.Note)+"; "+over, "; "))
+		}
 	}
 	return meta
 }

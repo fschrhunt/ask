@@ -12,6 +12,7 @@ they may change.
 | Result fields (`run`, `id`, `model`, `write`, `name`, `ok`, `answer`/`error`, `seconds`, `usage`, `session`, `dir`, `changes`, `commits`, `worktree`, `followups`) | [Batches](batches.md) |
 | Run records: `tasks.json` and `results.json` in `~/.ask/runs/STAMP-ID[-NAME]/` | [Runs](runs.md) |
 | `settings.json` keys and their meaning | [Settings](settings.md) |
+| `models.json`: per agent, a list of ids or ids mapped to `true`, `false` or `{"enabled", "max_cost"}` | [Models](models.md#modelsjson) |
 | `ask setup` flags, `--check` exit status and `--check --json` fields | [Setup](setup.md) |
 | `ask title --hook` output: Claude Code's `PreToolUse` `hookSpecificOutput` | [Hosts](hosts.md) |
 | The agent contract | [Agents](agents.md) |

@@ -43,6 +43,9 @@ func modelLines(a *agent.Registry) string {
 				words = append([]string{"(could not list: " + strings.Join(strings.Fields(reason), " ") + ")"}, words...)
 			}
 		}
+		if len(words) > 12 {
+			words = []string{fmt.Sprintf("%d models; ask models lists them, ask setup %s chooses", len(words), entry.Name)}
+		}
 		if len(words) == 0 {
 			words = []string{"(lists none; give an id)"}
 		}
@@ -111,6 +114,7 @@ Commands
   --worktree           Work in a new git worktree (with -w)
   -C, --dir DIR        Directory to work in
   -t, --timeout S      Seconds per task (default: 900)
+  --max-cost USD       Stop a task that spends more (default: none, or your settings)
   --json, --schema F   Require JSON, or JSON matching a schema
   --no-hooks           Skip your hooks
 
@@ -137,6 +141,7 @@ Options
   --worktree           Work in a new git worktree and branch (with -w)
   -C, --dir DIR        Directory to work in (default: current)
   -t, --timeout S      Seconds per task (default: 900)
+  --max-cost USD       Stop a task that spends more (default: none, or your settings)
   --json               Require a JSON answer
   --schema FILE        Require JSON matching this schema
   --no-hooks           Skip your hooks
@@ -169,6 +174,7 @@ Tasks · a JSON array, or one object per line
   worktree   Work in a new git worktree (default: --worktree)
   dir        Directory (default: -C)
   timeout    Seconds (default: -t, else 900)
+  max_cost   Dollars this task may spend (default: --max-cost, else your settings)
   json       Require a JSON answer
   schema     A JSON Schema, inline
 
@@ -185,6 +191,7 @@ Results · a JSON array on stdout, in task order
 
 Options
   -m, -w, --worktree, -C, -t   Defaults for every task
+  --max-cost USD               Each task's cost limit
   -j N                         Tasks at once (default: 4)
   --no-hooks                   Skip your hooks
 
@@ -271,19 +278,28 @@ Output
 Example
   ask stop login-checked` + "\n\ndocs  " + docsURL + "/runs.md"
 	case "models":
-		return `ask models · list the models you can use
+		return `ask models · list the models you can use, and turn them on or off
 
 Usage
-  ask models [--names]
+  ask models [--names] [--all]
+  ask models MODEL... --enable | --disable | --max-cost USD
 
 Output
-  piped      One agent:id per line
-  terminal   Grouped by agent, with each model's name
+  piped      One agent:id per line, the models that are on
+  terminal   Grouped by agent, with each model's name and cost limit
   --names    agent:id and name, tab-separated, everywhere
+  --all      Every model, with on or off
+
+Changes, saved in ~/.ask/models.json
+  --enable, --disable   Turn models on or off; off models are hidden and refused
+  --max-cost USD        Their cost limit per task; 0 for your default
 
 Examples
   ask models
-  ask models --names` + "\n\ndocs  " + docsURL + "/models.md"
+  ask models --all
+  ask models codex:gpt-5.6-sol opencode:gpt-4o --disable
+  ask models claude:opus-5.5 --max-cost 10
+  ask setup opencode                 Choose in a filterable list` + "\n\ndocs  " + docsURL + "/models.md"
 	case "title":
 		return `ask title · name a command for a host's task list
 
@@ -352,6 +368,7 @@ ask setup connects the official agents for the CLIs you have. Your own are execu
 
 Usage
   ask setup               In a terminal: a walkthrough the first time, then your settings
+  ask setup NAME          One agent: which of its models are on, and their cost limits
   ask setup --check       Report, and exit 1 while an installed agent can't run
   ask setup [flags]       Change things without asking, for scripts and agents
 
@@ -360,6 +377,7 @@ Flags
   -m, --model M     Default model; "" for none
   -t, --timeout S   Seconds per task; "" for 900
   -j, --jobs N      Batch tasks at once; "" for 4
+  --max-cost USD    Dollars a task may spend; 0 or "" for no limit
   --worktrees T     Where --worktree works, with {name}; "" for ~/.ask/worktrees/{name}
   --branches T      Worktree branch, with {name}; "" for ask/{name}
   --skills LIST     Add the ask skill to claude-code, codex, opencode, cursor, pi or all
@@ -378,6 +396,7 @@ Keys
   model       The model when -m gives none, like "claude:sonnet-5.5"
   timeout     Seconds per task (default: 900)
   jobs        Batch tasks at once (default: 4)
+  max_cost    Dollars a task may spend; ask stops it there (default: no limit)
   worktrees   Where --worktree works, like "~/code/worktrees/ask-{name}"
   branches    A worktree's branch, like "ask/{name}" (the default)
 

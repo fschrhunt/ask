@@ -132,6 +132,14 @@ func Fixed(n float64, digits int) string {
 	return strconv.FormatFloat(math.Round(n*scale)/scale, 'f', digits, 64)
 }
 
+// Dollars writes an amount of USD for people: cents from a cent up, every digit below one.
+func Dollars(n float64) string {
+	if n >= 0.01 {
+		return Fixed(n, 2)
+	}
+	return strconv.FormatFloat(n, 'f', -1, 64)
+}
+
 // Space recognizes whitespace accepted around prompts and model specifications.
 func Space(r rune) bool { return unicode.IsSpace(r) || r == '\ufeff' }
 

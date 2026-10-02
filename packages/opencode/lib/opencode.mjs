@@ -3,8 +3,8 @@
  * Opencode has no read-only flag, and a global allow-everything rule overrides its built-in plan
  * agent, so read runs inject rules for plan: file tools plus the read-only inspection commands.
  * Injected config is applied last and the last matching rule wins. Write runs use build with the
- * user's own permissions. Opencode lists hundreds of models, so this agent lists none; name the
- * ones you use in ~/.ask/models.json under "opencode". Models are named like the other agents',
+ * user's own permissions. It lists every model of the providers you have set up in Opencode;
+ * turn off the ones you don't use with ask models or ask setup opencode. Models are named like the other agents',
  * family-version-variant in lowercase (deepseek-4.1-flash for opencode-go/deepseek-v4.1-flash),
  * found in any provider; a provider/model id is used as it is. The session id of the first event is
  * reported at once; a follow-up continues it with --session. A new read run's prompt starts with
@@ -41,26 +41,34 @@ function executable(path) {
 const clean = (id) => id.toLowerCase().replace(/^([a-z]+)(\d)/, '$1-$2').replace(/-v(\d)/g, '-$1');
 
 /*
- * Opencode's provider/model id for a model name: a provider/model id as it is, else the listed model
- * with that clean name. When several providers have it, the first of $ASK_OPENCODE_PROVIDER,
- * opencode-go and opencode wins, else the first alphabetically. Returns { id } or { error }. The list
- * is asked for twice before giving up, since Opencode can briefly list nothing while it refreshes
- * its catalog.
+ * Every provider/model id Opencode offers, which is every model of the providers you have set up
+ * in Opencode. Returns { listed } or { error }; the list is asked for twice before giving up, since
+ * Opencode can briefly list nothing while it refreshes its catalog.
  */
-function opencodeId(model) {
-  if (model.includes('/')) return { id: model };
-  let listed = [];
+function listed() {
+  let ids = [];
   let reason = 'it listed none';
-  for (let attempt = 0; attempt < 2 && !listed.length; attempt++) {
+  for (let attempt = 0; attempt < 2 && !ids.length; attempt++) {
     try {
-      listed = execFileSync(CLI, ['models'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).split('\n').filter((id) => id.includes('/'));
+      ids = execFileSync(CLI, ['models'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).split('\n').filter((id) => id.includes('/'));
     } catch (error) {
       reason = String(error.stderr || error.message).trim().split('\n').pop();
     }
   }
-  if (!listed.length) return { error: `could not list Opencode's models: ${reason}` };
+  return ids.length ? { listed: ids } : { error: `could not list Opencode's models: ${reason}` };
+}
+
+/*
+ * Opencode's provider/model id for a model name: a provider/model id as it is, else the model with
+ * that clean name. When several providers have it, the first of $ASK_OPENCODE_PROVIDER,
+ * opencode-go and opencode wins, then the first alphabetically. Returns { id } or { error }.
+ */
+function opencodeId(model) {
+  if (model.includes('/')) return { id: model };
+  const all = listed();
+  if (all.error) return all;
   const provider = (id) => id.slice(0, id.indexOf('/'));
-  const found = listed.filter((id) => clean(id.slice(id.indexOf('/') + 1)) === clean(model));
+  const found = all.listed.filter((id) => clean(id.slice(id.indexOf('/') + 1)) === clean(model));
   if (!found.length) return { error: `no Opencode model named ${model}; see opencode models` };
   const rank = (id) => [process.env.ASK_OPENCODE_PROVIDER, 'opencode-go', 'opencode', provider(id)].indexOf(provider(id));
   return { id: found.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))[0] };
@@ -141,7 +149,12 @@ function exec(command, args, { input = '', env, onLine } = {}) {
  */
 async function adapter({ models, run }) {
   if (process.argv[2] === 'models') {
-    for (const [id, name] of await models()) console.log(name ? `${id}\t${name}` : id);
+    try {
+      for (const [id, name] of await models()) console.log(name ? `${id}\t${name}` : id);
+    } catch (error) {
+      console.error(error.message);
+      process.exitCode = 1;
+    }
     return;
   }
   const { ASK_MODEL, ASK_EFFORT, ASK_ACCESS, ASK_SCHEMA, ASK_SESSION, ASK_REPORT } = process.env;
@@ -178,7 +191,12 @@ if (!CLI) {
 }
 
 await adapter({
-  models: () => [],
+  // Every model Opencode offers, by clean name, once each; turn off the ones you don't use with ask.
+  models: () => {
+    const all = listed();
+    if (all.error) throw new Error(all.error);
+    return [...new Set(all.listed.map((id) => clean(id.slice(id.indexOf('/') + 1))))].sort().map((name) => [name]);
+  },
 
   async run({ prompt, model, effort, write, session, report }) {
     const { id, error } = opencodeId(model);

@@ -29,7 +29,7 @@ func New() Paths {
 // Env clears inherited per-task variables and supplies contract version 1.
 func (p Paths) Env(vars map[string]string) []string {
 	drop := map[string]bool{}
-	for _, k := range []string{"ASK_MODEL", "ASK_EFFORT", "ASK_ACCESS", "ASK_SCHEMA", "ASK_SESSION", "ASK_REPORT", "ASK_RUN", "ASK_EVENT", "ASK_CONTRACT", "ASK_BIN", "ASK_HOME"} {
+	for _, k := range []string{"ASK_MODEL", "ASK_EFFORT", "ASK_ACCESS", "ASK_SCHEMA", "ASK_SESSION", "ASK_REPORT", "ASK_MAX_COST", "ASK_RUN", "ASK_EVENT", "ASK_CONTRACT", "ASK_BIN", "ASK_HOME"} {
 		drop[k] = true
 	}
 	env := []string{}
@@ -118,46 +118,11 @@ func Tilde(path string) string {
 	return path
 }
 
-// ReadModels reads optional agent-to-model lists, rejecting damaged or malformed files.
-func (p Paths) ReadModels() (Object, error) {
-	path := filepath.Join(p.Home, "models.json")
-	b, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
-		return Object{}, nil
-	}
-	if err != nil {
-		return nil, Usage("cannot read %s: %s", path, FileError(err, "open", path))
-	}
-	v, err := ParseJSON(UTF8(b))
-	if err != nil {
-		return nil, Usage("cannot parse %s: %s", path, err)
-	}
-	o, ok := v.(Object)
-	if ok {
-		for _, val := range o {
-			a, good := val.([]any)
-			if !good {
-				ok = false
-				break
-			}
-			for _, id := range a {
-				if _, good := id.(string); !good {
-					ok = false
-					break
-				}
-			}
-		}
-	}
-	if !ok {
-		return nil, Usage(`%s must map agent names to lists of model ids, like {"opencode": ["deepseek-4.1-flash"]}`, path)
-	}
-	return o, nil
-}
-
 // Settings are the keys settings.json may hold, each replacing a built-in default:
-// model (the default -m), timeout (seconds per task), jobs (batch tasks at once), worktrees (a path
-// whose last part holds {name}) and branches (a worktree's branch name, holding {name}).
-var Settings = []string{"model", "timeout", "jobs", "worktrees", "branches"}
+// model (the default -m), timeout (seconds per task), jobs (batch tasks at once), max_cost (USD a
+// task may spend; none when absent or 0), worktrees (a path whose last part holds {name}) and
+// branches (a worktree's branch name, holding {name}).
+var Settings = []string{"model", "timeout", "jobs", "max_cost", "worktrees", "branches"}
 
 // ReadSettings reads the optional settings.json, like {"worktrees": "~/code/worktrees/ask-{name}"}.
 // Unknown keys and malformed values are errors.
@@ -214,6 +179,10 @@ func (p Paths) checkSettings(o Object) error {
 		case "timeout":
 			if n, ok := val.(float64); !ok || !(n > 0 && n <= 2000000) {
 				bad = "a number of seconds above 0"
+			}
+		case "max_cost":
+			if n, ok := val.(float64); !ok || n < 0 {
+				bad = "dollars a task may spend, like 2.50 (0 for no limit)"
 			}
 		case "jobs":
 			if n, ok := val.(float64); !ok || n < 1 || n != float64(int(n)) {

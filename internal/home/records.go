@@ -14,6 +14,7 @@ type TaskRecord struct {
 	Schema    json.RawMessage `json:"schema,omitempty"`
 	Dir       string          `json:"dir"`
 	Timeout   float64         `json:"timeout"`
+	MaxCost   float64         `json:"max_cost,omitempty"`
 	Worktree  string          `json:"worktree,omitempty"`
 	Reuse     bool            `json:"reuse,omitempty"`
 	Session   string          `json:"session,omitempty"`

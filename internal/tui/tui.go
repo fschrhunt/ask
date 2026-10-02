@@ -45,7 +45,8 @@ func Raw(f *os.File) (func(), error) {
 	}, nil
 }
 
-// key reads one keypress: a printable rune, or "up", "down", "enter", "space", "backspace", "ctrl-c".
+// key reads one keypress: a printable rune, or "up", "down", "enter", "space", "backspace",
+// "ctrl-a" or "ctrl-c".
 func (p *Prompter) key() (string, error) {
 	b := make([]byte, 1)
 	if _, e := p.In.Read(b); e != nil {
@@ -54,6 +55,8 @@ func (p *Prompter) key() (string, error) {
 	switch b[0] {
 	case 3:
 		return "ctrl-c", nil
+	case 1:
+		return "ctrl-a", nil
 	case '\r', '\n':
 		return "enter", nil
 	case ' ':
@@ -191,16 +194,61 @@ func (p *Prompter) optionLine(o Option, current bool, box string, width int) str
 	return strings.TrimRight(line, " ")
 }
 
-// Select asks for one of options with arrow keys (or j and k), starting at start.
+// visible returns the indexes of options whose label or note holds filter, ignoring case.
+func visible(options []Option, filter string) []int {
+	f := strings.ToLower(filter)
+	out := []int{}
+	for i, o := range options {
+		if f == "" || strings.Contains(strings.ToLower(o.Label+" "+o.Note), f) {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
+// filtered edits a filter with a typed key, reporting whether the key was text for it.
+func filtered(filter *string, k string) bool {
+	switch {
+	case k == "backspace":
+		if r := []rune(*filter); len(r) > 0 {
+			*filter = string(r[:len(r)-1])
+		}
+		return true
+	case len([]rune(k)) == 1 && k != "space":
+		*filter += k
+		return true
+	}
+	return false
+}
+
+// listLines renders the question, the filter when there is one, and the window of shown options.
+func (p *Prompter) listLines(q, hint, filter string, options []Option, shown []int, cursor int, box func(int) string) []string {
+	lines := []string{p.question(q, hint)}
+	if filter != "" {
+		lines = append(lines, p.paint("2", "  filter: ")+filter)
+	}
+	if len(shown) == 0 {
+		return append(lines, p.paint("2", "  nothing matches"))
+	}
+	from, to := window(len(shown), cursor)
+	width := labelWidth(options)
+	for n := from; n < to; n++ {
+		lines = append(lines, p.optionLine(options[shown[n]], n == cursor, box(shown[n]), width))
+	}
+	if len(shown) > to-from {
+		lines = append(lines, p.paint("2", fmt.Sprintf("  %d of %d", to-from, len(shown))))
+	}
+	return lines
+}
+
+// Select asks for one of options with arrow keys, starting at start; typing filters them.
 func (p *Prompter) Select(q string, options []Option, start int) (int, error) {
+	filter := ""
 	cursor := start
 	for {
-		lines := []string{p.question(q, "[↑↓ to move, enter to choose]")}
-		from, to := window(len(options), cursor)
-		for i := from; i < to; i++ {
-			lines = append(lines, p.optionLine(options[i], i == cursor, "", labelWidth(options)))
-		}
-		p.draw(lines)
+		shown := visible(options, filter)
+		cursor = min(max(cursor, 0), max(len(shown)-1, 0))
+		p.draw(p.listLines(q, "[type to filter · ↑↓ move · enter choose]", filter, options, shown, cursor, func(int) string { return "" }))
 		k, e := p.key()
 		if e != nil {
 			return 0, e
@@ -208,32 +256,43 @@ func (p *Prompter) Select(q string, options []Option, start int) (int, error) {
 		switch k {
 		case "ctrl-c":
 			return 0, ErrInterrupted
-		case "up", "k":
-			cursor = (cursor + len(options) - 1) % len(options)
-		case "down", "j":
-			cursor = (cursor + 1) % len(options)
+		case "up":
+			if len(shown) > 0 {
+				cursor = (cursor + len(shown) - 1) % len(shown)
+			}
+		case "down":
+			if len(shown) > 0 {
+				cursor = (cursor + 1) % len(shown)
+			}
 		case "enter":
-			p.done(q, options[cursor].Label)
-			return cursor, nil
+			if len(shown) > 0 {
+				p.done(q, options[shown[cursor]].Label)
+				return shown[cursor], nil
+			}
+		default:
+			if filtered(&filter, k) {
+				cursor = 0
+			}
 		}
 	}
 }
 
-// MultiSelect asks for any of options: space toggles, a toggles all, enter confirms.
+// MultiSelect asks for any of options: space toggles, ctrl-a toggles all shown, typing filters,
+// enter confirms.
 func (p *Prompter) MultiSelect(q string, options []Option, chosen []bool) ([]bool, error) {
 	picked := append([]bool(nil), chosen...)
+	filter := ""
 	cursor := 0
-	for {
-		lines := []string{p.question(q, "[space to select, a for all, enter to confirm]")}
-		from, to := window(len(options), cursor)
-		for i := from; i < to; i++ {
-			box := "[ ] "
-			if picked[i] {
-				box = p.paint("32", "[x]") + " "
-			}
-			lines = append(lines, p.optionLine(options[i], i == cursor, box, labelWidth(options)))
+	box := func(i int) string {
+		if picked[i] {
+			return p.paint("32", "[x]") + " "
 		}
-		p.draw(lines)
+		return "[ ] "
+	}
+	for {
+		shown := visible(options, filter)
+		cursor = min(max(cursor, 0), max(len(shown)-1, 0))
+		p.draw(p.listLines(q, "[type to filter · ↑↓ move · space select · ctrl-a all · enter done]", filter, options, shown, cursor, box))
 		k, e := p.key()
 		if e != nil {
 			return nil, e
@@ -241,33 +300,52 @@ func (p *Prompter) MultiSelect(q string, options []Option, chosen []bool) ([]boo
 		switch k {
 		case "ctrl-c":
 			return nil, ErrInterrupted
-		case "up", "k":
-			cursor = (cursor + len(options) - 1) % len(options)
-		case "down", "j":
-			cursor = (cursor + 1) % len(options)
-		case "space":
-			picked[cursor] = !picked[cursor]
-		case "a":
-			all := true
-			for _, x := range picked {
-				all = all && x
+		case "up":
+			if len(shown) > 0 {
+				cursor = (cursor + len(shown) - 1) % len(shown)
 			}
-			for i := range picked {
+		case "down":
+			if len(shown) > 0 {
+				cursor = (cursor + 1) % len(shown)
+			}
+		case "space":
+			if len(shown) > 0 {
+				picked[shown[cursor]] = !picked[shown[cursor]]
+			}
+		case "ctrl-a":
+			all := true
+			for _, i := range shown {
+				all = all && picked[i]
+			}
+			for _, i := range shown {
 				picked[i] = !all
 			}
 		case "enter":
-			names := []string{}
-			for i, x := range picked {
+			count := 0
+			for _, x := range picked {
 				if x {
-					names = append(names, options[i].Label)
+					count++
 				}
 			}
-			answer := strings.Join(names, ", ")
-			if answer == "" {
-				answer = "None"
+			answer := fmt.Sprintf("%d of %d", count, len(options))
+			if len(options) <= 6 {
+				names := []string{}
+				for i, x := range picked {
+					if x {
+						names = append(names, options[i].Label)
+					}
+				}
+				answer = strings.Join(names, ", ")
+				if answer == "" {
+					answer = "None"
+				}
 			}
 			p.done(q, answer)
 			return picked, nil
+		default:
+			if filtered(&filter, k) {
+				cursor = 0
+			}
 		}
 	}
 }
