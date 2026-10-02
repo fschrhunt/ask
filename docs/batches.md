@@ -109,8 +109,13 @@ done | ask batch -
 **Parallel fixes that can't collide:** give each task its own worktree, then review each branch.
 
 ```sh
-ask batch -w --worktree -m claude:sonnet-5.5 issues.json
+gh issue list --label bug --limit 5 --json number,title,body |
+  jq -c '.[] | {id: "issue-\(.number)", prompt: "Fix issue #\(.number): \(.title)\n\n\(.body)"}' |
+  ask batch -w --worktree -m claude:sonnet-5.5 -
 ```
+
+Each issue becomes a task with its own branch (`ask/RUN-1-issue-12`), so you review and merge them
+one by one.
 
 **Follow up on every task of a batch:**
 

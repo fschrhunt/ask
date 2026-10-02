@@ -3,7 +3,7 @@
 A hook is a small executable in `~/.ask/hooks/` that runs around every task: before it, to change
 or refuse the task, and after it, to check the result. With hooks you can:
 
-- add project context to every prompt, or route reads to a cheaper model;
+- tell every agent where you are in git: the branch, uncommitted files, recent commits;
 - refuse write runs outside some folders;
 - run the tests after a write run and, if they fail, have the same agent fix them;
 - fail a result that doesn't meet your bar, or post it somewhere.
@@ -40,19 +40,27 @@ isn't a JSON object changes nothing; ask notes it and carries on. Only an explic
 `fail` stops a task. Every note and follow-up shows as a status line:
 
 ```text
-ask k3f9a2 · started · Sonnet 5.5 · write · ~/code/app
-ask k3f9a2 · note · hook verify · 2 tests fail
-ask k3f9a2 · follow-up · hook verify · These tests fail after your change: ...
-ask k3f9a2 · ok · Sonnet 5.5 · 3:12 · 3 files changed · 140.2k in · 6.1k out · $0.62
+ask fu22uq · started · Haiku 4.5 · write · ~/code/calc
+ask fu22uq · note · hook verify · go test ./... fails
+ask fu22uq · follow-up · hook verify · `go test ./...` fails after your change. Fix it:
+ask fu22uq · ok · Haiku 4.5 · 21.4s · 1 file changed · 203.7k in · 1.0k out · $0.07
+Fixed: Add was returning `a - b` instead of `a + b`.
 ```
+
+That run was asked only to add a `Sub` function. The `verify` hook below ran the tests, found an
+older bug, and the same agent fixed it before ask returned.
 
 ## Example: verify write runs with the tests
 
+Runs the project's own tests after every write run, whatever the language, and hands failures back
+to the same agent to fix:
+
 ```js
 #!/usr/bin/env node
-// ~/.ask/hooks/verify: after a write run, run the tests and hand failures back to the agent.
+// ~/.ask/hooks/verify: after a write run, run the project's tests; if they fail, hand the failures
+// back to the same agent to fix.
 import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 if (process.argv[2] === 'events') {
   console.log('result');
@@ -60,11 +68,17 @@ if (process.argv[2] === 'events') {
 }
 const { task, result } = JSON.parse(readFileSync(0, 'utf8'));
 if (!task.write || !result.ok) process.exit(0);
+const test = existsSync('go.mod') ? 'go test ./...'
+  : existsSync('Cargo.toml') ? 'cargo test'
+  : existsSync('package.json') ? 'npm test'
+  : existsSync('pyproject.toml') ? 'pytest -q'
+  : null;
+if (!test) process.exit(0);
 try {
-  execSync('npm test', { stdio: 'pipe' });
+  execSync(test, { stdio: 'pipe' });
 } catch (error) {
-  const output = String(error.stdout).slice(-4000);
-  console.log(JSON.stringify({ note: 'tests fail', followup: `These tests fail after your change; fix them:\n${output}` }));
+  const output = `${error.stdout}${error.stderr}`.slice(-4000);
+  console.log(JSON.stringify({ note: `${test} fails`, followup: `\`${test}\` fails after your change. Fix it:\n\n${output}` }));
 }
 ```
 
@@ -80,18 +94,29 @@ case "$PWD" in
 esac
 ```
 
-## Example: add context to every prompt
+## Example: tell the agent where you are in git
+
+Starts every prompt with the branch, uncommitted files and the last few commits, so "review what
+I'm doing" or "finish this" needs no explaining (it needs `jq`):
 
 ```sh
 #!/bin/sh
-# ~/.ask/hooks/context: put the project's CONTEXT.md before every prompt, when there is one.
+# ~/.ask/hooks/context: start every prompt with where you are in git: the branch, uncommitted
+# files and the last few commits, so the agent knows what you're in the middle of.
 [ "$1" = events ] && { echo task; exit 0; }
-[ -f CONTEXT.md ] || exit 0
-node -e '
-  const { task } = JSON.parse(require("fs").readFileSync(0, "utf8"));
-  const context = require("fs").readFileSync("CONTEXT.md", "utf8");
-  console.log(JSON.stringify({ task: { prompt: context + "\n\n" + task.prompt } }));
-'
+git rev-parse --git-dir >/dev/null 2>&1 || exit 0
+context="Git context:
+branch $(git branch --show-current)
+uncommitted:
+$(git status --short | head -20)
+recent commits:
+$(git log --oneline -5)"
+jq -c --arg context "$context" '{task: {prompt: ($context + "\n\n" + .task.prompt)}}'
+```
+
+```text
+$ ask -m claude:haiku-4.5 "What am I in the middle of? One sentence."
+You're in the middle of modifying `calc.go` on the main branch after an initial commit.
 ```
 
 ask never runs hooks from the project it works in, only yours and your packages'.

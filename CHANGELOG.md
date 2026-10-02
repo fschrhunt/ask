@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Docs examples are real and tested: a `verify` hook that runs any project's tests and has the
+  agent fix failures, a `context` hook that tells agents where you are in git, a batch built from
+  GitHub issues, the Claude Code title hook, and real sample output from runs and follow-ups.
 - Docs use real agents and models throughout (Claude Code, Codex, Opencode) instead of made-up ones,
   and the agents page has two tested Claude Code agents: a minimal one in shell, and one in Node
   that reports sessions for `ask -c` and usage.
