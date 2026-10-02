@@ -120,6 +120,18 @@ test('counts the usage of the answering step that Opencode prints no step_finish
   for (const [key, value] of Object.entries({ input: 100, output: 14, cached: 20, cost: 0.004 })) assert.equal(r.report[key], value, key);
 });
 
+test('counts the answering step when Opencode prints only its text', async () => {
+  const r = await run('hi', { extra: { FAKE_UNFINISHED: 'text' } });
+  assert.equal(r.code, 0);
+  for (const [key, value] of Object.entries({ input: 50, output: 7, cached: 10, cost: 0.002 })) assert.equal(r.report[key], value, key);
+});
+
+test('waits for Opencode to save the answering step before counting it', async () => {
+  const r = await run('hi', { extra: { FAKE_STEPS: '2', FAKE_UNFINISHED: '1', FAKE_SAVED_LATE: join(tmp, 'saved') } });
+  assert.equal(r.code, 0);
+  for (const [key, value] of Object.entries({ input: 100, output: 14, cached: 20, cost: 0.004 })) assert.equal(r.report[key], value, key);
+});
+
 test('reports usage while Opencode is still running', async () => {
   let done = false;
   const finished = run('hi', { extra: { FAKE_PAUSE: '1500' } }).then(() => (done = true));

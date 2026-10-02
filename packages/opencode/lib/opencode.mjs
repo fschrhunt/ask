@@ -192,6 +192,7 @@ await adapter({
     let failure;
     const usage = {};
     const unfinished = new Set();
+    const finished = new Set();
     const add = ({ tokens: t = {}, cost }) => {
       usage.input = (usage.input || 0) + (t.input || 0);
       usage.output = (usage.output || 0) + (t.output || 0) + (t.reasoning || 0);
@@ -208,21 +209,30 @@ await adapter({
         return;
       }
       if (event.type === 'error') failure ??= event.error?.message || 'error';
-      if (event.type === 'step_start') {
-        steps++;
-        unfinished.add(event.part?.messageID);
-      }
+      if (event.type === 'step_start') steps++;
+      // Every step's events carry its message id; Opencode 2.0 sometimes prints only an answer's text.
+      const step = event.part?.messageID;
       if (event.type === 'step_finish') {
-        unfinished.delete(event.part?.messageID);
+        finished.add(step);
+        unfinished.delete(step);
         add(event.part || {});
         report({ ...usage });
-      }
+      } else if (step && !finished.has(step)) unfinished.add(step);
       if (event.type === 'text' && typeof event.part?.text === 'string' && !event.part.synthetic) text = event.part.text;
     };
     const r = await exec(CLI, args, { input: prompt, env: { OPENCODE_CONFIG_CONTENT: config(write) }, onLine });
-    // Opencode 2.0 prints no step_finish for the step that answers; its stored message has the usage.
+    // Opencode 2.0 prints no step_finish for the step that answers; its stored message has the
+    // usage, saved a moment after Opencode exits, so the export is retried for up to 1.5 seconds.
     if (unfinished.size && sessionId) {
-      for (const message of exported(sessionId)) if (message.type === 'assistant' && unfinished.has(message.id)) add(message);
+      const saved = (m) => m.type === 'assistant' && unfinished.has(m.id) && (m.tokens?.input || 0) + (m.tokens?.cache?.read || 0) > 0;
+      for (let attempt = 1; ; attempt++) {
+        const found = exported(sessionId).filter(saved);
+        if (found.length === unfinished.size || attempt === 10) {
+          found.forEach(add);
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      }
       report({ ...usage });
     }
     if (failure) return { ok: false, error: failure, usage };
