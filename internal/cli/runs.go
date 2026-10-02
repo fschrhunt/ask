@@ -9,6 +9,7 @@ import (
 
 	"github.com/fschrhunt/ask/internal/git"
 	"github.com/fschrhunt/ask/internal/home"
+	"github.com/fschrhunt/ask/internal/process"
 	"github.com/fschrhunt/ask/internal/runs"
 	"github.com/fschrhunt/ask/internal/status"
 	"github.com/fschrhunt/ask/internal/tui"
@@ -162,13 +163,8 @@ func clean(p home.Paths, opts home.Object) (int, error) {
 			fmt.Fprintln(os.Stderr, "ask: run ask clean --yes to remove these")
 			return 0, nil
 		}
-		restore, e := tui.Raw(os.Stdin)
-		if e != nil {
-			return 0, e
-		}
-		t := &tui.Prompter{In: os.Stdin, Out: os.Stdout, Color: color}
+		t := &tui.Prompter{In: os.Stdin, Out: os.Stdout, Color: color, Unicode: status.UTF8(), OnStop: process.OnStop}
 		yes, e := t.Confirm("Remove them?", true)
-		restore()
 		if e != nil || !yes {
 			return 0, nil
 		}

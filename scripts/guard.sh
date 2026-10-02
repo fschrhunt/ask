@@ -10,9 +10,10 @@ bad() { printf 'guard: FAIL: %s\n' "$1" >&2; fail=1; }
 # Production Go sources only.
 prod_go() { find cmd internal packages docs -name '*.go' -not -name '*_test.go'; }
 
-# 1. Standard library only: ask is one binary with nothing to audit but itself.
-if grep -q '^require' go.mod; then
-    bad "go.mod requires a module; ask uses the standard library only"
+# 1. Terminal dependencies stay in presentation packages; execution stays standard-library only.
+if prod_go | xargs grep -nE '^[[:space:]]*(import[[:space:]]+|[[:alnum:]_]+[[:space:]]+)?"[[:alnum:]_.-]+\.[[:alnum:]_.-]+/' \
+    | grep -vE 'internal/(tui|status)/|"github.com/fschrhunt/ask/' | grep .; then
+    bad "external Go dependency outside terminal presentation packages"
 fi
 
 # 2. ask knows no particular agent. Only setup, which offers the official ones on a first run,

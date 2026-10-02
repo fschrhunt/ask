@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // Change is one file a command is about to change: its text before and after ("" when it doesn't
@@ -84,10 +87,8 @@ func Review(w io.Writer, changes []Change, color bool, width int) {
 			return mark + " " + text
 		}
 		text = "  " + text
-		if r := []rune(text); len(r) > width-1 {
-			text = string(r[:width-2]) + "…"
-		}
-		return bar(code, text, len([]rune(text)))
+		text = ansi.Truncate(text, width-1, "…")
+		return bar(code, text, lipgloss.Width(text))
 	}
 	added, removed := 0, 0
 	for _, c := range changes {
@@ -117,7 +118,7 @@ func Review(w io.Writer, changes []Change, color bool, width int) {
 			}
 		}
 		added, removed = added+plus, removed+minus
-		head, visible := c.Path, len([]rune(c.Path))
+		head, visible := c.Path, lipgloss.Width(c.Path)
 		if color {
 			head, visible = " "+head, visible+1
 		}
@@ -144,6 +145,10 @@ func Review(w io.Writer, changes []Change, color bool, width int) {
 		if counts != "" {
 			head += " " + counts
 			visible++
+		}
+		if color {
+			head = ansi.Truncate(head, width-1, "…")
+			visible = lipgloss.Width(head)
 		}
 		fmt.Fprint(w, bar(base+";1", head, visible), "\n")
 		for _, l := range body {

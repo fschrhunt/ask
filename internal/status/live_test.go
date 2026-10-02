@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/fschrhunt/ask/internal/home"
 )
 
@@ -71,7 +73,9 @@ func TestLiveBatchFinishPrintsTotals(t *testing.T) {
 	}
 	os.Stderr = w
 	defer func() { os.Stderr = old }()
-	l := &Live{state: LiveState{Batch: true}, stop: make(chan struct{})}
+	l := &Live{state: LiveState{Batch: true}, done: make(chan struct{})}
+	l.program = tea.NewProgram(&liveModel{width: 80, height: 24}, tea.WithInput(nil), tea.WithOutput(w), tea.WithoutSignalHandler())
+	go func() { defer close(l.done); _, _ = l.program.Run() }()
 	l.Finish("ask run · 2/2 ok · 10 in · 5 out · $0.02", false)
 	w.Close()
 	b, _ := io.ReadAll(r)

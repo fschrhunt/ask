@@ -110,13 +110,8 @@ func bench(a *agent.Registry, opts home.Object, words []string) (int, error) {
 		return 0, e
 	}
 	if !opts.B("--yes") && status.IsTerminal(os.Stdin) && status.IsTerminal(os.Stderr) {
-		restore, e := tui.Raw(os.Stdin)
-		if e != nil {
-			return 0, e
-		}
-		t := &tui.Prompter{In: os.Stdin, Out: os.Stderr, Color: status.CanStyle(os.Stderr), Unicode: status.UTF8()}
+		t := &tui.Prompter{In: os.Stdin, Out: os.Stderr, Color: status.CanStyle(os.Stderr), Unicode: status.UTF8(), OnStop: process.OnStop}
 		yes, e := t.Confirm(fmt.Sprintf("Run %d attempts (%d tasks × %d models × %d)?", len(tasks), len(items), len(models), repeat), true)
-		restore()
 		if e != nil || !yes {
 			return 0, e
 		}

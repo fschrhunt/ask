@@ -94,7 +94,7 @@ brew tap fschrhunt/ask https://github.com/fschrhunt/ask && brew install ask
 go install github.com/fschrhunt/ask/cmd/ask@latest             # Go 1.26 or newer
 ```
 
-One binary, no dependencies. `ask update` keeps a curl install current. Each agent needs its CLI
+One binary, no additional UI runtime to install. `ask update` keeps a curl install current. Each agent needs its CLI
 logged in, and the official ones need Node.js 18 or newer. More in [Install](docs/install.md).
 
 ## Docs

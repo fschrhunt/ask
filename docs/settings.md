@@ -8,13 +8,14 @@ worktrees go, and what the apps you work in know about ask.
 ```text
 ask settings  ~/.ask
 
-? What do you want to change?
-❯ Agents           claude, codex, opencode
+What do you want to change?
+› Agents           claude, codex, opencode
   Defaults         claude:sonnet-5.5 · no cost limit · edited
   Worktrees        ~/code/worktrees/ask-{name}
   Apps             ask skill in 5 of 5 apps · task titles on
   Review and save  1 change
   Done
+  ↑↓ move · type to filter · enter select
 ```
 
 Nothing is written while you edit: what you change is marked `edited`, and **Review and save**
@@ -27,12 +28,18 @@ shows exactly what will change, file by file, before it asks:
 
 1 file changed, 1 insertion(+), 1 deletion(-)
 
-? Save these changes? (Y/n)
+Save these changes?
+  Y/n · enter to confirm
 ```
 
 Removed lines sit on a red band and added ones on a green band, under a bar naming each file
 with its counts. Leaving with unsaved changes asks whether to
 save them, and Ctrl-C discards them.
+
+Prompts use an inline Bubble Tea interface with bold primary text and muted hints, using your
+terminal's background and foreground. Lists adapt to terminal size. Text fields support left/right,
+Home/End, deletion and bracketed paste; pasted newlines become spaces rather than submitting.
+`NO_COLOR` disables styling. Completed answers remain in terminal scrollback.
 
 - **Agents**: each agent: install or remove an official one, which of its models are on, and
   their cost limits. `ask settings NAME` opens one directly, like `ask settings opencode`.

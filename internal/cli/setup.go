@@ -12,6 +12,7 @@ import (
 	"github.com/fschrhunt/ask/internal/find"
 	"github.com/fschrhunt/ask/internal/home"
 	"github.com/fschrhunt/ask/internal/packages"
+	"github.com/fschrhunt/ask/internal/process"
 	"github.com/fschrhunt/ask/internal/setup"
 	"github.com/fschrhunt/ask/internal/status"
 	"github.com/fschrhunt/ask/internal/tui"
@@ -277,12 +278,7 @@ func setupCommand(p home.Paths, opts home.Object) (int, error) {
 // interactive runs on the terminal: one agent's screen when agentName is given, the walkthrough
 // when setup finds nothing set up yet, and the settings menu otherwise.
 func interactive(p home.Paths, agentName string, fromSetup bool) (int, error) {
-	restore, e := tui.Raw(os.Stdin)
-	if e != nil {
-		return 0, e
-	}
-	defer restore()
-	t := &tui.Prompter{In: os.Stdin, Out: os.Stdout, Color: status.CanStyle(os.Stdout), Unicode: status.UTF8()}
+	t := &tui.Prompter{In: os.Stdin, Out: os.Stdout, Color: status.CanStyle(os.Stdout), Unicode: status.UTF8(), OnStop: process.OnStop}
 	m, e := survey(p)
 	if e != nil {
 		return 0, e

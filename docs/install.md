@@ -108,6 +108,9 @@ ask update            # an ask from the installer or an archive: replaced with t
 ask update --check    # only say whether a newer one is out
 ```
 
+On a terminal, checking and installing show a transient progress indicator; the final result
+stays in scrollback. Redirected output uses plain status messages.
+
 Homebrew updates its own (`brew upgrade ask`), and so does Go (rerun `go install ...@latest`);
 `ask update` says so for those. In a terminal, ask mentions a newer release at most once a day;
 `ASK_NO_UPDATE_CHECK=1` turns that off. Your `~/.ask` agents, hooks, commands, packages and
