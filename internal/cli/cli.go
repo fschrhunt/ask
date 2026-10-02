@@ -178,6 +178,9 @@ func taskOptions(opts home.Object) (home.Object, error) {
 		if e != nil {
 			return nil, e
 		}
+		if n > 2000000 {
+			return nil, home.Usage("-t needs at most 2000000 seconds, not \"%s\"", opts.S("-t"))
+		}
 		t.Set("timeout", n)
 	}
 	return t, nil
@@ -204,8 +207,9 @@ func readTasks(text string) ([]any, error) {
 		}
 		items, _ = v.([]any)
 	} else {
-		for i, line := range strings.Split(trimmed, "\n") {
-			if home.Trim(line) == "" {
+		for i, line := range strings.Split(text, "\n") {
+			line = home.Trim(line)
+			if line == "" {
 				continue
 			}
 			v, e := decode(line, fmt.Sprintf("line %d", i+1))
@@ -331,6 +335,7 @@ func runOne(a *agent.Registry, opts home.Object, words []string) (int, error) {
 		report(runs.Event{Kind: "note", Note: n})
 	}
 	results, e := runs.Execute(a, r, 1, !opts.B("--no-hooks"), report)
+	process.AwaitShutdown()
 	final := ""
 	if e == nil {
 		final = status.Done(results[0])
@@ -425,6 +430,7 @@ func batch(a *agent.Registry, opts home.Object, words []string) (int, error) {
 		report(runs.Event{Kind: "note", Note: n})
 	}
 	results, e := runs.Execute(a, r, jobs, !opts.B("--no-hooks"), report)
+	process.AwaitShutdown()
 	summary := status.BatchEnd(r, float64(time.Since(begin).Milliseconds())/1000)
 	live.Finish(summary, false)
 	if e != nil {

@@ -41,7 +41,7 @@ ask batch -j 4 -m claude:haiku-4.5 tasks.json
 ```
 
 `-j` is how many tasks run at once (default 4). In a terminal, stderr shows live task rows (queued, running with elapsed time and usage so far,
-ok or failed) above a running total of usage and cost, then a summary. In pipes, the same status lines go to stderr as tasks start and end:
+ok or failed) above a running total of usage and cost, then a summary. The total leaves out cost when a task reported usage without one. In pipes, the same status lines go to stderr as tasks start and end:
 
 ```text
 ask summarize-public-api-src · started · batch of 3 · 3 at a time

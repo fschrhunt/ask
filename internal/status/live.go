@@ -171,7 +171,7 @@ func Frame(s LiveState, now time.Time, tick, width, height int, color, utf8 bool
 		for _, r := range s.Rows {
 			all = append(all, r.Usage)
 		}
-		if u := Usage(runs.AddUsage(all...)); u != "" {
+		if u := Usage(batchUsage(all)); u != "" {
 			footer += " · " + u
 		}
 		lines = append(lines, ClipLine(footer, width-1))

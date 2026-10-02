@@ -186,21 +186,26 @@ func BatchStart(r *runs.Run, jobs, todo int) string {
 // BatchEnd prints outcome counts, elapsed time and summed usage.
 func BatchEnd(r *runs.Run, seconds float64) string {
 	ok := 0
-	total := home.Object{}
+	all := []any{}
 	for _, x := range r.Results {
 		if x.B("ok") {
 			ok++
 		}
-		if u, yes := x.Get("usage").(home.Object); yes {
-			for _, key := range []string{"input", "output", "cached"} {
-				total.Set(key, total.N(key)+u.N(key))
-			}
-			if u.Has("cost") {
-				total.Set("cost", total.N("cost")+u.N("cost"))
-			}
+		all = append(all, x.Get("usage"))
+	}
+	return line(r.Label(), fmt.Sprintf("%d/%d ok", ok, len(r.Tasks)), Duration(seconds), Usage(batchUsage(all)))
+}
+
+// batchUsage sums a batch's task usage, leaving out cost unless every task that reported usage
+// reported its cost, so a partial sum never reads as the batch's total.
+func batchUsage(list []any) any {
+	sum, _ := runs.AddUsage(list...).(home.Object)
+	for _, v := range list {
+		if u, ok := v.(home.Object); ok && home.Truth(v) && !u.Has("cost") {
+			delete(sum, "cost")
 		}
 	}
-	return line(r.Label(), fmt.Sprintf("%d/%d ok", ok, len(r.Tasks)), Duration(seconds), Usage(total))
+	return sum
 }
 
 // BatchSaved reports a recorded batch's result count without inventing elapsed wall time.
