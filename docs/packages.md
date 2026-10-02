@@ -49,8 +49,8 @@ github.com/fschrhunt/ask-claude  agents: claude
 
 `ask install` clones into `~/.ask/packages/HOST/OWNER/REPO`, and updating pulls fast-forward only.
 Nothing runs at install time except the readiness check: no scripts, no prompts. A bare NAME
-means `fschrhunt/ask-NAME`, unless a folder of that name is here. `OWNER/REPO` always means
-GitHub; name a local repository by a path such as `./tools`, `../team/tools` or `~/code/tools`.
+always means `fschrhunt/ask-NAME` and `OWNER/REPO` always means GitHub, whatever folders are
+here; name a local repository by a path such as `./tools`, `../team/tools` or `~/code/tools`.
 Installing a source where another one is already installed, like a second local `team/tools`,
 fails: remove the first.
 
