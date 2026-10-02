@@ -2,6 +2,7 @@ package status
 
 import (
 	"os"
+	"strconv"
 	"syscall"
 	"unsafe"
 )
@@ -11,11 +12,11 @@ func terminalSize(file *os.File) (int, int, bool) {
 	var size [4]uint16
 	_, _, err := syscall.Syscall(syscall.SYS_IOCTL, file.Fd(), syscall.TIOCGWINSZ, uintptr(unsafe.Pointer(&size)))
 	if err != 0 {
-		return 0, 0, false
+		return fallbackWidth(), 24, false
 	}
 	width, height := int(size[1]), int(size[0])
 	if width == 0 {
-		width = 80
+		width = fallbackWidth()
 	}
 	if height == 0 {
 		height = 24
@@ -31,4 +32,13 @@ func terminalWidth() int {
 		return int(size[1])
 	}
 	return 120
+}
+
+// fallbackWidth honors a positive COLUMNS value when terminal dimensions are unavailable.
+func fallbackWidth() int {
+	n, err := strconv.Atoi(os.Getenv("COLUMNS"))
+	if err == nil && n > 0 {
+		return n
+	}
+	return 80
 }

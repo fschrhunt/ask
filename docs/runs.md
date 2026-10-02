@@ -23,7 +23,7 @@ ask -c b7x01q "Now add a test for the expired-token case."
 
 A follow-up:
 
-- runs where the first run ran: the same directory, or the same worktree;
+- runs where the first run ran: the same directory, or the same worktree if it is still present;
 - keeps the model and access (`-r`/`-w`) unless you give new ones. The model may change within
   the same agent (`-c k3f9a2 -m mycli:atlas-2.1-mini`), but not to another agent;
 - can continue a run that failed or timed out, so the agent can finish what it started;
@@ -49,8 +49,8 @@ p81c0d  24m ago  2/3 ok   3 tasks              Summarize the public API in src/.
 x7d2e1  Sep 30   stopped  5 tasks              resume: ask batch --resume x7d2e1
 ```
 
-`running` means an ask is working on it now; `stopped` means it was interrupted before every task
-finished.
+`running` means ask holds the run's operating system lock; `stopped` means it was interrupted
+before every task finished. Interrupted tasks keep empty result slots, so they can be resumed.
 
 ## Showing a run again
 
@@ -61,7 +61,7 @@ ask show p81c0d           # a batch: all its results, as a JSON array
 ask show p81c0d/api       # one task of a batch
 ```
 
-Showing a whole batch prints its outcome count on stderr; saved wall time is not recorded.
+Showing a whole batch prints its outcome count on stderr and exits 1 if any task failed; saved wall time is not recorded.
 
 ## Stopping a run
 
@@ -83,10 +83,11 @@ Each run is a folder in `~/.ask/runs/` (or `$ASK_HOME/runs/`), named by its star
 ~/.ask/runs/20261001T140912345-k3f9a2/
 ├── tasks.json     the tasks, as they were given
 ├── results.json   the results so far, rewritten whole after each task
-└── lock           while running: the pid of the ask running it
+└── lock           the ask pid, valid only while ask holds its operating system lock
 ```
 
-Delete old folders whenever you like; nothing else refers to them.
+ask creates new run directories with mode 0700 and records with mode 0600. Delete old folders
+whenever you like; nothing else refers to them.
 
 Hosts can name a background run with `ask title --command STRING --description TEXT`; see
 [Hosts](hosts.md) for title forms and a Claude Code integration.

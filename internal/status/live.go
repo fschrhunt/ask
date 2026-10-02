@@ -304,7 +304,7 @@ func (l *Live) Finish(summary string, stopped bool) {
 	}
 	l.draw()
 	fmt.Fprint(os.Stderr, "\x1b[?25h")
-	if summary != "" && stopped {
+	if summary != "" && (stopped || l.state.Batch) {
 		fmt.Fprintln(os.Stderr, summary)
 	}
 }

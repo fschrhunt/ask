@@ -26,7 +26,7 @@ A batch is a JSON array, or one JSON object per line:
 | `id` | A name for the result. Default: the task's position, from 1. |
 | `model` | `agent:id[#effort]`. Required unless the batch's `-m` gives a default or the task continues a run. |
 | `write` | `true` for read and write. Default: the batch's `-w`, else read only. |
-| `worktree` | `true` to work in its own git worktree and branch (needs write). Default: the batch's `--worktree`. |
+| `worktree` | `true` to work in its own git worktree and branch (creating one needs write). Default: the batch's `--worktree`. |
 | `continue` | A run to follow up, like `"k3f9a2"` or `"p81c0d/api"` (see [Runs](runs.md#follow-ups)). |
 | `dir` | Directory the agent works in. Default: the batch's `-C`, else the current directory. |
 | `json`, `schema` | Like `--json` and `--schema`; `schema` is the schema itself, not a file. |
@@ -41,7 +41,7 @@ ask batch -j 4 -m mycli:atlas-2.1-mini tasks.json
 ```
 
 `-j` is how many tasks run at once (default 4). In a terminal, stderr shows live task rows (queued, running with elapsed time, ok or failed),
-then a summary. In pipes, the same status lines go to stderr as tasks start and end:
+then a summary with total usage and cost. In pipes, the same status lines go to stderr as tasks start and end:
 
 ```text
 ask p81c0d · started · batch of 3 · 3 at a time
@@ -64,6 +64,7 @@ stdout gets one JSON array, in task order, whatever order the tasks finished in:
     "run": "p81c0d/api",
     "id": "api",
     "model": "mycli:atlas-2.1-mini",
+    "write": false,
     "name": "Atlas 2.1 Mini",
     "ok": true,
     "answer": "The public API is...",
@@ -76,6 +77,7 @@ stdout gets one JSON array, in task order, whatever order the tasks finished in:
     "run": "p81c0d/tests",
     "id": "tests",
     "model": "othercli:nova-4",
+    "write": false,
     "name": "Nova 4",
     "ok": false,
     "error": "timed out",
@@ -88,7 +90,7 @@ stdout gets one JSON array, in task order, whatever order the tasks finished in:
 ```
 
 Write tasks in a git repository also have `changes` and `commits`, and worktree tasks that changed
-something have `worktree: {path, branch}`. The batch exits 1 if any task failed. With `jq`:
+something have `worktree: {path, branch}`. The batch exits 1 if any task failed. Result records include the effective `model` and `write` access after task hooks, so follow-ups inherit what actually ran. With `jq`:
 
 ```sh
 ask batch tasks.json | jq -r '.[] | select(.ok) | "\(.id): \(.answer)"'

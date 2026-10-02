@@ -14,7 +14,8 @@ expansions, compound shell syntax and incomplete input return no title.
 A task title is `Model · Job`, with effort, and a ` · write` or ` · worktree` suffix.
 Follow-ups inherit the recorded model and access unless overridden. A readable batch task file
 with known models gets `Batch of N`, plus distinct display names when there are at most three;
-stdin or unknown tasks get `Batch`. Resumes get `Resume RUN`.
+stdin or unknown tasks get `Batch`. A batch file path is resolved from the invocation
+directory, even when `-C` sets the tasks' working directory. Resumes get `Resume RUN`.
 
 Job text comes from the trimmed description, with its first letter capitalized. Without one,
 ask uses the first prompt line (including saved follow-up or task-file prompts), clipped to

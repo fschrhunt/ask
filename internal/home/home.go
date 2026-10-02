@@ -55,12 +55,21 @@ func (e *UsageError) Error() string { return e.Message }
 // Usage constructs a formatted command-line error.
 func Usage(format string, args ...any) error { return &UsageError{fmt.Sprintf(format, args...)} }
 
-// WriteJSON atomically replaces a complete, pretty-printed JSON record.
+// WriteJSON atomically replaces a private JSON record using a unique temporary file.
 func WriteJSON(path string, v any) error {
-	if err := os.WriteFile(path+".tmp", []byte(JSON(v, true)+"\n"), 0666); err != nil {
+	f, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+"-*")
+	if err != nil {
 		return err
 	}
-	return os.Rename(path+".tmp", path)
+	defer os.Remove(f.Name())
+	if _, err = io.WriteString(f, JSON(v, true)+"\n"); err != nil {
+		f.Close()
+		return err
+	}
+	if err = f.Close(); err != nil {
+		return err
+	}
+	return os.Rename(f.Name(), path)
 }
 
 // ReadInput reads a named file or stdin, turning I/O failures into usage errors.
@@ -103,7 +112,7 @@ func FileError(err error, op, path string) string {
 // Tilde abbreviates a home prefix as the status-line contract does.
 func Tilde(path string) string {
 	h, _ := os.UserHomeDir()
-	if h != "" && strings.HasPrefix(path, h) {
+	if h != "" && (path == h || strings.HasPrefix(path, h+string(os.PathSeparator))) {
 		return "~" + strings.TrimPrefix(path, h)
 	}
 	return path

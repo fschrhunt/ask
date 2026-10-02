@@ -27,3 +27,13 @@ func TestShellCommands(t *testing.T) {
 		}
 	}
 }
+
+// TestQuotedDigitsBeforeRedirect keeps a quoted or escaped numeric argument.
+func TestQuotedDigitsBeforeRedirect(t *testing.T) {
+	for _, input := range []string{`ask -m fake:x '2'>file`, `ask -m fake:x \2>file`} {
+		got, ok := shellCommands(input)
+		if !ok || !reflect.DeepEqual(got, [][]string{{"ask", "-m", "fake:x", "2"}}) {
+			t.Fatalf("%q: %v %v", input, got, ok)
+		}
+	}
+}

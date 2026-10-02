@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/fschrhunt/ask/internal/home"
@@ -60,12 +61,22 @@ func Usage(v any) string {
 	return text
 }
 
+// SafeText replaces control characters in text supplied by agents, hooks and saved records.
+func SafeText(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return ' '
+		}
+		return r
+	}, s)
+}
+
 // line joins nonempty status parts using the stable run-prefix format.
 func line(ref string, parts ...string) string {
-	all := []string{ref}
+	all := []string{SafeText(ref)}
 	for _, p := range parts {
 		if p != "" {
-			all = append(all, p)
+			all = append(all, SafeText(p))
 		}
 	}
 	return "ask " + strings.Join(all, " · ")
@@ -119,6 +130,7 @@ func EventLine(r *runs.Run, e runs.Event) string {
 		return text
 	}
 	first, _, _ := strings.Cut(e.Note.Text, "\n")
+	first = SafeText(first)
 	if length(first) > 100 {
 		first = clip(first, 99) + "…"
 	}
@@ -315,7 +327,7 @@ func Table(list []*runs.Run, now time.Time, color bool) string {
 	render := func(row []string, header bool) string {
 		parts := []string{}
 		for _, col := range keep {
-			value := row[col]
+			value := SafeText(row[col])
 			if col == 5 && length(value) > room {
 				value = clip(value, room-1) + "…"
 			}

@@ -55,6 +55,9 @@ func Listen() {
 	}()
 }
 
+// Stopping reports whether signal shutdown has begun.
+func Stopping() bool { groups.Lock(); defer groups.Unlock(); return groups.stopping }
+
 // AwaitShutdown keeps the entry point alive until a signal handler has stopped every group.
 func AwaitShutdown() {
 	groups.Lock()
@@ -108,6 +111,7 @@ type Result struct {
 	Code           int
 	Stdout, Stderr string
 	TimedOut       bool
+	Signal         syscall.Signal
 }
 
 type tail struct{ b []byte }
@@ -122,8 +126,39 @@ func (t *tail) Write(b []byte) (int, error) {
 	return n, nil
 }
 
-// Run resolves after the child and its leftovers stop; failures become Result, never panics.
-// Agent exit stops descendants before waiting for their output pipes to close.
+// SignalName renders the common POSIX signal names used in process failures.
+func SignalName(signal syscall.Signal) string {
+	switch signal {
+	case syscall.SIGINT:
+		return "SIGINT"
+	case syscall.SIGTERM:
+		return "SIGTERM"
+	case syscall.SIGKILL:
+		return "SIGKILL"
+	case syscall.SIGPIPE:
+		return "SIGPIPE"
+	case syscall.SIGHUP:
+		return "SIGHUP"
+	default:
+		return signal.String()
+	}
+}
+
+// Timeout clamps a seconds value to the supported timer range.
+func Timeout(seconds float64) time.Duration {
+	max := 2147483647 * time.Millisecond
+	if seconds >= float64(max)/float64(time.Second) {
+		return max
+	}
+	d := time.Duration(seconds * float64(time.Second))
+	if d < time.Millisecond {
+		return time.Millisecond
+	}
+	return d
+}
+
+// Run returns after the child exits, bounding pipe waits even for detached descendants.
+// Failures become Result, and agent exit stops descendants in its process group.
 func Run(command string, args []string, o Options) Result {
 	r := Result{Code: -1}
 	cmd := exec.Command(command, args...)
@@ -187,25 +222,36 @@ func Run(command string, args []string, o Options) Result {
 		}
 		errDone <- string(utf16.Decode(units))
 	}()
-	closed := make(chan Result, 1)
+	waited := make(chan Result, 1)
 	go func() {
 		_ = cmd.Wait()
 		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-		closed <- Result{Code: cmd.ProcessState.ExitCode(), Stdout: <-outDone, Stderr: <-errDone}
+		result := Result{Code: cmd.ProcessState.ExitCode()}
+		if state, ok := cmd.ProcessState.Sys().(syscall.WaitStatus); ok && state.Signaled() {
+			result.Signal = state.Signal()
+		}
+		waited <- result
 	}()
 	d := o.Timeout
-	if d < time.Millisecond || d > 2147483647*time.Millisecond {
+	if d < time.Millisecond {
 		d = time.Millisecond
+	}
+	if d > 2147483647*time.Millisecond {
+		d = 2147483647 * time.Millisecond
 	}
 	timer := time.NewTimer(d)
 	defer timer.Stop()
 	select {
-	case r = <-closed:
+	case r = <-waited:
 	case <-timer.C:
 		stopGroups([]int{cmd.Process.Pid})
-		r = <-closed
+		r = <-waited
 		r.TimedOut = true
 	}
+	deadline := time.AfterFunc(time.Second, func() { outR.Close(); errR.Close() })
+	r.Stdout = <-outDone
+	r.Stderr = <-errDone
+	deadline.Stop()
 
 	groups.Lock()
 	delete(groups.pids, cmd.Process.Pid)

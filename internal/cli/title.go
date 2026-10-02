@@ -23,7 +23,7 @@ func shellCommands(s string) ([][]string, bool) {
 	commands := [][]string{}
 	words := []string{}
 	var word strings.Builder
-	active, redirect, skip := false, false, false
+	active, redirect, skip, descriptor := false, false, false, true
 	quote := byte(0)
 	flush := func() {
 		if active {
@@ -34,6 +34,7 @@ func shellCommands(s string) ([][]string, bool) {
 			}
 			word.Reset()
 			active = false
+			descriptor = true
 		}
 	}
 	finish := func() bool {
@@ -67,6 +68,7 @@ func shellCommands(s string) ([][]string, bool) {
 				continue
 			}
 			active = true
+			descriptor = false
 			redirect = false
 			if quote == '"' && !strings.ContainsRune("$`\"\\", rune(next)) {
 				word.WriteByte('\\')
@@ -88,6 +90,7 @@ func shellCommands(s string) ([][]string, bool) {
 		switch c {
 		case '\'', '"':
 			quote = c
+			descriptor = false
 			active = true
 			redirect = false
 		case ' ', '\t', '\r':
@@ -104,7 +107,7 @@ func shellCommands(s string) ([][]string, bool) {
 		case '$', '`', '(', ')', '{', '}':
 			return nil, false
 		case '<', '>':
-			if active && allDigits(word.String()) {
+			if active && descriptor && allDigits(word.String()) {
 				word.Reset()
 				active = false
 			} else {
@@ -140,6 +143,9 @@ func shellCommands(s string) ([][]string, bool) {
 		default:
 			redirect = false
 			active = true
+			if c < '0' || c > '9' {
+				descriptor = false
+			}
 			word.WriteByte(c)
 		}
 	}
@@ -199,7 +205,7 @@ func invocationTitle(a *agent.Registry, argv []string, description, dir string) 
 	if len(args) == 0 {
 		return "", nil
 	}
-	if _, ok := options[args[0]]; ok {
+	if _, ok := options[args[0]]; ok && args[0] != "run" {
 		command = args[0]
 		args = args[1:]
 	} else if find.Path(a.Paths, "commands", args[0]) != "" {
@@ -219,6 +225,7 @@ func invocationTitle(a *agent.Registry, argv []string, description, dir string) 
 			}
 		}
 	}
+	invocationDir := dir
 	if opts.Has("-C") {
 		dir = titlePath(dir, opts.S("-C"))
 	}
@@ -245,7 +252,7 @@ func invocationTitle(a *agent.Registry, argv []string, description, dir string) 
 			label = "Batch"
 			prompt = ""
 			if len(words) == 1 && words[0] != "-" {
-				if b, err := os.ReadFile(titlePath(dir, words[0])); err == nil {
+				if b, err := os.ReadFile(titlePath(invocationDir, words[0])); err == nil {
 					if items, err := readTasks(string(b)); err == nil {
 						names := []string{}
 						known := true
@@ -264,7 +271,7 @@ func invocationTitle(a *agent.Registry, argv []string, description, dir string) 
 							}
 							if model == "" && t.B("continue") {
 								if r, i, e := runs.Open(a.Paths, t.S("continue")); e == nil && i >= 0 {
-									model = r.Tasks[i].S("model")
+									model = r.Results[i].S("model")
 								}
 							}
 							m, err := agent.Parse(a.Paths, model)
@@ -298,10 +305,10 @@ func invocationTitle(a *agent.Registry, argv []string, description, dir string) 
 			}
 			old := r.Tasks[i]
 			if model == "" {
-				model = old.S("model")
+				model = r.Results[i].S("model")
 			}
 			if !opts.B("-r") && !opts.B("-w") {
-				write = old.B("write")
+				write = r.Results[i].B("write") || !r.Results[i].Has("write") && old.B("write")
 			}
 			worktree = worktree || old.B("worktree")
 			if prompt == "" || prompt == "-" {

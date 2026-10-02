@@ -12,7 +12,8 @@ ask council "Should we move the parser to a separate package?"
 ## The contract
 
 - `ask NAME ARGS...` runs `~/.ask/commands/NAME ARGS...` (or a [package's](packages.md)), with your
-  terminal's stdin, stdout and stderr. ask exits with its exit code.
+  terminal's stdin, stdout and stderr. The command replaces ask, so it receives terminal signals
+directly and supplies the exit status.
 - The command gets `ASK_BIN`, the path of the running ask binary with symlinks resolved, so it calls the same ask; plus
   `ASK_HOME` and `ASK_CONTRACT` (see [Compatibility](compatibility.md)).
 - A line containing `ask-command: TEXT` near the top of the file is its description in `ask --help`.
