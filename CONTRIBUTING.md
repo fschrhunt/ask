@@ -30,4 +30,8 @@ provenance, the release with that section as its notes, the Homebrew formula on 
 (`scripts/formula.sh`), and a real `install.sh` install of the release on both systems. When the
 run record format changed, pin a record from the release in `test/fixtures/run-vX.Y.Z/`.
 
+Only the `formula` job writes to main. It runs in the `release` environment, which only `v*`
+tags can use, and pushes with that environment's `RELEASE_DEPLOY_KEY` secret: a deploy key that
+main's ruleset lets past its pull request rule. Nothing else in the repository can.
+
 By contributing you agree that your work is licensed under the MIT license of this project.
