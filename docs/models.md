@@ -27,6 +27,11 @@ mycli:atlas-2.1-mini
 othercli:nova-4
 ```
 
+`ask models --names` prints `agent:id<TAB>Display Name`. `ask --help` groups available ids
+on one line per agent, including listing failures.
+At a terminal, `ask models` groups each agent's ids with a dim display-name column. In
+a pipe it keeps the one-`agent:id`-per-line form for scripts. `NO_COLOR` removes styling.
+
 Each agent lists its own models with `NAME models`. An agent whose CLI offers too many to list
 lists none, and you name the ones you use.
 

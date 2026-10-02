@@ -2,6 +2,7 @@
 package agent
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -55,7 +56,6 @@ type listing struct {
 	models []listedModel
 	error  string
 	ready  chan struct{}
-	fatal  error
 }
 
 // Registry caches agent-owned lists during an invocation; models.json ids are added per call.
@@ -80,9 +80,7 @@ func (a *Registry) models(name string, config home.Object) listing {
 	if !ok {
 		r := process.Run(find.Path(a.Paths, "agents", name), []string{"models"}, process.Options{Env: a.Paths.Env(nil), Timeout: 10 * time.Second})
 		if r.Code != 0 {
-			if r.Fatal {
-				own.fatal = fmt.Errorf("%s", home.Trim(r.Stderr))
-			}
+
 			own.error = process.Reason(r.Stderr)
 			if own.error == "" {
 				if r.TimedOut {
@@ -107,7 +105,7 @@ func (a *Registry) models(name string, config home.Object) listing {
 		close(own.ready)
 	}
 	<-own.ready
-	out := listing{models: append([]listedModel{}, own.models...), error: own.error, fatal: own.fatal}
+	out := listing{models: append([]listedModel{}, own.models...), error: own.error}
 	if extra, ok := config.Get(name).([]any); ok {
 		for _, id := range extra {
 			out.models = append(out.models, listedModel{id: home.String(id)})
@@ -117,8 +115,8 @@ func (a *Registry) models(name string, config home.Object) listing {
 }
 
 // List returns model ids in agent order and each listing failure as "agent: reason".
-// Synchronous process-start failures remain fatal for compatibility.
-func (a *Registry) List(config home.Object) ([]string, []string, error) {
+// Failed declarations are reported per agent, including executable start errors.
+func (a *Registry) List(config home.Object) ([]string, []string) {
 	names := find.Sorted(a.Paths, "agents")
 	all := make([]listing, len(names))
 	var wg sync.WaitGroup
@@ -129,9 +127,7 @@ func (a *Registry) List(config home.Object) ([]string, []string, error) {
 	wg.Wait()
 	ids, errors := []string{}, []string{}
 	for i, x := range names {
-		if all[i].fatal != nil {
-			return nil, nil, all[i].fatal
-		}
+
 		for _, m := range all[i].models {
 			ids = append(ids, x.Name+":"+m.id)
 		}
@@ -139,7 +135,7 @@ func (a *Registry) List(config home.Object) ([]string, []string, error) {
 			errors = append(errors, x.Name+": "+all[i].error)
 		}
 	}
-	return ids, errors, nil
+	return ids, errors
 }
 
 // Name prefers the report, then the listed model name, then a title-cased model id.
@@ -147,11 +143,9 @@ func (a *Registry) Name(m Model, reported string) string {
 	name := reported
 	if name == "" {
 		listed := a.models(m.Agent, nil)
-		if listed.fatal != nil {
-			return m.Spec
-		}
+
 		for _, x := range listed.models {
-			if x.id == m.ID {
+			if strings.EqualFold(x.id, m.ID) {
 				name = x.name
 				break
 			}
@@ -196,7 +190,7 @@ func (a *Registry) Run(m Model, prompt string, t home.Object) home.Object {
 		access = "write"
 	}
 	vars := map[string]string{"ASK_MODEL": m.ID, "ASK_EFFORT": m.Effort, "ASK_ACCESS": access, "ASK_REPORT": filepath.Join(work, "report.json")}
-	if t.B("schema") {
+	if t.Has("schema") && t.Get("schema") != nil {
 		vars["ASK_SCHEMA"] = filepath.Join(work, "schema.json")
 		if e := os.WriteFile(vars["ASK_SCHEMA"], []byte(home.JSON(t.Get("schema"), false)), 0600); e != nil {
 			return home.O("ok", false, "note", e.Error())
@@ -210,27 +204,25 @@ func (a *Registry) Run(m Model, prompt string, t home.Object) home.Object {
 		timeout = 900
 	}
 	r := process.Run(find.Path(a.Paths, "agents", m.Agent), nil, process.Options{Input: prompt, Dir: t.S("dir"), Env: a.Paths.Env(vars), Timeout: time.Duration(timeout * float64(time.Second))})
-	if r.Fatal {
-		return home.O("ok", false, "note", home.Trim(r.Stderr))
+
+	report := Report{}
+	if b, err := os.ReadFile(vars["ASK_REPORT"]); err == nil {
+		_ = json.Unmarshal(b, &report)
 	}
-	report := home.Object{}
-	if b, e := os.ReadFile(vars["ASK_REPORT"]); e == nil {
-		v, _ := home.ParseJSON(home.UTF8(b))
-		report, _ = v.(home.Object)
-	}
-	meta := home.O("usage", nil, "name", home.Trim(report.S("name")), "session", home.Trim(report.S("session")))
+	meta := home.O("usage", nil, "name", home.Trim(report.Name), "session", home.Trim(report.Session))
 	if !meta.B("session") {
 		meta.Set("session", t.Get("session"))
 	}
 	usage := home.Object{}
-	for _, key := range []string{"input", "output", "cached", "cost"} {
-		if n, ok := report.Get(key).(float64); ok && n >= 0 && !math.IsInf(n, 0) && !math.IsNaN(n) {
-			usage.Set(key, n)
+	for key, n := range map[string]*float64{"input": report.Input, "output": report.Output, "cached": report.Cached, "cost": report.Cost} {
+		if n != nil && *n >= 0 && !math.IsInf(*n, 0) && !math.IsNaN(*n) {
+			usage.Set(key, *n)
 		}
 	}
 	if len(usage) > 0 {
 		meta.Set("usage", usage)
 	}
+
 	meta.Set("ok", false)
 	switch {
 	case r.TimedOut:
@@ -246,7 +238,19 @@ func (a *Registry) Run(m Model, prompt string, t home.Object) home.Object {
 	default:
 		meta.Set("ok", true)
 		meta.Set("text", r.Stdout)
-		meta.Set("note", home.Trim(report.S("note")))
+		meta.Set("note", home.Trim(report.Note))
 	}
 	return meta
+}
+
+// Report is the agent's optional version 1 metadata; unknown fields are ignored.
+// Pointer counts distinguish an omitted metric from a reported zero.
+type Report struct {
+	Session string   `json:"session"`
+	Name    string   `json:"name"`
+	Input   *float64 `json:"input"`
+	Output  *float64 `json:"output"`
+	Cached  *float64 `json:"cached"`
+	Cost    *float64 `json:"cost"`
+	Note    string   `json:"note"`
 }

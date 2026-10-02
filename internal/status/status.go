@@ -4,25 +4,37 @@ package status
 import (
 	"fmt"
 	"math"
-	"strconv"
+	"os"
 	"strings"
 	"time"
-	"unicode/utf16"
+	"unicode/utf8"
 
 	"github.com/fschrhunt/ask/internal/home"
 	"github.com/fschrhunt/ask/internal/runs"
 )
 
-// Duration prints seconds, minutes and seconds, or hours and minutes.
+// Duration prints subminute time in seconds and longer time as a compact clock.
 func Duration(seconds float64) string {
 	if seconds < 60 {
 		return home.Fixed(seconds, 1) + "s"
 	}
-	m := int(math.Floor(seconds / 60))
-	if m < 60 {
-		return fmt.Sprintf("%dm %02ds", m, int(math.Floor(math.Mod(seconds, 60)+0.5)))
+	n := int(math.Round(seconds))
+	if n < 3600 {
+		return fmt.Sprintf("%d:%02d", n/60, n%60)
 	}
-	return fmt.Sprintf("%dh %02dm", m/60, m%60)
+	return fmt.Sprintf("%d:%02d:%02d", n/3600, (n/60)%60, n%60)
+}
+
+// Clock prints live elapsed time as minutes and seconds.
+func Clock(d time.Duration) string {
+	n := int(d.Seconds())
+	if n < 0 {
+		n = 0
+	}
+	if n < 3600 {
+		return fmt.Sprintf("%d:%02d", n/60, n%60)
+	}
+	return fmt.Sprintf("%d:%02d:%02d", n/3600, (n/60)%60, n%60)
 }
 
 // Usage prints token totals and optional cost, omitting empty reports.
@@ -40,7 +52,7 @@ func Usage(v any) string {
 	text := k(u.N("input")) + " in · " + k(u.N("output")) + " out"
 	if u.Has("cost") {
 		digits := 4
-		if u.N("cost") >= 1 {
+		if u.N("cost") >= 0.01 {
 			digits = 2
 		}
 		text += " · $" + home.Fixed(u.N("cost"), digits)
@@ -68,16 +80,16 @@ func plural(n int, word string) string {
 	return fmt.Sprintf("%d %s%s", n, word, s)
 }
 
-// length measures text as UTF-16 units, matching the original table widths.
-func length(s string) int { return len(utf16.Encode([]rune(s))) }
+// length counts characters for status tables and hook-note limits.
+func length(s string) int { return utf8.RuneCountInString(s) }
 
-// clip truncates text at the original UTF-16 limit.
+// clip truncates at a character boundary.
 func clip(s string, n int) string {
-	units := utf16.Encode([]rune(s))
+	units := []rune(s)
 	if len(units) <= n {
 		return s
 	}
-	return string(utf16.Decode(units[:n]))
+	return string(units[:n])
 }
 
 // EventLine formats a task start, hook event, or completed result.
@@ -87,7 +99,7 @@ func EventLine(r *runs.Run, e runs.Event) string {
 	}
 	ref := runs.Ref(r, e.Index)
 	if e.Kind == "start" {
-		t := r.Tasks[e.Index]
+		t := e.Started.Task
 		where := home.Tilde(e.Started.Dir)
 		if e.Started.Worktree != nil {
 			where = "worktree " + home.Tilde(e.Started.Worktree.Path)
@@ -98,11 +110,11 @@ func EventLine(r *runs.Run, e runs.Event) string {
 		}
 		continues := ""
 		if t.B("continues") {
-			continues = "continues " + t.S("continues")
+			continues = "follow-up " + t.S("continues")
 		}
-		text := line(ref, t.S("model"), access, where, continues, "started")
+		text := line(ref, "started", e.Started.Name, access, where, continues)
 		if e.Started.Worktree != nil && e.Started.Worktree.Dirty {
-			text += "\n" + line(ref, "the worktree starts from HEAD; uncommitted changes in "+home.Tilde(t.S("dir"))+" are not in it")
+			text += "\n" + line(ref, "note", "the worktree starts from HEAD; uncommitted changes in "+home.Tilde(t.S("dir"))+" are not in it")
 		}
 		return text
 	}
@@ -110,10 +122,11 @@ func EventLine(r *runs.Run, e runs.Event) string {
 	if length(first) > 100 {
 		first = clip(first, 99) + "…"
 	}
+	kind := "note"
 	if e.Kind == "followup" {
-		first = "follow-up: " + first
+		kind = "follow-up"
 	}
-	return line(ref, "hook "+e.Note.Name, first)
+	return line(ref, kind, "hook "+e.Note.Name, first)
 }
 
 // Done formats a completed result, including its failure reason or successful note.
@@ -143,7 +156,7 @@ func Done(r home.Object) string {
 	if w, ok := r.Get("worktree").(home.Object); ok {
 		branch = "branch " + w.S("branch")
 	}
-	return line(r.S("run"), r.S("name"), outcome, Duration(r.N("seconds")), changed, branch, Usage(r.Get("usage")), note)
+	return line(r.S("run"), outcome, r.S("name"), Duration(r.N("seconds")), changed, branch, Usage(r.Get("usage")), note)
 }
 
 // BatchStart prints the batch size and effective parallelism, including resume state.
@@ -155,7 +168,7 @@ func BatchStart(r *runs.Run, jobs, todo int) string {
 	if jobs > todo {
 		jobs = todo
 	}
-	return line(r.ID, fmt.Sprintf("batch of %d", len(r.Tasks)), resume, fmt.Sprintf("%d at a time", jobs))
+	return line(r.ID, "started", fmt.Sprintf("batch of %d", len(r.Tasks)), resume, fmt.Sprintf("%d at a time", jobs))
 }
 
 // BatchEnd prints outcome counts, elapsed time and summed usage.
@@ -178,35 +191,59 @@ func BatchEnd(r *runs.Run, seconds float64) string {
 	return line(r.ID, fmt.Sprintf("%d/%d ok", ok, len(r.Tasks)), Duration(seconds), Usage(total))
 }
 
-// when renders a UTC record timestamp in the local timezone, using today's shorter form.
-func when(stamp string) string {
+// BatchSaved reports a recorded batch's result count without inventing elapsed wall time.
+func BatchSaved(r *runs.Run) string {
+	ok := 0
+	for _, result := range r.Results {
+		if result.B("ok") {
+			ok++
+		}
+	}
+	return line(r.ID, fmt.Sprintf("%d/%d ok", ok, len(r.Tasks)))
+}
+
+// when renders a saved UTC timestamp relative to the caller's local clock.
+func when(stamp string, now time.Time) string {
 	if len(stamp) < 15 {
 		return ""
 	}
-	date, e := time.Parse("20060102T150405", stamp[:15])
-	if e != nil {
+	date, err := time.Parse("20060102T150405", stamp[:15])
+	if err != nil {
 		return ""
 	}
-	date = date.In(time.Local)
-	clock := date.Format("15:04")
-	now := time.Now()
-	if date.Format("2006-01-02") == now.Format("2006-01-02") {
-		return clock
+	date = date.In(now.Location())
+	age := now.Sub(date)
+	if age < 0 {
+		return date.Format("Jan 2 15:04")
 	}
-	return date.Format("Jan ") + strconv.Itoa(date.Day()) + " " + clock
+	if age < time.Minute {
+		return "now"
+	}
+	if age < time.Hour {
+		return fmt.Sprintf("%dm ago", int(age.Minutes()))
+	}
+	if age < 24*time.Hour && date.Day() == now.Day() {
+		return fmt.Sprintf("%dh ago", int(age.Hours()))
+	}
+	yesterday := now.AddDate(0, 0, -1)
+	if date.Year() == yesterday.Year() && date.YearDay() == yesterday.YearDay() {
+		return "yesterday " + date.Format("15:04")
+	}
+	return date.Format("Jan 2 15:04")
 }
 
-// Table prints aligned recent runs with a 120-column default outside a terminal.
-func Table(list []*runs.Run) string {
-	rows := [][]string{{"RUN", "STARTED", "STATUS", "MODEL", "TIME", "TASK"}}
+// Table prints recent runs with relative dates, omitting columns with no values.
+func Table(list []*runs.Run, now time.Time, color bool) string {
+	headers := []string{"RUN", "STARTED", "STATUS", "MODEL", "TIME", "TASK"}
+	rows := [][]string{}
 	for _, r := range list {
 		done := []home.Object{}
-		ok := 0
-		for _, x := range r.Results {
-			if x != nil {
-				done = append(done, x)
-				if x.B("ok") {
-					ok++
+		okCount := 0
+		for _, result := range r.Results {
+			if result != nil {
+				done = append(done, result)
+				if result.B("ok") {
+					okCount++
 				}
 			}
 		}
@@ -223,7 +260,7 @@ func Table(list []*runs.Run) string {
 				state = "ok"
 			}
 		default:
-			state = fmt.Sprintf("%d/%d ok", ok, len(r.Tasks))
+			state = fmt.Sprintf("%d/%d ok", okCount, len(r.Tasks))
 		}
 		first := r.Tasks[0]
 		model := fmt.Sprintf("%d tasks", len(r.Tasks))
@@ -244,35 +281,105 @@ func Table(list []*runs.Run) string {
 		if state == "stopped" {
 			about = "resume: ask batch --resume " + r.ID
 		}
-		rows = append(rows, []string{r.ID, when(r.Created), state, model, elapsed, about})
+		rows = append(rows, []string{r.ID, when(r.Created, now), state, model, elapsed, about})
 	}
-	widths := make([]int, 6)
-	for _, row := range rows {
-		for c, cell := range row {
-			if length(cell) > widths[c] {
-				widths[c] = length(cell)
+	keep := []int{}
+	for col := range headers {
+		visible := col == 0 || col == 2 || col == 5
+		for _, row := range rows {
+			if row[col] != "" {
+				visible = true
+				break
+			}
+		}
+		if visible {
+			keep = append(keep, col)
+		}
+	}
+	widths := make([]int, len(headers))
+	for _, col := range keep {
+		widths[col] = length(headers[col])
+		for _, row := range rows {
+			if length(row[col]) > widths[col] {
+				widths[col] = length(row[col])
 			}
 		}
 	}
 	room := terminalWidth()
-	for _, w := range widths[:5] {
-		room -= w + 2
+	for _, col := range keep[:len(keep)-1] {
+		room -= widths[col] + 2
 	}
-	if room < 20 {
-		room = 20
+	if room < 8 {
+		room = 8
 	}
-	out := []string{}
+	render := func(row []string, header bool) string {
+		parts := []string{}
+		for _, col := range keep {
+			value := row[col]
+			if col == 5 && length(value) > room {
+				value = clip(value, room-1) + "…"
+			}
+			if col != 5 {
+				value += strings.Repeat(" ", widths[col]-length(value))
+			}
+			if color && !header && col == 2 {
+				value = ColorStatus(value, row[col])
+			}
+			parts = append(parts, value)
+		}
+		return strings.TrimRight(strings.Join(parts, "  "), " ")
+	}
+	out := []string{render(headers, true)}
 	for _, row := range rows {
-		cells := []string{}
-		for c, cell := range row[:5] {
-			cells = append(cells, cell+strings.Repeat(" ", widths[c]-length(cell)))
-		}
-		about := row[5]
-		if length(about) > room {
-			about = clip(about, room-1) + "…"
-		}
-		cells = append(cells, about)
-		out = append(out, strings.TrimRight(strings.Join(cells, "  "), " "))
+		out = append(out, render(row, false))
 	}
 	return strings.Join(out, "\n")
+}
+
+// CanStyle checks the stream and color environment before adding ANSI to text.
+func CanStyle(file *os.File) bool {
+	return IsTerminal(file) && os.Getenv("NO_COLOR") == ""
+}
+
+// IsTerminal reports whether a stream can display an interactive layout.
+func IsTerminal(file *os.File) bool {
+	_, _, ok := terminalSize(file)
+	return ok && os.Getenv("TERM") != "dumb"
+}
+
+// ColorStatus marks successful and failed outcomes without changing visible text.
+func ColorStatus(text, status string) string {
+	code := ""
+	if status == "ok" {
+		code = "32"
+	}
+	if status == "failed" || status == "stopped" {
+		code = "31"
+	}
+	if strings.HasSuffix(status, " ok") {
+		code = "32"
+	}
+	if status == "note" || status == "follow-up" {
+		code = "2"
+	}
+	if code == "" {
+		return text
+	}
+	return "\x1b[" + code + "m" + text + "\x1b[0m"
+}
+
+// StyledLine adds color to a status outcome when its output stream supports styling.
+func StyledLine(text string, file *os.File) string {
+	if !CanStyle(file) {
+		return text
+	}
+	parts := strings.SplitN(text, " · ", 3)
+	if len(parts) < 2 {
+		return text
+	}
+	out := parts[0] + " · " + ColorStatus(parts[1], parts[1])
+	if len(parts) == 3 {
+		out += " · " + parts[2]
+	}
+	return out
 }

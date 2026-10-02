@@ -4,8 +4,8 @@ Every time ask starts agents, that is a run, with a short id like `k3f9a2`. Stat
 with it:
 
 ```text
-ask k3f9a2 · mycli:atlas-2.1 · read · ~/code/app · started
-ask k3f9a2 · Atlas 2.1 · ok · 14.2s · 31.0k in · 812 out · $0.0874
+ask k3f9a2 · started · Atlas 2.1 · read · ~/code/app
+ask k3f9a2 · ok · Atlas 2.1 · 14.2s · 31.0k in · 812 out · $0.09
 ```
 
 A task in a batch is `RUN/TASK`, using the task's id (or its position, from 1): `p81c0d/api`.
@@ -16,7 +16,7 @@ A task in a batch is `RUN/TASK`, using the task's id (or its position, from 1): 
 
 ```sh
 ask -m mycli:atlas-2.1 "Why does the login test fail?"
-# ask k3f9a2 · Atlas 2.1 · ok · 48.0s · ...
+# ask k3f9a2 · ok · Atlas 2.1 · 48.0s · ...
 ask -c k3f9a2 -w "Fix it, then run the test."
 ask -c b7x01q "Now add a test for the expired-token case."
 ```
@@ -43,9 +43,9 @@ ask runs -n 50
 
 ```text
 RUN     STARTED  STATUS   MODEL        TIME    TASK
-b7x01q  14:12    ok       Atlas 2.1   2m 31s  ↪ k3f9a2 Fix it, then run the test.
-k3f9a2  14:09    ok       Atlas 2.1   48.0s   Why does the login test fail?
-p81c0d  13:50    2/3 ok   3 tasks              Summarize the public API in src/.
+b7x01q  2m ago   ok       Atlas 2.1   2:31  ↪ k3f9a2 Fix it, then run the test.
+k3f9a2  5m ago   ok       Atlas 2.1   48.0s   Why does the login test fail?
+p81c0d  24m ago  2/3 ok   3 tasks              Summarize the public API in src/.
 x7d2e1  Sep 30   stopped  5 tasks              resume: ask batch --resume x7d2e1
 ```
 
@@ -60,6 +60,8 @@ ask show k3f9a2 --json    # the whole result, with session, changes and worktree
 ask show p81c0d           # a batch: all its results, as a JSON array
 ask show p81c0d/api       # one task of a batch
 ```
+
+Showing a whole batch prints its outcome count on stderr; saved wall time is not recorded.
 
 ## Stopping a run
 
@@ -85,3 +87,6 @@ Each run is a folder in `~/.ask/runs/` (or `$ASK_HOME/runs/`), named by its star
 ```
 
 Delete old folders whenever you like; nothing else refers to them.
+
+Hosts can name a background run with `ask title --command STRING --description TEXT`; see
+[Hosts](hosts.md) for title forms and a Claude Code integration.

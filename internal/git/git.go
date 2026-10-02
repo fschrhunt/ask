@@ -168,8 +168,8 @@ func Changes(before *Snapshot) ([]any, int) {
 
 // Worktree describes a task's branch, location and omitted source changes.
 type Worktree struct {
-	Path, Branch, Dir string
-	Dirty             bool
+	Path, Branch, Dir, Base string
+	Dirty                   bool
 }
 
 // Add creates a branch from HEAD or reuses a follow-up's worktree at the recorded name.
@@ -195,7 +195,14 @@ func Add(p home.Paths, dir, name string) (*Worktree, error) {
 		}
 	}
 	rel, _ := filepath.Rel(root, dir)
-	return &Worktree{path, branch, filepath.Join(path, rel), len(dirtyPaths(root)) > 0}, nil
+	history, _ := git(path, []string{"reflog", "show", "--format=%H", branch}, "")
+	entries := strings.Fields(history)
+	base, _ := git(path, []string{"merge-base", "HEAD", head(root)}, "")
+	base = home.Trim(base)
+	if len(entries) > 0 {
+		base = entries[len(entries)-1]
+	}
+	return &Worktree{Path: path, Branch: branch, Dir: filepath.Join(path, rel), Base: base, Dirty: len(dirtyPaths(root)) > 0}, nil
 }
 
 // Remove removes an unchanged worktree and attempts to delete its branch.

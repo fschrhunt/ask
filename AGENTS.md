@@ -29,9 +29,9 @@ Go 1.25 or newer, standard library only. ask runs as one binary; agents may use 
   - `status`: status lines and the `ask runs` table.
   - `schema`: the `--schema` check.
   - `home`: `~/.ask` paths, the contract environment, `models.json`, atomic JSON writes,
-    ordered JSON and compatible diagnostics, `UsageError`.
+    typed JSON records and readable encoding, `UsageError`.
 - `test/`: `cli`, `batch`, `subagent` (follow-ups, changes, worktrees, show, stop), `extend`
-  (hooks, commands, packages), `compat` (released run records, pinned in `fixtures/`) and `local`
+  (hooks, commands, packages), `compat` (released run records, pinned in `fixtures/`), `contracts` (raw JSON, streams and process guarantees) and `local`
   (the agent contract, with shell agents) black-box Go tests, `helpers_test.go`, and `fake/`,
   the Go fake agent every test installs. `TestMain` builds ask and fake once. `FAKE_LOG` records
   runs; `FAKE_FAIL`, `FAKE_HANG` and `FAKE_SLOW` match the prompt; `FAKE_WRITE` and `FAKE_COMMIT`

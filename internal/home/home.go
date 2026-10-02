@@ -125,8 +125,8 @@ func (p Paths) ReadModels() (Object, error) {
 	}
 	o, ok := v.(Object)
 	if ok {
-		for _, f := range o {
-			a, good := f.Value.([]any)
+		for _, val := range o {
+			a, good := val.([]any)
 			if !good {
 				ok = false
 				break

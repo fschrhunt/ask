@@ -1,7 +1,8 @@
-// Package schema checks the original CLI's core JSON Schema keywords; others are ignored.
+// Package schema validates the documented core JSON Schema keywords; others are ignored.
 package schema
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
@@ -20,8 +21,8 @@ func same(a, b any) bool {
 		if !ok || len(x) != len(y) {
 			return false
 		}
-		for _, f := range x {
-			if !y.Has(f.Key) || !same(f.Value, y.Get(f.Key)) {
+		for key, val := range x {
+			if !y.Has(key) || !same(val, y.Get(key)) {
 				return false
 			}
 		}
@@ -46,6 +47,13 @@ func same(a, b any) bool {
 
 // Mismatch returns the first path-qualified mismatch, or an error for unusable keyword shapes.
 func Mismatch(value, schema any, path string) (string, error) {
+	if raw, ok := schema.(json.RawMessage); ok {
+		decoded, err := home.ParseJSON(string(raw))
+		if err != nil {
+			return "", err
+		}
+		schema = decoded
+	}
 	if schema == false {
 		return path + ": no value is allowed here", nil
 	}
@@ -76,7 +84,7 @@ func Mismatch(value, schema any, path string) (string, error) {
 	if home.Truth(s.Get("enum")) {
 		a, ok := s.Get("enum").([]any)
 		if !ok {
-			return "", fmt.Errorf("schema.enum.some is not a function")
+			return "", fmt.Errorf("schema enum must be an array")
 		}
 		found := false
 		for _, v := range a {
@@ -95,18 +103,8 @@ func Mismatch(value, schema any, path string) (string, error) {
 	if v, ok := value.(home.Object); ok {
 		if s.B("required") {
 			req, ok := s.Get("required").([]any)
-			if text, stringOK := s.Get("required").(string); stringOK {
-				ok = true
-				for _, r := range text {
-					req = append(req, string(r))
-				}
-			}
 			if !ok {
-				what := home.Kind(s.Get("required"))
-				if what == "boolean" || what == "number" {
-					what += " " + home.String(s.Get("required"))
-				}
-				return "", fmt.Errorf("%s is not iterable (cannot read property Symbol(Symbol.iterator))", what)
+				return "", fmt.Errorf("schema required must be an array of property names")
 			}
 			for _, key := range req {
 				if !v.Has(home.String(key)) {
@@ -115,17 +113,17 @@ func Mismatch(value, schema any, path string) (string, error) {
 			}
 		}
 		props, _ := s.Get("properties").(home.Object)
-		for _, f := range v {
-			if props.Has(f.Key) {
-				if problem, err := Mismatch(f.Value, props.Get(f.Key), path+"."+f.Key); problem != "" || err != nil {
+		for key, val := range v {
+			if props.Has(key) {
+				if problem, err := Mismatch(val, props.Get(key), path+"."+key); problem != "" || err != nil {
 					return problem, err
 				}
 			} else if s.Get("additionalProperties") == false {
-				return fmt.Sprintf("%s: unexpected \"%s\"", path, f.Key), nil
+				return fmt.Sprintf("%s: unexpected \"%s\"", path, key), nil
 			}
 		}
 	}
-	if a, ok := value.([]any); ok && s.B("items") {
+	if a, ok := value.([]any); ok && s.Has("items") {
 		for i, v := range a {
 			if problem, err := Mismatch(v, s.Get("items"), fmt.Sprintf("%s[%d]", path, i)); problem != "" || err != nil {
 				return problem, err

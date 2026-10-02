@@ -40,7 +40,7 @@ func TestBatch(t *testing.T) {
 		r := s.run([]string{"batch"}, `[{"prompt":"a"}]`, nil)
 		eq(t, r.code, 2)
 		match(t, r.stderr, `task 1 needs a model`)
-		match(t, r.stderr, `fake:small`)
+		match(t, r.stderr, `fake +small  +big`)
 	})
 	t.Run("an empty batch is a usage error", func(t *testing.T) {
 		s := fresh(t)

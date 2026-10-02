@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+- One compact help overview for `ask`, `ask help` and help flags; every command has a short
+  `--help` page, and `-h` works throughout. `-V` aliases `--version`; near-miss options
+  suggest a correction. Existing public names remain stable for scripts and run records.
+- Status lines put the outcome directly after the run id, use display names at start,
+  compact times and cents for costs of at least $0.01. Live rows use marks, aligned batch
+  tasks and notes beneath each task; non-UTF-8 locales use ASCII marks. `ask runs` shows
+  relative times and hides empty columns. Terminal `ask models` groups display names;
+  piped output keeps one id per line. `ask packages` uses aligned columns. The start-line
+  label `continues` is now `follow-up`; the `-c` option and JSON `continue` field stay.
+- Live stderr terminals show a spinner or batch task rows with elapsed time, clipped to the
+  screen, with minimal color (`NO_COLOR` disables it). Hook notes appear beneath their task;
+  answers print after it finishes. Pipes and `TERM=dumb` keep plain status lines. Ctrl-C
+  restores the cursor and leaves the stopped state visible.
+- Replace Node-compatible JSON parsing/serialization with `encoding/json`, typed records and
+  reports, and raw JSON answers/schema payloads. Released records still load and continue;
+  readable JSON preserves field order and does not escape HTML. Parse errors now use Go wording.
+
+
+- Compact help includes local models grouped by agent. Add `ask help COMMAND` and
+  `ask models --names`; usage errors give one fix and a topic pointer, with grouped models
+  for missing or invalid model specifications.
+
+- Add `ask title --command STRING [--description TEXT]` for host background titles, with
+  literal shell parsing, model names, follow-up/batch titles and fail-open `title` hooks.
+
+- Honor false schemas and `items: false`; retain earlier worktree changes across idle follow-ups;
+  finish promptly when descendants retain agent output pipes; keep all hook start failures
+  fail-open with notes; report the model and access after task hooks; reject surplus command arguments.
+
 - Rewritten in Go: ask is one binary, with no Node requirement. Install a release binary,
   use `go install github.com/fschrhunt/ask/cmd/ask@latest`, or build from source. Agents, hooks
   and commands may still be written in any language. Existing contracts and run records are
@@ -27,7 +56,7 @@
   - `ask show RUN [--json]`, `ask stop RUN`, and an `ask runs` table with status, model and task.
 - Harness contract: `ASK_SESSION` in, `"session"` in the report out. ask reads the report even
   after a failure or timeout. Contract variables inherited from an outer ask are cleared.
-- Status lines start when a run starts, and read `ask RUN · model · outcome · time · changes ·
+- Status lines start when a run starts, and read `ask RUN · outcome · model · time · changes ·
   usage`.
 - Records survive interruptions: results are written atomically, a damaged `results.json` is
   reported instead of rerunning finished tasks, and a lock keeps two asks off one run.

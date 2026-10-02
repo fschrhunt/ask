@@ -51,12 +51,13 @@ ask -m mycli:atlas-2.1 -w --worktree "Add rate limits." # its own git worktree a
 ask batch -j 4 -m mycli:atlas-2.1-mini tasks.json             # many tasks in parallel
 ```
 
-The answer goes to stdout. Status lines on stderr name the run, the model that ran, and what it
+The answer goes to stdout. A terminal shows live task state; pipes get concise status lines
+on stderr naming the run, the model that ran, and what it
 changed and cost:
 
 ```text
-ask k3f9a2 · mycli:atlas-2.1 · read · ~/code/app · started
-ask k3f9a2 · Atlas 2.1 · ok · 48.0s · 31.0k in · 812 out · $0.0874
+ask k3f9a2 · started · Atlas 2.1 · read · ~/code/app
+ask k3f9a2 · ok · Atlas 2.1 · 48.0s · 31.0k in · 812 out · $0.09
 ```
 
 Every run is recorded: `ask runs` lists them, `ask show RUN` prints one again, and `ask stop RUN`
@@ -79,7 +80,7 @@ stay stable across releases.
 
 [Install](docs/install.md) · [Usage](docs/usage.md) · [Runs](docs/runs.md) ·
 [Batches](docs/batches.md) · [Models](docs/models.md) · [Agents](docs/agents.md) ·
-[Hooks](docs/hooks.md) · [Commands](docs/commands.md) · [Packages](docs/packages.md) ·
+[Hosts](docs/hosts.md) · [Hooks](docs/hooks.md) · [Commands](docs/commands.md) · [Packages](docs/packages.md) ·
 [Compatibility](docs/compatibility.md)
 
 ### License

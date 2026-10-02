@@ -11,21 +11,19 @@ import (
 	"testing"
 )
 
-// TestJSONBytes protects JSON property order, literal Unicode and surrogate escaping.
-func TestJSONBytes(t *testing.T) {
+// TestRawJSONAnswer preserves agent key order and JSON spelling through runs and hooks.
+func TestRawJSONAnswer(t *testing.T) {
 	s := fresh(t)
-	r := s.run([]string{"-m", "fake:small", "--json", "go"}, "", map[string]string{"FAKE_ANSWER": `{"z":"<>&🐧","a":"\ud800","2":2,"1":1}`})
+	answer := `{"z":"<>&🐧","a":"\ud800","2":2,"1":1}`
+	s.hook("seen", []string{"result"}, ":")
+	r := s.run([]string{"-m", "fake:small", "--json", "go"}, "", map[string]string{"FAKE_ANSWER": answer})
 	eq(t, r.code, 0)
-	eq(t, r.stdout, "{\"1\":1,\"2\":2,\"z\":\"<>&🐧\",\"a\":\"\\ud800\"}\n")
-}
-
-// TestDecimalRounding pins status formatting where JavaScript and Go's usual rounding disagree.
-func TestDecimalRounding(t *testing.T) {
-	s := fresh(t)
-	s.localAgent("echo", `echo '{"input":1250,"output":2500,"cost":1.125}' > "$ASK_REPORT"; echo fine`)
-	r := s.ask("-m", "echo:small", "go")
-	eq(t, r.code, 0)
-	match(t, r.stderr, `1\.3k in · 2\.5k out · \$1\.13`)
+	eq(t, r.stdout, answer+"\n")
+	eq(t, s.ask("show", runID(t, r.stderr)).stdout, answer+"\n")
+	stored := s.read(filepath.Join(s.home, "runs", s.latest(), "results.json"))
+	if strings.Index(stored, `"z"`) > strings.Index(stored, `"1"`+":") {
+		t.Fatal("reordered raw answer")
+	}
 }
 
 // TestUTF8Chunks checks decoding across reads and replacement of a truncated multibyte character.

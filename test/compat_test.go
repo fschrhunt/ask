@@ -15,7 +15,7 @@ func TestCompat(t *testing.T) {
 		}
 		shown := s.ask("show", "abc123")
 		eq(t, shown.stdout, "The token expiry is compared in seconds against milliseconds.\n")
-		match(t, shown.stderr, `(?m)^ask abc123 · Fake 1\.0 · ok · 41\.2s · 1 file changed · 52\.1k in · 2\.0k out · \$0\.3100$`)
+		match(t, shown.stderr, `(?m)^ask abc123 · ok · Fake 1\.0 · 41\.2s · 1 file changed · 52\.1k in · 2\.0k out · \$0\.31$`)
 		match(t, s.ask("runs").stdout, `(?m)^abc123 .* ok +Fake 1\.0 +41\.2s +Why does the login test fail\?$`)
 		followup := s.ask("-c", "abc123", "Fix it.")
 		eq(t, followup.code, 0)
