@@ -9,8 +9,9 @@ import (
 // TestSetup pins what makes ask easy to set up and adapt: official agent names, readiness checks,
 // settings, runs per repository and the host title hook.
 func TestSetup(t *testing.T) {
-	t.Run("ask install NAME installs fschrhunt/ask-NAME and says whether each agent is ready", func(t *testing.T) {
+	t.Run("ask install NAME installs fschrhunt/ask-NAME, even beside a folder NAME, and says whether each agent is ready", func(t *testing.T) {
 		s := fresh(t)
+		s.mkdir(filepath.Join(s.tmp, "demo"))
 		repo := filepath.Join(s.tmp, "fschrhunt", "ask-demo")
 		s.mkdir(repo)
 		git := s.gitAt(repo)
