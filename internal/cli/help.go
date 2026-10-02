@@ -84,6 +84,7 @@ Commands
   models     List available models
   title      Name a command for a host
   docs       Read the docs
+  update     Update ask to the latest release
   install    Install or update packages
   packages   List installed packages
   remove     Remove a package`}
@@ -380,6 +381,15 @@ Options
 Examples
   ask setup
   ask setup --check --json` + "\n\ndocs  ask docs setup"
+	case "update":
+		return `ask update · update ask to the latest release
+
+Usage
+  ask update            Replace this ask with the latest release, checked against its checksums
+  ask update --check    Only say whether a newer release is out (exit 1 when one is)
+
+ask installed by Homebrew or go install is updated there; ask update says how. In a terminal,
+ask mentions a newer release at most once a day; ASK_NO_UPDATE_CHECK=1 turns that off.` + "\n\ndocs  ask docs install"
 	case "docs":
 		return `ask docs · read ask's docs, built in
 

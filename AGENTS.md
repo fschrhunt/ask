@@ -13,6 +13,8 @@ ones use Node.js 18+, standard library only).
 - `gofmt -l .`: must be empty; `go vet ./...`: must pass.
 - `go build -o ask ./cmd/ask`: build the binary; `./ask --help` is the contract for flags and output.
 - `cd packages/claude && node --test`: one official agent's tests, against a fake CLI in `test/bin`.
+- `scripts/release.sh vX.Y.Z`: release, in two runs (see CONTRIBUTING.md); `install.sh` is the
+  installer people run, `HomebrewFormula/ask.rb` the formula each release regenerates.
 
 ## Code map
 
@@ -66,5 +68,5 @@ ones use Node.js 18+, standard library only).
   comments and docs a change touches.
 - One test per behavior change. Never call a network or a real model in a test.
 - A user-visible change gets a `CHANGELOG.md` entry under `## Unreleased` at the top (add the
-  heading when it's missing). Releasing turns it into `## vX.Y.Z · DATE` and pins a run record in
-  `test/fixtures/run-vX.Y.Z/`.
+  heading when it's missing). `scripts/release.sh` turns it into `## vX.Y.Z · DATE`; a release that
+  changed the run record format pins one in `test/fixtures/run-vX.Y.Z/`.

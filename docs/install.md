@@ -3,20 +3,34 @@
 ask is a single binary with no language runtime or library dependencies. Git is needed for packages,
 worktrees and reporting changes. Your agents keep their own CLI and runtime requirements.
 
-## Release binary
-
-Download `ask_VERSION_OS_ARCH.tar.gz` for your system from
-[Releases](https://github.com/fschrhunt/ask/releases/latest): `linux` or `darwin` (macOS),
-and `amd64` (Intel/AMD) or `arm64` (Apple Silicon/ARM). Download `checksums.txt` from the same release.
-Verify the archive's SHA-256 against that file (`sha256sum` on Linux, `shasum -a 256` on macOS),
-then extract the archive and install the executable:
+## The installer
 
 ```sh
-mkdir -p ~/.local/bin
-cp ask ~/.local/bin/ask
+curl -fsSL https://fschrhunt.com/ask/install.sh | sh
 ```
 
-Make sure `~/.local/bin` is on your `PATH`.
+It downloads the release archive for your system (macOS or Linux, Intel or ARM), checks it against
+the release's `checksums.txt`, and installs `ask` into `~/.local/bin`, saying so if that isn't on
+your `PATH`. It never edits your shell files. Options, after `sh -s --`:
+
+```sh
+curl -fsSL https://fschrhunt.com/ask/install.sh | sh -s -- --version v0.1.0 --dir ~/bin
+```
+
+`ASK_INSTALL_DIR` and `ASK_VERSION` do the same as `--dir` and `--version`. The script is
+[`install.sh`](../install.sh) in ask's repository; read it before you run it if you like.
+
+## Homebrew
+
+ask's repository is its own tap:
+
+```sh
+brew tap fschrhunt/ask https://github.com/fschrhunt/ask
+brew install ask
+```
+
+Each release updates the formula, [`HomebrewFormula/ask.rb`](../HomebrewFormula/ask.rb), so
+`brew upgrade ask` brings the latest.
 
 ## With Go
 
@@ -27,6 +41,14 @@ go install github.com/fschrhunt/ask/cmd/ask@latest
 ```
 
 Put `$(go env GOPATH)/bin` on your `PATH`.
+
+## By hand
+
+Download `ask_VERSION_OS_ARCH.tar.gz` for your system and `checksums.txt` from
+[Releases](https://github.com/fschrhunt/ask/releases/latest), check the archive's SHA-256
+(`sha256sum` on Linux, `shasum -a 256` on macOS), extract it and put `ask` on your `PATH`. Each
+archive's build provenance can be verified with
+`gh attestation verify ask_VERSION_OS_ARCH.tar.gz -R fschrhunt/ask`.
 
 ## From source
 
@@ -80,9 +102,15 @@ ask -m claude:haiku-4.5 "What does this project do?"
 
 ## Update
 
-Replace the binary with the latest release, or rerun `go install ...@latest`. For a source checkout,
-pull the changes, rebuild and copy the binary again. Your `~/.ask` agents, hooks, commands, packages
-and recorded runs keep working.
+```sh
+ask update            # an ask from the installer or an archive: replaced with the latest release
+ask update --check    # only say whether a newer one is out
+```
+
+Homebrew updates its own (`brew upgrade ask`), and so does Go (rerun `go install ...@latest`);
+`ask update` says so for those. In a terminal, ask mentions a newer release at most once a day;
+`ASK_NO_UPDATE_CHECK=1` turns that off. Your `~/.ask` agents, hooks, commands, packages and
+recorded runs keep working across updates.
 
 ## Where ask keeps things
 

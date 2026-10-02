@@ -31,7 +31,7 @@ var options = map[string][]string{
 	"run":   {"-m", "-r", "-w", "--worktree", "-c", "--json", "--schema", "-C", "-t", "--max-cost", "--no-hooks"},
 	"batch": {"-m", "-r", "-w", "--worktree", "--json", "--schema", "-C", "-t", "--max-cost", "-j", "--resume", "--no-hooks"},
 	"title": {"--command", "--description", "--hook"},
-	"setup": {"--check", "--json", "--yes"}, "settings": {"--json", "--dry-run"}, "docs": {"--raw", "--search", "--url"},
+	"setup": {"--check", "--json", "--yes"}, "settings": {"--json", "--dry-run"}, "docs": {"--raw", "--search", "--url"}, "update": {"--check"},
 	"show": {"--json"}, "runs": {"-n", "--all"}, "wait": {"-t", "--json"}, "clean": {"--days", "--dry-run", "--yes"}, "stop": {}, "models": {"--names", "--all", "--enable", "--disable", "--max-cost"}, "help": {}, "install": {}, "packages": {}, "remove": {},
 }
 var long = map[string]string{"--model": "-m", "--read": "-r", "--write": "-w", "--continue": "-c", "--dir": "-C", "--timeout": "-t", "--jobs": "-j"}
@@ -876,6 +876,11 @@ func main(argv []string, version string) (int, error) {
 		return settingsCommand(p, opts, words)
 	case "docs":
 		return docsCommand(opts, words)
+	case "update":
+		if len(words) != 0 {
+			return 0, home.Usage("ask update takes no arguments; see ask update --help")
+		}
+		return updateCommand(p, version, opts.B("--check"))
 	case "show":
 		return show(p, opts, words)
 	case "wait":
@@ -917,6 +922,9 @@ func Main(argv []string, version string) int {
 	process.Listen()
 	code, e := main(argv, version)
 	process.AwaitShutdown()
+	if len(argv) == 0 || !has([]string{"title", "update"}, argv[0]) {
+		notice(home.New(), version)
+	}
 	if e != nil {
 		var usage *home.UsageError
 		if errors.As(e, &usage) {
