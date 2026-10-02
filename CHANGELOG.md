@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Stopping a batch (Ctrl-C or `ask stop`) no longer prints `[null]` results or a `0/1 ok` summary;
+  it ends with the stopped line, like a single run. A batch's usage total leaves out cost when
+  only some tasks reported one. A JSON line that does not parse is reported by its line in the
+  input, counting leading blank lines, and `-t` above 2000000 seconds is rejected by name.
 - The live view shows tokens and cost while agents run, and a batch's footer keeps a running
   total. ask reads an agent's report as the agent rewrites it; agents that report usage only at
   the end show it at the end, as before. Plain status lines are unchanged.

@@ -99,7 +99,7 @@ func TestBatchWorktreeNamesUsePosition(t *testing.T) {
 	}
 }
 
-// TestStoppedTaskHasEmptyResult lets a stopped run resume without a failure result or result hook.
+// TestStoppedTaskHasEmptyResult lets a stopped run resume without a failure result, result hook or printed results.
 func TestStoppedTaskHasEmptyResult(t *testing.T) {
 	s := fresh(t)
 	s.hook("observe", []string{"result"}, `echo '{}'`)
@@ -107,7 +107,9 @@ func TestStoppedTaskHasEmptyResult(t *testing.T) {
 	until(t, func() bool { return len(s.calls()) == 1 })
 	id := strings.TrimPrefix(s.latest()[strings.LastIndex(s.latest(), "-"):], "-")
 	eq(t, s.ask("stop", id).code, 0)
-	eq(t, run.wait(t).code, 130)
+	out := run.wait(t)
+	eq(t, out.code, 130)
+	eq(t, out.stdout, "")
 	path := filepath.Join(s.home, "runs", s.latest(), "results.json")
 	if exists(path) && strings.Contains(s.read(path), `"ok": false`) {
 		t.Fatal("stopped task saved as failed")

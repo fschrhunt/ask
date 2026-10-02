@@ -22,6 +22,12 @@ func TestBatch(t *testing.T) {
 		r := s.run([]string{"batch", "-m", "fake:small"}, "{\"prompt\": \"a\"}\n{\"prompt\": \"b\", \"model\": \"fake:big\"}", nil)
 		eq(t, fields(objects(t, r.stdout), "id", "model"), [][]any{{"1", "fake:small"}, {"2", "fake:big"}})
 	})
+	t.Run("a JSON line that does not parse is reported by its line in the input", func(t *testing.T) {
+		s := fresh(t)
+		r := s.run([]string{"batch", "-m", "fake:small"}, "\n\n{bad", nil)
+		eq(t, r.code, 2)
+		match(t, r.stderr, `cannot parse line 3:`)
+	})
 	t.Run("a batch task whose write is not a boolean is a usage error", func(t *testing.T) {
 		s := fresh(t)
 		r := s.run([]string{"batch", "-m", "fake:small"}, `[{"prompt":"a","write":"false"}]`, nil)

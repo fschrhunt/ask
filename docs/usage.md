@@ -103,7 +103,7 @@ ask -m claude:sonnet-5.5 -C ~/code/app "How does login work?"
 
 ## Time limit
 
-`-t SECONDS` stops a run that takes too long (default 900). The run fails with `timed out`, and
+`-t SECONDS` stops a run that takes too long (default 900, at most 2000000). The run fails with `timed out`, and
 everything the agent started is stopped.
 
 ```sh

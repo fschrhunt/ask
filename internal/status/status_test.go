@@ -30,3 +30,14 @@ func TestRunsTable(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+// TestBatchEndPartialCost leaves out a cost that only some tasks reported.
+func TestBatchEndPartialCost(t *testing.T) {
+	r := &runs.Run{ID: "abc123", Tasks: []home.Object{{}, {}}, Results: []home.Object{
+		{"ok": true, "usage": home.Object{"input": 10, "output": 5, "cost": 0.01}},
+		{"ok": true, "usage": home.Object{"input": 100, "output": 50}},
+	}}
+	if got := BatchEnd(r, 1); got != "ask abc123 · 2/2 ok · 1.0s · 110 in · 55 out" {
+		t.Fatal(got)
+	}
+}
