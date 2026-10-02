@@ -2,13 +2,13 @@
 package cli
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math"
 	"os"
 	"os/exec"
-	"regexp"
 	"strings"
 	"sync"
 	"syscall"
@@ -26,10 +26,50 @@ import (
 var options = map[string][]string{
 	"run":   {"-m", "-r", "-w", "--worktree", "-c", "--json", "--schema", "-C", "-t", "--no-hooks"},
 	"batch": {"-m", "-r", "-w", "--worktree", "--json", "--schema", "-C", "-t", "-j", "--resume", "--no-hooks"},
-	"show":  {"--json"}, "runs": {"-n"}, "stop": {}, "models": {}, "install": {}, "packages": {}, "remove": {},
+	"title": {"--command", "--description"},
+	"show":  {"--json"}, "runs": {"-n"}, "stop": {}, "models": {"--names"}, "help": {}, "install": {}, "packages": {}, "remove": {},
 }
 var long = map[string]string{"--model": "-m", "--read": "-r", "--write": "-w", "--continue": "-c", "--dir": "-C", "--timeout": "-t"}
-var value = map[string]bool{"-m": true, "-c": true, "--schema": true, "-C": true, "-t": true, "-j": true, "-n": true, "--resume": true}
+var value = map[string]bool{"-m": true, "-c": true, "--schema": true, "-C": true, "-t": true, "-j": true, "-n": true, "--resume": true, "--command": true, "--description": true}
+
+// suggestion returns a valid option only when the spelling is one edit away.
+func suggestion(command, wrong string) string {
+	choices := append([]string{"--help", "-h", "--version", "-V"}, options[command]...)
+	for alias, short := range long {
+		if has(options[command], short) {
+			choices = append(choices, alias)
+		}
+	}
+	for _, right := range choices {
+		if oneEdit(wrong, right) {
+			return right
+		}
+	}
+	return ""
+}
+
+// oneEdit recognizes one inserted, removed, changed or transposed character.
+func oneEdit(a, b string) bool {
+	if a == b {
+		return false
+	}
+	if len(a) > len(b) {
+		a, b = b, a
+	}
+	if len(b)-len(a) > 1 {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		if a[i] == b[i] {
+			continue
+		}
+		if len(a) == len(b) {
+			return a[i+1:] == b[i+1:] || i+1 < len(a) && a[i] == b[i+1] && a[i+1] == b[i] && a[i+2:] == b[i+2:]
+		}
+		return a[i:] == b[i+1:]
+	}
+	return len(b) == len(a)+1
+}
 
 // has tests membership in a command's accepted option list.
 func has(list []string, item string) bool {
@@ -80,11 +120,10 @@ func parse(command string, argv []string) (home.Object, []string, error) {
 				flag = alias
 			}
 			if !has(options[command], flag) {
-				prefix := ""
-				if command != "run" {
-					prefix = "ask " + command + ": "
+				if right := suggestion(command, arg); right != "" {
+					return nil, nil, home.Usage("unknown option %s; did you mean %s?", arg, right)
 				}
-				return nil, nil, home.Usage("%sunknown option %s", prefix, arg)
+				return nil, nil, home.Usage("unknown option %s", arg)
 			}
 			if !value[flag] {
 				opts.Set(flag, true)
@@ -128,7 +167,8 @@ func taskOptions(opts home.Object) (home.Object, error) {
 		if e != nil {
 			return nil, home.Usage("cannot parse schema %s: %s", opts.S("--schema"), e)
 		}
-		t.Set("schema", schema)
+		_ = schema
+		t.Set("schema", json.RawMessage(text))
 	}
 	if opts.B("-C") {
 		t.Set("dir", opts.Get("-C"))
@@ -181,48 +221,43 @@ func readTasks(text string) ([]any, error) {
 	return items, nil
 }
 
-// prepare lists available models only when needed, then validates and resolves tasks.
+// prepare validates task fields and resolves follow-ups without starting model processes.
 func prepare(a *agent.Registry, items []any, defaults home.Object, id string, single bool) ([]home.Object, error) {
-	lacking := false
-	for _, v := range items {
-		t, _ := v.(home.Object)
-		if !t.B("model") && !defaults.B("model") && !t.B("continue") {
-			lacking = true
-		}
-	}
-	ids := []string{}
-	if lacking {
-		config, e := a.Paths.ReadModels()
-		if e != nil {
-			return nil, e
-		}
-		var fatal error
-		ids, _, fatal = a.List(config)
-		if fatal != nil {
-			return nil, fatal
-		}
-	}
-	return runs.Prepare(a.Paths, items, defaults, id, single, func(where string) error {
-		available := strings.Join(ids, "\n  ")
-		if available == "" {
-			available = "none; add an agent to " + a.Paths.Agents
-		}
-		return home.Usage("%s needs a model (-m); available:\n  %s", where, available)
-	})
+	return runs.Prepare(a.Paths, items, defaults, id, single, func(where string) error { return home.Usage("%s needs a model (-m)", where) })
 }
 
 // reporter serializes complete status lines from parallel tasks to stderr.
-func reporter(r *runs.Run) func(runs.Event) {
+func reporter(a *agent.Registry, r *runs.Run, live *status.Live) func(runs.Event) {
 	var mu sync.Mutex
-	return func(e runs.Event) { mu.Lock(); defer mu.Unlock(); fmt.Fprintln(os.Stderr, status.EventLine(r, e)) }
+	return func(e runs.Event) {
+		mu.Lock()
+		defer mu.Unlock()
+		if live == nil {
+			fmt.Fprintln(os.Stderr, status.StyledLine(status.EventLine(r, e), os.Stderr))
+			return
+		}
+		name := ""
+		if e.Kind == "start" {
+			name = e.Started.Name
+		}
+		live.Update(e, name, status.EventLine(r, e))
+	}
 }
 
 // answerText prints JSON task values as JSON and ordinary answers as text.
 func answerText(t, r home.Object) string {
-	if t.B("json") || t.B("schema") {
+	if t.B("json") || t.Has("schema") && t.Get("schema") != nil {
 		return home.JSON(r.Get("answer"), false)
 	}
-	return home.String(r.Get("answer"))
+	answer := r.Get("answer")
+	if raw, ok := answer.(json.RawMessage); ok {
+		var text string
+		if json.Unmarshal(raw, &text) == nil {
+			return text
+		}
+		return string(raw)
+	}
+	return home.String(answer)
 }
 
 // runOne records and executes one prompt, printing only a successful answer.
@@ -255,7 +290,15 @@ func runOne(a *agent.Registry, opts home.Object, words []string) (int, error) {
 	if e != nil {
 		return 0, e
 	}
-	results, e := runs.Execute(a, r, 1, !opts.B("--no-hooks"), reporter(r))
+	live := status.NewLive(r, "", false)
+	process.OnStop(func() { live.Finish("ask "+r.ID+" · stopped", true) })
+	defer process.OnStop(nil)
+	results, e := runs.Execute(a, r, 1, !opts.B("--no-hooks"), reporter(a, r, live))
+	final := ""
+	if e == nil {
+		final = status.Done(results[0])
+	}
+	live.Finish(final, false)
 	if e != nil {
 		return 0, e
 	}
@@ -280,9 +323,9 @@ func batch(a *agent.Registry, opts home.Object, words []string) (int, error) {
 	var e error
 	if opts.B("--resume") {
 		extra := []string{}
-		for _, f := range opts {
-			if !has([]string{"--resume", "-j", "--no-hooks"}, f.Key) {
-				extra = append(extra, f.Key)
+		for key := range opts {
+			if !has([]string{"--resume", "-j", "--no-hooks"}, key) {
+				extra = append(extra, key)
 			}
 		}
 		extra = append(extra, words...)
@@ -330,13 +373,23 @@ func batch(a *agent.Registry, opts home.Object, words []string) (int, error) {
 		}
 	}
 	begin := time.Now()
-	fmt.Fprintln(os.Stderr, status.BatchStart(r, jobs, todo))
-	results, e := runs.Execute(a, r, jobs, !opts.B("--no-hooks"), reporter(r))
+	header := status.BatchStart(r, jobs, todo)
+	live := status.NewLive(r, header, true)
+	if live == nil {
+		fmt.Fprintln(os.Stderr, status.StyledLine(header, os.Stderr))
+	}
+	process.OnStop(func() { live.Finish("ask "+r.ID+" · stopped", true) })
+	defer process.OnStop(nil)
+	results, e := runs.Execute(a, r, jobs, !opts.B("--no-hooks"), reporter(a, r, live))
+	summary := status.BatchEnd(r, float64(time.Since(begin).Milliseconds())/1000)
+	live.Finish(summary, false)
 	if e != nil {
 		return 0, e
 	}
-	fmt.Fprintln(os.Stderr, status.BatchEnd(r, float64(time.Since(begin).Milliseconds())/1000))
-	fmt.Fprintln(os.Stdout, home.JSON(results, true))
+	if live == nil {
+		fmt.Fprintln(os.Stderr, status.StyledLine(summary, os.Stderr))
+	}
+	fmt.Fprintln(os.Stdout, home.JSON(home.ResultRecords(results), true))
 	for _, x := range results {
 		if !x.B("ok") {
 			return 1, nil
@@ -355,16 +408,17 @@ func show(p home.Paths, opts home.Object, words []string) (int, error) {
 		return 0, e
 	}
 	if i < 0 {
-		fmt.Fprintln(os.Stdout, home.JSON(r.Results, true))
+		fmt.Fprintln(os.Stderr, status.StyledLine(status.BatchSaved(r), os.Stderr))
+		fmt.Fprintln(os.Stdout, home.JSON(home.ResultRecords(r.Results), true))
 		return 0, nil
 	}
 	result := r.Results[i]
 	if result == nil {
 		return 0, home.Usage("%s has not finished; see `ask runs`", words[0])
 	}
-	fmt.Fprintln(os.Stderr, status.Done(result))
+	fmt.Fprintln(os.Stderr, status.StyledLine(status.Done(result), os.Stderr))
 	if opts.B("--json") {
-		fmt.Fprintln(os.Stdout, home.JSON(result, true))
+		fmt.Fprintln(os.Stdout, home.JSON(home.ResultRecords([]home.Object{result})[0], true))
 	} else if result.B("ok") {
 		fmt.Fprintln(os.Stdout, answerText(r.Tasks[i], result))
 	}
@@ -409,29 +463,51 @@ func listRuns(p home.Paths, opts home.Object) (int, error) {
 	if len(list) == 0 {
 		fmt.Fprintln(os.Stderr, "ask: no runs yet")
 	} else {
-		fmt.Fprintln(os.Stdout, status.Table(list))
+		fmt.Fprintln(os.Stdout, status.Table(list, time.Now(), status.CanStyle(os.Stdout)))
 	}
 	return 0, nil
 }
 
 // models lists installed model ids and reports declaration failures without failing the command.
-func models(a *agent.Registry) (int, error) {
+func models(a *agent.Registry, names bool) (int, error) {
 	config, e := a.Paths.ReadModels()
 	if e != nil {
 		return 0, e
 	}
-	ids, errors, fatal := a.List(config)
-	if fatal != nil {
-		return 0, fatal
-	}
+	ids, errors := a.List(config)
 	for _, e := range errors {
 		fmt.Fprintln(os.Stderr, "ask: could not list the models of "+e)
 	}
 	if len(ids) == 0 {
 		fmt.Fprintf(os.Stderr, "ask: no models; add an agent to %s (see docs/agents.md)\n", a.Paths.Agents)
 	}
+	previous := ""
 	for _, id := range ids {
-		fmt.Fprintln(os.Stdout, id)
+		if names {
+			m, _ := agent.Parse(a.Paths, id)
+			fmt.Fprintf(os.Stdout, "%s\t%s\n", id, a.Name(m, ""))
+		} else if status.IsTerminal(os.Stdout) {
+			owner, model, _ := strings.Cut(id, ":")
+			if owner != previous {
+				if previous != "" {
+					fmt.Fprintln(os.Stdout)
+				}
+				if status.CanStyle(os.Stdout) {
+					fmt.Fprintf(os.Stdout, "\x1b[1m%s\x1b[0m\n", owner)
+				} else {
+					fmt.Fprintln(os.Stdout, owner)
+				}
+				previous = owner
+			}
+			m, _ := agent.Parse(a.Paths, id)
+			label := fmt.Sprintf("  %-24s %s", model, a.Name(m, ""))
+			if status.CanStyle(os.Stdout) {
+				label = fmt.Sprintf("  %-24s \x1b[2m%s\x1b[0m", model, a.Name(m, ""))
+			}
+			fmt.Fprintln(os.Stdout, label)
+		} else {
+			fmt.Fprintln(os.Stdout, id)
+		}
 	}
 	return 0, nil
 }
@@ -472,8 +548,14 @@ func listPackages(p home.Paths) (int, error) {
 	if len(all) == 0 {
 		fmt.Fprintln(os.Stderr, "ask: no packages installed; ask install OWNER/REPO adds one")
 	}
+	width := 0
 	for _, x := range all {
-		fmt.Fprintf(os.Stdout, "%s\t%s\n", x.Name, packages.Contents(x.Path))
+		if len(x.Name) > width {
+			width = len(x.Name)
+		}
+	}
+	for _, x := range all {
+		fmt.Fprintf(os.Stdout, "%-*s  %s\n", width, x.Name, packages.Contents(x.Path))
 	}
 	return 0, nil
 }
@@ -489,37 +571,6 @@ func remove(p home.Paths, words []string) (int, error) {
 	}
 	fmt.Fprintln(os.Stderr, "ask: "+line)
 	return 0, nil
-}
-
-var description = regexp.MustCompile(`ask-command:\s*(.+)`)
-
-// help appends descriptions of discovered commands to the stable built-in help.
-func help(p home.Paths) string {
-	commands := find.Sorted(p, "commands")
-	if len(commands) == 0 {
-		return helpText
-	}
-	width := 0
-	for _, c := range commands {
-		if len(c.Name) > width {
-			width = len(c.Name)
-		}
-	}
-	lines := []string{}
-	for _, c := range commands {
-		desc := ""
-		if b, e := os.ReadFile(c.Path); e == nil {
-			s := string(b)
-			if len(s) > 4096 {
-				s = s[:4096]
-			}
-			if m := description.FindStringSubmatch(s); m != nil {
-				desc = home.Trim(m[1])
-			}
-		}
-		lines = append(lines, strings.TrimRight(fmt.Sprintf("  ask %-*s  %s", width, c.Name, desc), " "))
-	}
-	return helpText + "\n\nyour commands\n" + strings.Join(lines, "\n")
 }
 
 // runCommand gives a user executable the terminal streams, arguments and contract environment.
@@ -539,17 +590,15 @@ func runCommand(p home.Paths, path string, args []string) (int, error) {
 		}
 		return cmd.ProcessState.ExitCode(), nil
 	}
-	if errors.Is(e, syscall.ENOEXEC) || errors.Is(e, syscall.ENOTDIR) {
-		return 0, fmt.Errorf("%s", process.SpawnError(path, e))
-	}
-	fmt.Fprintf(os.Stderr, "ask: cannot run %s: %s\n", path, process.SpawnError(path, e))
+
+	fmt.Fprintf(os.Stderr, "ask: cannot run %s: %s\n", path, e.Error())
 	return 1, nil
 }
 
 // main selects built-in or user commands before parsing command-specific options.
 func main(argv []string, version string) (int, error) {
 	p := home.New()
-	if len(argv) == 1 && argv[0] == "--version" {
+	if len(argv) == 1 && (argv[0] == "--version" || argv[0] == "-V") {
 		fmt.Fprintln(os.Stdout, version)
 		return 0, nil
 	}
@@ -572,12 +621,31 @@ func main(argv []string, version string) (int, error) {
 	if e != nil {
 		return 0, e
 	}
-	if opts.B("help") || len(argv) == 0 {
-		fmt.Fprintln(os.Stdout, help(p))
+	if len(argv) == 0 || command == "run" && len(argv) == 1 && opts.B("help") || command == "help" && len(words) == 0 {
+		printHelp(overview(agent.New(p)))
 		return 0, nil
+	}
+	if opts.B("help") {
+		topic := command
+		if topic == "help" {
+			topic = "run"
+		}
+		printHelp(topicHelp(topic))
+		return 0, nil
+	}
+	if has([]string{"models", "runs", "packages"}, command) && len(words) != 0 {
+		return 0, home.Usage("ask %s takes no arguments", command)
 	}
 	a := agent.New(p)
 	switch command {
+	case "title":
+		if len(words) != 0 || !opts.Has("--command") {
+			return 0, home.Usage("ask title needs --command STRING and optional --description TEXT")
+		}
+		if title := commandTitle(a, opts.S("--command"), opts.S("--description")); title != "" {
+			fmt.Fprintln(os.Stdout, title)
+		}
+		return 0, nil
 	case "batch":
 		return batch(a, opts, words)
 	case "show":
@@ -587,7 +655,17 @@ func main(argv []string, version string) (int, error) {
 	case "runs":
 		return listRuns(p, opts)
 	case "models":
-		return models(a)
+		return models(a, opts.B("--names"))
+	case "help":
+		if len(words) != 1 {
+			return 0, home.Usage("ask help takes one command")
+		}
+		text := topicHelp(words[0])
+		if text == "" {
+			return 0, home.Usage("unknown help topic %q", words[0])
+		}
+		printHelp(text)
+		return 0, nil
 	case "install":
 		return install(p, words)
 	case "packages":
@@ -607,11 +685,25 @@ func Main(argv []string, version string) int {
 	process.AwaitShutdown()
 	if e != nil {
 		var usage *home.UsageError
-		fmt.Fprintln(os.Stderr, "ask: "+e.Error())
 		if errors.As(e, &usage) {
-			fmt.Fprintln(os.Stderr, "run `ask --help`")
+			topic := "run"
+			if len(argv) > 0 {
+				if _, ok := options[argv[0]]; ok {
+					topic = argv[0]
+				}
+			}
+			message := strings.Join(strings.Fields(e.Error()), " ")
+			if message == "unknown option -help; did you mean --help?" || message == "unknown option -version; did you mean --version?" {
+				fmt.Fprintf(os.Stderr, "ask: %s\n", message)
+			} else {
+				fmt.Fprintf(os.Stderr, "ask: %s; see ask %s --help\n", message, topic)
+			}
+			if strings.Contains(e.Error(), "needs a model") || strings.Contains(e.Error(), "bad model") || strings.Contains(e.Error(), "no agent") {
+				fmt.Fprintln(os.Stderr, modelLines(agent.New(home.New())))
+			}
 			return 2
 		}
+		fmt.Fprintln(os.Stderr, "ask: "+e.Error())
 		return 1
 	}
 	return code

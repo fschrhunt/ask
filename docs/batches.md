@@ -40,17 +40,18 @@ Options given to `ask batch` are defaults; a task's own fields win.
 ask batch -j 4 -m mycli:atlas-2.1-mini tasks.json
 ```
 
-`-j` is how many tasks run at once (default 4). Status lines go to stderr as tasks start and end:
+`-j` is how many tasks run at once (default 4). In a terminal, stderr shows live task rows (queued, running with elapsed time, ok or failed),
+then a summary. In pipes, the same status lines go to stderr as tasks start and end:
 
 ```text
-ask p81c0d · batch of 3 · 3 at a time
-ask p81c0d/api · mycli:atlas-2.1-mini · read · ~/code/app · started
-ask p81c0d/tests · othercli:nova-4 · read · ~/code/app · started
-ask p81c0d/fix · mycli:atlas-2.1-mini · write · ~/code/app · started
-ask p81c0d/api · Atlas 2.1 Mini · ok · 18.1s · 22.4k in · 640 out · $0.0710
-ask p81c0d/fix · Atlas 2.1 Mini · ok · 25.3s · 1 file changed · 30.2k in · 410 out · $0.0340
-ask p81c0d/tests · Nova 4 · failed · 15m 00s · timed out
-ask p81c0d · 2/3 ok · 15m 00s · 52.6k in · 1.1k out · $0.1050
+ask p81c0d · started · batch of 3 · 3 at a time
+ask p81c0d/api · started · Atlas 2.1 Mini · read · ~/code/app
+ask p81c0d/tests · started · Nova 4 · read · ~/code/app
+ask p81c0d/fix · started · Atlas 2.1 Mini · write · ~/code/app
+ask p81c0d/api · ok · Atlas 2.1 Mini · 18.1s · 22.4k in · 640 out · $0.07
+ask p81c0d/fix · ok · Atlas 2.1 Mini · 25.3s · 1 file changed · 30.2k in · 410 out · $0.03
+ask p81c0d/tests · failed · Nova 4 · 15:00 · timed out
+ask p81c0d · 2/3 ok · 15:00 · 52.6k in · 1.1k out · $0.11
 ```
 
 ## Results

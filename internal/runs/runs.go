@@ -3,6 +3,7 @@ package runs
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -14,10 +15,10 @@ import (
 	"sync"
 	"syscall"
 	"time"
-	"unicode/utf8"
 
 	"github.com/fschrhunt/ask/internal/agent"
 	"github.com/fschrhunt/ask/internal/find"
+	"github.com/fschrhunt/ask/internal/git"
 	"github.com/fschrhunt/ask/internal/home"
 	"github.com/fschrhunt/ask/internal/hooks"
 	"github.com/fschrhunt/ask/internal/task"
@@ -66,27 +67,31 @@ func readJSON(path string) any {
 
 // load reads task-position results and refuses damaged results instead of silently rerunning them.
 func load(dir string) (*Run, error) {
-	a, ok := readJSON(filepath.Join(dir, "tasks.json")).([]any)
-	if !ok {
+	b, err := os.ReadFile(filepath.Join(dir, "tasks.json"))
+	var records []home.TaskRecord
+	if err != nil || json.Unmarshal(b, &records) != nil || records == nil {
 		return nil, home.Usage("%s is not a readable run", dir)
 	}
-	tasks := make([]home.Object, len(a))
-	results := make([]home.Object, len(a))
-	for i, t := range a {
-		tasks[i], _ = t.(home.Object)
+	tasks := make([]home.Object, len(records))
+	results := make([]home.Object, len(records))
+	for i, t := range records {
+		tasks[i], _ = home.ParsePayload(home.JSON(t, false))
 	}
 	path := filepath.Join(dir, "results.json")
-	if _, e := os.Stat(path); e == nil {
-		saved, ok := readJSON(path).([]any)
-		if !ok {
+	if b, err := os.ReadFile(path); err == nil {
+		var saved []*home.ResultRecord
+		if json.Unmarshal(b, &saved) != nil || saved == nil {
 			return nil, home.Usage("%s is damaged; move it away to rerun every task", path)
 		}
 		for i := range tasks {
-			if i < len(saved) {
-				results[i], _ = saved[i].(home.Object)
+			if i < len(saved) && saved[i] != nil {
+				results[i], _ = home.ParsePayload(home.JSON(saved[i], false))
 			}
 		}
+	} else if !os.IsNotExist(err) {
+		return nil, err
 	}
+
 	name := filepath.Base(dir)
 	at := strings.LastIndex(name, "-")
 	id, created := name, ""
@@ -105,7 +110,7 @@ func Create(p home.Paths, id string, tasks []home.Object) (*Run, error) {
 	if e := os.MkdirAll(dir, 0777); e != nil {
 		return nil, e
 	}
-	if e := home.WriteJSON(filepath.Join(dir, "tasks.json"), tasks); e != nil {
+	if e := home.WriteJSON(filepath.Join(dir, "tasks.json"), home.TaskRecords(tasks)); e != nil {
 		return nil, e
 	}
 	return load(dir)
@@ -166,28 +171,14 @@ func Open(p home.Paths, ref string) (*Run, int, error) {
 
 var digits = regexp.MustCompile(`^\d+$`)
 
-// safeWorktreeID replaces each unsafe UTF-16 unit, matching the original batch branch names.
+// safeWorktreeID replaces characters unsafe in branch names and filesystem paths.
 func safeWorktreeID(id string) string {
-	var out strings.Builder
-	for i := 0; i < len(id); {
-		c := id[i]
-		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '.' || c == '-' {
-			out.WriteByte(c)
-			i++
-			continue
+	return strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || strings.ContainsRune("_.-", r) {
+			return r
 		}
-		out.WriteByte('_')
-		if c == 0xed && i+2 < len(id) && id[i+1] >= 0xa0 && id[i+1] <= 0xbf && id[i+2] >= 0x80 && id[i+2] <= 0xbf {
-			i += 3
-			continue
-		}
-		r, n := utf8.DecodeRuneInString(id[i:])
-		if r > 0xffff {
-			out.WriteByte('_')
-		}
-		i += n
-	}
-	return out.String()
+		return '_'
+	}, id)
 }
 
 // Alive tests process existence, treating permission errors as alive.
@@ -233,9 +224,9 @@ func Prepare(p home.Paths, items []any, defaults home.Object, id string, single 
 			return nil, home.Usage("%s must be a JSON object", where)
 		}
 		t := defaults.Clone()
-		for _, f := range original {
-			if f.Value != nil {
-				t.Set(f.Key, f.Value)
+		for key, val := range original {
+			if val != nil {
+				t.Set(key, val)
 			}
 		}
 		if _, ok := t.Get("prompt").(string); !ok || home.Trim(t.S("prompt")) == "" {
@@ -434,31 +425,38 @@ type Event struct {
 }
 
 // withHooks applies refusal and result decisions, allowing at most three session follow-ups.
-func withHooks(a *agent.Registry, h *hooks.Hooks, t home.Object, ref string, report func(Event)) (home.Object, error) {
-	if h != nil {
-		changed, refused, notes, err := h.Before(t, ref)
-		if err != nil {
-			return nil, err
+func withHooks(a *agent.Registry, h *hooks.Hooks, t home.Object, ref string, report func(Event)) (final home.Object) {
+	var worktree *git.Worktree
+	defer func() {
+		if worktree == nil {
+			return
 		}
+		files, commits := git.Changes(&git.Snapshot{Root: worktree.Path, Head: worktree.Base})
+		if len(files) == 0 && commits == 0 {
+			git.Remove(worktree)
+			final.Delete("worktree")
+		} else if final != nil {
+			final.Set("worktree", home.O("path", worktree.Path, "branch", worktree.Branch))
+		}
+	}()
+	if h != nil {
+		changed, refused, notes := h.Before(t, ref)
 		for _, n := range notes {
 			report(Event{Kind: "note", Note: n})
 		}
 		t = changed
 		if refused != "" {
-			return home.O("id", t.Get("id"), "model", t.Get("model"), "name", t.Get("model"), "ok", false, "error", "refused by hook "+refused, "seconds", 0, "usage", nil, "session", nil, "dir", t.Get("dir")), nil
+			return home.O("id", t.Get("id"), "model", t.Get("model"), "name", t.Get("model"), "ok", false, "error", "refused by hook "+refused, "seconds", 0, "usage", nil, "session", nil, "dir", t.Get("dir"))
 		}
 	}
-	started := func(info task.Started) { report(Event{Kind: "start", Started: info}) }
+	started := func(info task.Started) { worktree = info.Worktree; report(Event{Kind: "start", Started: info}) }
 	result := task.Run(a, t, started)
 	for round := 0; h != nil; round++ {
 		x := home.O("run", ref)
-		for _, f := range result {
-			x.Set(f.Key, f.Value)
+		for key, val := range result {
+			x.Set(key, val)
 		}
-		followup, fail, notes, err := h.After(t, x, ref)
-		if err != nil {
-			return nil, err
-		}
+		followup, fail, notes := h.After(t, x, ref)
 		for _, n := range notes {
 			report(Event{Kind: "note", Note: n})
 		}
@@ -468,7 +466,7 @@ func withHooks(a *agent.Registry, h *hooks.Hooks, t home.Object, ref string, rep
 			result.Delete("note")
 			result.Set("ok", false)
 			result.Set("error", "failed by hook "+fail.Name+": "+fail.Text)
-			return result, nil
+			return result
 		}
 		if followup == nil {
 			break
@@ -487,7 +485,7 @@ func withHooks(a *agent.Registry, h *hooks.Hooks, t home.Object, ref string, rep
 		next.Set("session", result.Get("session"))
 		result = combine(result, task.Run(a, next, started))
 	}
-	return result, nil
+	return result
 }
 
 // Execute runs unfinished tasks up to jobs at once and atomically saves each completed result.
@@ -538,7 +536,7 @@ func Execute(a *agent.Registry, r *Run, jobs int, enabled bool, report func(Even
 				if ordered {
 					<-starts[position]
 				}
-				result, err := withHooks(a, h, r.Tasks[i], Ref(r, i), func(e Event) {
+				result := withHooks(a, h, r.Tasks[i], Ref(r, i), func(e Event) {
 					e.Index = i
 					report(e)
 					if e.Kind == "start" {
@@ -546,19 +544,14 @@ func Execute(a *agent.Registry, r *Run, jobs int, enabled bool, report func(Even
 					}
 				})
 				release()
-				if err != nil {
-					mu.Lock()
-					failure = err
-					mu.Unlock()
-					return
-				}
+
 				x := home.O("run", Ref(r, i))
-				for _, f := range result {
-					x.Set(f.Key, f.Value)
+				for key, val := range result {
+					x.Set(key, val)
 				}
 				mu.Lock()
 				r.Results[i] = x
-				e := home.WriteJSON(filepath.Join(r.Dir, "results.json"), r.Results)
+				e := home.WriteJSON(filepath.Join(r.Dir, "results.json"), home.ResultRecords(r.Results))
 				if e != nil {
 					failure = e
 				}

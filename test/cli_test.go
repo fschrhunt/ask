@@ -16,8 +16,8 @@ func TestCLI(t *testing.T) {
 		r := s.ask("hello")
 		eq(t, r.code, 2)
 		match(t, r.stderr, `needs a model`)
-		match(t, r.stderr, `fake:small`)
-		match(t, r.stderr, `fake:extra`)
+		match(t, r.stderr, `fake +small  +big`)
+		match(t, r.stderr, `fake +small  +big  +extra`)
 		eq(t, len(s.calls()), 0)
 	})
 	t.Run("a malformed model or an unknown agent is a usage error", func(t *testing.T) {
@@ -122,7 +122,7 @@ func TestCLI(t *testing.T) {
 		r := s.ask("-m", "fake:small", "hi")
 		eq(t, r.stdout, "fake: hi\n")
 		id := runID(t, r.stderr)
-		match(t, r.stderr, fmt.Sprintf(`^ask %s · fake:small · read · .+ · started\nask %s · Fake 1\.0 · ok · [\d.]+s · 10 in · 5 out · \$0\.0100\n$`, id, id))
+		match(t, r.stderr, fmt.Sprintf(`^ask %s · started · Small One · read · .+\nask %s · ok · Fake 1\.0 · [\d.]+s · 10 in · 5 out · \$0\.01\n$`, id, id))
 	})
 	t.Run("a run that reports no usage prints no usage", func(t *testing.T) {
 		s := fresh(t)

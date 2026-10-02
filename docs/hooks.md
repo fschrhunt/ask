@@ -17,8 +17,9 @@ A hook is any executable. ask calls it with one argument, the event:
 
 | Call | stdin | What it may print (one JSON object, or nothing) |
 | --- | --- | --- |
-| `NAME events` | none | The events it handles, one per line: `task`, `result` |
+| `NAME events` | none | The events it handles, one per line: `task`, `result`, `title` |
 | `NAME task` | `{"task": {...}}` | `{"task": {changes}}`, `{"refuse": "why"}`, `{"note": "text"}` |
+| `NAME title` | `{"title": "...", "command": ["ask", "..."], "description": "..."}` | `{"title": "replacement"}` |
 | `NAME result` | `{"task": {...}, "result": {...}}` | `{"followup": "prompt"}`, `{"fail": "why"}`, `{"note": "text"}` |
 
 - **`task`** is the task about to run: `id`, `prompt`, `model`, `write`, `json`, `schema`, `dir`,
@@ -34,15 +35,15 @@ A hook is any executable. ask calls it with one argument, the event:
 Hooks run in name order; each sees the task as the previous one left it. For results, the first
 hook to ask for a follow-up or to fail the result decides, and the rest wait for the next round.
 
-**Hooks fail open.** A hook that crashes, takes more than 10 minutes, or prints something that
+**Hooks fail open.** A hook that cannot start, crashes, takes more than 10 minutes, or prints something that
 isn't a JSON object changes nothing; ask notes it and carries on. Only an explicit `refuse` or
 `fail` stops a task. Every note and follow-up shows as a status line:
 
 ```text
-ask k3f9a2 · claude:sonnet-5.5 · write · ~/code/app · started
-ask k3f9a2 · hook verify · 2 tests fail
-ask k3f9a2 · hook verify · follow-up: These tests fail after your change: ...
-ask k3f9a2 · Sonnet 5.5 · ok · 3m 12s · 3 files changed · 140.2k in · 6.1k out · $0.6200
+ask k3f9a2 · started · Sonnet 5.5 · write · ~/code/app
+ask k3f9a2 · note · hook verify · 2 tests fail
+ask k3f9a2 · follow-up · hook verify · These tests fail after your change: ...
+ask k3f9a2 · ok · Sonnet 5.5 · 3:12 · 3 files changed · 140.2k in · 6.1k out · $0.62
 ```
 
 ## Example: verify write runs with the tests
@@ -94,3 +95,7 @@ node -e '
 ```
 
 ask never runs hooks from the project it works in, only yours and your packages'.
+
+The `title` event runs only for [host titles](hosts.md). `command` is the literal ask argv,
+without shell assignments or redirects; `description` is the host's original text. Hooks run
+in the invocation's directory without a run id. An empty replacement keeps the current title.

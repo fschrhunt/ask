@@ -4,6 +4,9 @@
 ask -m MODEL [options] PROMPT
 ```
 
+`ask --help` is a compact reference with the models installed here. `ask batch --help`,
+`ask help hooks` and `ask help agents` describe their contracts.
+
 Every run names its model. ask never picks one for you, the same way you name a model when you
 start a subagent.
 
@@ -47,7 +50,7 @@ When a write run's directory is in a git repository, ask compares the repository
 and reports what the run changed: in the status line, and in full with `ask show RUN --json`.
 
 ```text
-ask k3f9a2 · Atlas 2.1 · ok · 41.2s · 3 files changed, 1 commit · 52.1k in · 2.0k out · $0.3100
+ask k3f9a2 · ok · Atlas 2.1 · 41.2s · 3 files changed, 1 commit · 52.1k in · 2.0k out · $0.31
 ```
 
 ```json
@@ -71,8 +74,8 @@ ask -m mycli:atlas-2.1 -w --worktree -C ~/code/app "Add rate limiting to the log
 ```
 
 ```text
-ask k3f9a2 · mycli:atlas-2.1 · write · worktree ~/.ask/worktrees/k3f9a2 · started
-ask k3f9a2 · Atlas 2.1 · ok · 3m 05s · 4 files changed · branch ask/k3f9a2 · 120.4k in · 6.2k out
+ask k3f9a2 · started · Atlas 2.1 · write · worktree ~/.ask/worktrees/k3f9a2
+ask k3f9a2 · ok · Atlas 2.1 · 3:05 · 4 files changed · branch ask/k3f9a2 · 120.4k in · 6.2k out
 ```
 
 The worktree starts from the repository's `HEAD`, at `~/.ask/worktrees/RUN`, on branch `ask/RUN`.
@@ -84,7 +87,8 @@ git -C ~/code/app merge ask/k3f9a2
 git -C ~/code/app worktree remove ~/.ask/worktrees/k3f9a2 && git -C ~/code/app branch -d ask/k3f9a2
 ```
 
-If it changed nothing, ask removes them. Uncommitted changes in your checkout are not in the
+After all hook follow-ups, ask removes them only if no file changes or commits remain relative
+to the worktree's starting commit. An idle follow-up keeps earlier work. Uncommitted changes in your checkout are not in the
 worktree; ask says so when it starts.
 
 ## Where the agent works
@@ -135,11 +139,11 @@ EOF
 ask -m mycli:atlas-2.1 --schema findings.json "Find bugs in src/parser.js" | jq '.bugs[].file'
 ```
 
-ask checks `type`, `enum`, `properties`, `required`, `additionalProperties: false` and `items`. An
+ask honors boolean schemas (`false` rejects every answer) and checks `type`, `enum`, `const`, `properties`, `required`, `additionalProperties: false` and `items` (including `items: false`). An
 answer that is not JSON, or does not match, fails the run with the reason:
 
 ```text
-ask k3f9a2 · Atlas 2.1 · failed · 12.3s · answer does not match the schema: $.bugs[0]: missing "file"
+ask k3f9a2 · failed · Atlas 2.1 · 12.3s · answer does not match the schema: $.bugs[0]: missing "file"
 ```
 
 ## Follow-ups
@@ -154,16 +158,25 @@ ask -c k3f9a2 -w "Fix it."
 ## Output
 
 - **stdout** has only the answer: text, or JSON under `--json`/`--schema`. It is safe to pipe.
-- **stderr** has a status line when the run starts and one when it ends. Each begins with the run's
-  id. The first names what you asked for, the second the model that ran, with the outcome, time,
+- **stderr** in a pipe has a status line when the run starts and one when it ends. Each begins
+  with the run's id. The first names the task after hooks, the second the model that ran, with the outcome, time,
   what changed and usage when the agent reports it.
 
 ```text
-ask k3f9a2 · mycli:atlas-2.1 · read · ~/code/app · started
-ask k3f9a2 · Atlas 2.1 · ok · 14.2s · 31.0k in · 812 out · $0.0874
+ask k3f9a2 · started · Atlas 2.1 · read · ~/code/app
+ask k3f9a2 · ok · Atlas 2.1 · 14.2s · 31.0k in · 812 out · $0.09
 ```
 
 - **Exit code**: 0 on success, 1 when the run failed, 2 when ask was called wrong (the message says
-  what to fix).
+  what to fix and points to `ask COMMAND --help`). Missing or malformed model specifications
+  also show available models grouped by agent.
 
 Stopping ask (Ctrl-C) stops the agent too.
+
+On a terminal, stderr shows a spinner with the model name, read/write access, directory and
+elapsed time, then a final marked row. Hook notes and follow-ups appear beneath their task.
+Batches show a header and task rows with queued, running, ok or failed state and reasons.
+Rows fit the terminal width; very large batches show a count of hidden lines.
+The frame finishes before answers print, so stdout may share the terminal. Ctrl-C stops agents,
+leaves the stopped state visible and restores the cursor. `TERM=dumb` uses plain lines;
+`NO_COLOR` disables colors while retaining live updates. Piped stderr has no ANSI or spinner.

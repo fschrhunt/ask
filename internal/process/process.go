@@ -3,8 +3,6 @@
 package process
 
 import (
-	"errors"
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -18,6 +16,14 @@ import (
 
 	"github.com/fschrhunt/ask/internal/home"
 )
+
+var shutdown struct {
+	sync.Mutex
+	cleanup func()
+}
+
+// OnStop installs terminal cleanup to run after stopped groups, before exit 130.
+func OnStop(cleanup func()) { shutdown.Lock(); shutdown.cleanup = cleanup; shutdown.Unlock() }
 
 var groups = struct {
 	sync.Mutex
@@ -39,6 +45,12 @@ func Listen() {
 		}
 		groups.Unlock()
 		stopGroups(pids)
+		shutdown.Lock()
+		cleanup := shutdown.cleanup
+		shutdown.Unlock()
+		if cleanup != nil {
+			cleanup()
+		}
 		os.Exit(130)
 	}()
 }
@@ -92,12 +104,10 @@ type Options struct {
 }
 
 // Result contains decoded output, exit code (-1 for signals/spawn errors), and timeout state.
-// Fatal identifies start errors that bypassed the original runtime's process error callback.
 type Result struct {
 	Code           int
 	Stdout, Stderr string
 	TimedOut       bool
-	Fatal          bool
 }
 
 type tail struct{ b []byte }
@@ -113,7 +123,7 @@ func (t *tail) Write(b []byte) (int, error) {
 }
 
 // Run resolves after the child and its leftovers stop; failures become Result, never panics.
-// Open descendant pipes retain the original timeout behavior even after the agent has exited.
+// Agent exit stops descendants before waiting for their output pipes to close.
 func Run(command string, args []string, o Options) Result {
 	r := Result{Code: -1}
 	cmd := exec.Command(command, args...)
@@ -162,8 +172,7 @@ func Run(command string, args []string, o Options) Result {
 	errW.Close()
 	if e != nil {
 		inW.Close()
-		r.Stderr = SpawnError(command, e) + "\n"
-		r.Fatal = errors.Is(e, syscall.ENOEXEC) || errors.Is(e, syscall.ENOTDIR)
+		r.Stderr = e.Error() + "\n"
 		return r
 	}
 	go func() { defer inW.Close(); _, _ = io.WriteString(inW, o.Input) }()
@@ -181,6 +190,7 @@ func Run(command string, args []string, o Options) Result {
 	closed := make(chan Result, 1)
 	go func() {
 		_ = cmd.Wait()
+		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 		closed <- Result{Code: cmd.ProcessState.ExitCode(), Stdout: <-outDone, Stderr: <-errDone}
 	}()
 	d := o.Timeout
@@ -196,41 +206,11 @@ func Run(command string, args []string, o Options) Result {
 		r = <-closed
 		r.TimedOut = true
 	}
-	if !r.TimedOut {
-		stopGroups([]int{cmd.Process.Pid})
-	}
+
 	groups.Lock()
 	delete(groups.pids, cmd.Process.Pid)
 	groups.Unlock()
 	return r
-}
-
-// SpawnError renders process-start errors in the existing agent and command vocabulary.
-func SpawnError(command string, err error) string {
-	code := "ENOENT"
-	var errno syscall.Errno
-	if errors.As(err, &errno) {
-		switch errno {
-		case syscall.EACCES:
-			code = "EACCES"
-		case syscall.ENOTDIR:
-			code = "ENOTDIR"
-		case syscall.ENOEXEC:
-			code = "ENOEXEC"
-		case syscall.EPERM:
-			code = "EPERM"
-		case syscall.EMFILE:
-			code = "EMFILE"
-		case syscall.ENFILE:
-			code = "ENFILE"
-		case syscall.E2BIG:
-			code = "E2BIG"
-		}
-	}
-	if code == "ENOEXEC" || code == "ENOTDIR" {
-		return "spawn " + code
-	}
-	return fmt.Sprintf("spawn %s %s", command, code)
 }
 
 var errorLine = regexp.MustCompile(`^(\w*(Error|Exception)|panic)\b[^:]*:`)

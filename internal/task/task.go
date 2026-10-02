@@ -2,6 +2,7 @@
 package task
 
 import (
+	"encoding/json"
 	"regexp"
 	"time"
 
@@ -20,7 +21,7 @@ func fullPrompt(t home.Object) string {
 	if !t.B("write") && !t.B("session") {
 		prompt = grounding + prompt
 	}
-	if t.B("schema") {
+	if t.Has("schema") && t.Get("schema") != nil {
 		prompt += "\n\nAnswer ONLY with JSON matching this JSON Schema, no prose and no code fences:\n" + home.JSON(t.Get("schema"), false)
 	} else if t.B("json") {
 		prompt += "\n\nAnswer ONLY with JSON, no prose and no code fences."
@@ -42,13 +43,15 @@ func checkJSON(text string, s any) (any, string) {
 	if problem != "" {
 		return nil, "answer does not match the schema: " + problem
 	}
-	return v, ""
+	return json.RawMessage(home.Trim(text)), ""
 }
 
 // Started is the actual working directory and optional worktree reported before the agent runs.
 type Started struct {
 	Dir      string
 	Worktree *git.Worktree
+	Task     home.Object
+	Name     string
 }
 
 // Run returns one complete result, converting task errors into failed results.
@@ -68,7 +71,7 @@ func Run(a *agent.Registry, t home.Object, started func(Started)) home.Object {
 		}
 	}
 	if e == nil {
-		started(Started{dir, w})
+		started(Started{Dir: dir, Worktree: w, Task: t, Name: a.Name(m, "")})
 		var before *git.Snapshot
 		if t.B("write") {
 			before = git.Take(dir)
@@ -80,7 +83,7 @@ func Run(a *agent.Registry, t home.Object, started func(Started)) home.Object {
 			files, commits = git.Changes(before)
 			diff = true
 		}
-		if r.B("ok") && (t.B("json") || t.B("schema")) {
+		if r.B("ok") && (t.B("json") || (t.Has("schema") && t.Get("schema") != nil)) {
 			answer, problem := checkJSON(r.S("text"), t.Get("schema"))
 			if problem != "" {
 				r.Set("ok", false)
@@ -91,9 +94,7 @@ func Run(a *agent.Registry, t home.Object, started func(Started)) home.Object {
 		} else if r.B("ok") {
 			r.Set("answer", home.TrimEnd(r.S("text")))
 		}
-		if w != nil && len(files) == 0 && commits == 0 {
-			git.Remove(w)
-		}
+
 	}
 	if e != nil {
 		r.Set("ok", false)
@@ -124,7 +125,7 @@ func Run(a *agent.Registry, t home.Object, started func(Started)) home.Object {
 		out.Set("changes", files)
 		out.Set("commits", commits)
 	}
-	if w != nil && (len(files) > 0 || commits > 0) {
+	if w != nil {
 		out.Set("worktree", home.O("path", w.Path, "branch", w.Branch))
 	}
 	return out

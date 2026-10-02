@@ -8,7 +8,7 @@ they may change.
 | Contract | Where it is described |
 | --- | --- |
 | The command line: commands, options, exit codes (0 ok, 1 a run failed, 2 a usage error), stdout carrying only answers | `ask --help`, [Usage](usage.md) |
-| Status lines start with `ask RUN ·` | [Runs](runs.md) |
+| Plain status lines start with `ask RUN · outcome ·`; terminals may redraw live state | [Runs](runs.md) |
 | Result fields (`run`, `id`, `model`, `name`, `ok`, `answer`/`error`, `seconds`, `usage`, `session`, `dir`, `changes`, `commits`, `worktree`, `followups`) | [Batches](batches.md) |
 | Run records: `tasks.json` and `results.json` in `~/.ask/runs/` | [Runs](runs.md) |
 | The agent contract | [Agents](agents.md) |
@@ -25,3 +25,16 @@ they may change.
   the changelog with what to do.
 - **Run records stay readable.** Records written by a release are pinned in ask's tests
   (`test/fixtures/`) and never rewritten; newer versions must keep showing and continuing them.
+
+JSON uses Go's `encoding/json`. Records keep the documented field order; JSON answers retain
+agent key order. Parser diagnostics, insignificant whitespace, number spelling in ask's own
+records and malformed Unicode handling are not byte-level contracts.
+
+The public names remain `run` for a recorded invocation, `task` for one unit in a batch,
+`model` for an `agent:id`, and `follow-up` for a continuation. Existing command, option,
+result and record field names remain stable. Status lines now put `started`, `ok` or
+`failed` directly after the run id, followed by the model display name; hook lines use
+`note` or `follow-up`. The start-line `continues` label is now `follow-up`; the `-c`
+option and JSON `continue` field remain. Times are compact clocks above a minute and costs show cents at
+or above $0.01. `ask help COMMAND` and `ask COMMAND --help` are equivalent; `-h` works
+on every command, and `-V` aliases `--version`.

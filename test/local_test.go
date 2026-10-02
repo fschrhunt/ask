@@ -35,7 +35,7 @@ func TestLocal(t *testing.T) {
 		eq(t, r.stdout, "answer\n")
 		eq(t, s.read(filepath.Join(s.tmp, "prompt")), "do it")
 		eq(t, strings.TrimSpace(s.read(filepath.Join(s.tmp, "env"))), "small high write "+s.tmp)
-		match(t, r.stderr, ` · Small One \(high\) · ok · `)
+		match(t, r.stderr, ` · ok · Small One \(high\) · `)
 	})
 	t.Run("an agent gets --schema as a file in ASK_SCHEMA", func(t *testing.T) {
 		s := fresh(t)
@@ -50,7 +50,7 @@ func TestLocal(t *testing.T) {
 		s := fresh(t)
 		s.localAgent("echo", `echo '{"name": "Echo 2", "input": 1200, "output": 30, "cost": 0.5, "note": "partial"}' > "$ASK_REPORT"; echo ok`)
 		r := s.ask("-m", "echo:big", "go")
-		match(t, r.stderr, `(?m) · Echo 2 · ok · [\d.]+s · 1\.2k in · 30 out · \$0\.5000 · partial$`)
+		match(t, r.stderr, `(?m) · ok · Echo 2 · [\d.]+s · 1\.2k in · 30 out · \$0\.50 · partial$`)
 	})
 	t.Run("a failed agent's last stderr line is the error", func(t *testing.T) {
 		s := fresh(t)

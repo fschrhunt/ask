@@ -24,7 +24,7 @@ func TestSubagent(t *testing.T) {
 		eq(t, b.s("model"), "big")
 		eq(t, b.s("effort"), "high")
 		eq(t, b.s("stdin"), "what word?")
-		match(t, second.stderr, `continues `+runID(t, first.stderr))
+		match(t, second.stderr, `follow-up `+runID(t, first.stderr))
 	})
 	t.Run("a follow-up keeps write access unless it says -r, and may change the model within the agent", func(t *testing.T) {
 		s := fresh(t)
@@ -85,7 +85,7 @@ func TestSubagent(t *testing.T) {
 		result := objects(t, r.stdout)[0]
 		jsonEqual(t, result["changes"], []object{{"path": "b.txt", "change": "added"}})
 		eq(t, result.n("commits"), 0.0)
-		match(t, r.stderr, ` · ok · [\d.]+s · 1 file changed · `)
+		match(t, r.stderr, ` · ok · Fake 1\.0 · [\d.]+s · 1 file changed · `)
 	})
 	t.Run("a write run that commits reports its commits and the files they changed", func(t *testing.T) {
 		s := fresh(t)
@@ -137,10 +137,14 @@ func TestSubagent(t *testing.T) {
 		id := runID(t, first.stderr)
 		shown := s.ask("show", id)
 		eq(t, shown.stdout, "fake: hello\n")
-		match(t, shown.stderr, `^ask `+id+` · Fake 1\.0 · ok`)
+		match(t, shown.stderr, `^ask `+id+` · ok · Fake 1\.0`)
 		full := obj(t, s.ask("show", id, "--json").stdout)
 		eq(t, full.s("run"), id)
 		eq(t, full.s("session"), fmt.Sprintf("s-%.0f", s.calls()[0].n("pid")))
+		batch := s.run([]string{"batch", "-m", "fake:small", "-"}, `[{"prompt":"a"},{"prompt":"b"}]`, nil)
+		batchID := runID(t, batch.stderr)
+		shownBatch := s.ask("show", batchID)
+		eq(t, shownBatch.stderr, "ask "+batchID+" · 2/2 ok\n")
 	})
 	t.Run("stop stops a run that is going, and its agents", func(t *testing.T) {
 		s := fresh(t)
