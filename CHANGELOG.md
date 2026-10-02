@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- `ask install` refuses sources whose host, owner or repository is `.`, `..` or starts with `-`,
+  and SCP-style sources whose user part hides another host, so a package always lands in
+  `~/.ask/packages/HOST/OWNER/REPO`. `OWNER/REPO` always means GitHub, even beside a folder of that
+  name; installing a different source where a package is installed fails instead of updating it.
+- A task hook's `refuse` or a result hook's `fail` that is not a string is noted instead of
+  silently ignored.
 - The live view shows tokens and cost while agents run, and a batch's footer keeps a running
   total. ask reads an agent's report as the agent rewrites it; agents that report usage only at
   the end show it at the end, as before. Plain status lines are unchanged.

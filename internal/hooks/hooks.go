@@ -113,7 +113,8 @@ func notes(answer home.Object, name string, all []Note) []Note {
 	return all
 }
 
-// Before applies task changes in name order, returning a refusal only when explicit.
+// Before applies task changes in name order, returning a refusal only when explicit: a
+// "refuse" that is not a string leaves a note and refuses nothing.
 // Every executable failure leaves a note and preserves the task.
 func (h *Hooks) Before(t home.Object, ref string) (home.Object, string, []Note) {
 	all := []Note{}
@@ -129,6 +130,8 @@ func (h *Hooks) Before(t home.Object, ref string) (home.Object, string, []Note) 
 				why = "refused"
 			}
 			return t, x.Name + ": " + why, all
+		} else if a.Has("refuse") {
+			all = append(all, Note{x.Name, "ignored \"refuse\": expected a string"})
 		}
 		change, _ := a.Get("task").(home.Object)
 		if a.Has("task") && change == nil {
@@ -150,7 +153,8 @@ func (h *Hooks) Before(t home.Object, ref string) (home.Object, string, []Note) 
 	return t, "", all
 }
 
-// After checks a result, stopping at the first explicit failure or follow-up.
+// After checks a result, stopping at the first explicit failure or follow-up; a "fail" that
+// is not a string leaves a note and fails nothing.
 func (h *Hooks) After(t, result home.Object, ref string) (*Note, *Note, []Note) {
 	all := []Note{}
 	dir := result.S("dir")
@@ -170,6 +174,8 @@ func (h *Hooks) After(t, result home.Object, ref string) (*Note, *Note, []Note) 
 				why = "failed"
 			}
 			return nil, &Note{x.Name, why}, all
+		} else if a.Has("fail") {
+			all = append(all, Note{x.Name, "ignored \"fail\": expected a string"})
 		}
 		if prompt := home.Trim(a.S("followup")); prompt != "" {
 			return &Note{x.Name, prompt}, nil, all

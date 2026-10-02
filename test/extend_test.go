@@ -33,6 +33,7 @@ func TestExtend(t *testing.T) {
 		s.hook("broken", []string{"task"}, "echo 'Error: boom' >&2; echo 'runtime banner' >&2; exit 1")
 		s.hook("chatty", []string{"task"}, "echo 'not json'")
 		s.hook("typo", []string{"task"}, `echo '{"task":{"write":"yes","dir":"/"}}'`)
+		s.hook("vague", []string{"task"}, `echo '{"refuse":true}'`)
 		r := s.ask("-m", "fake:small", "look")
 		eq(t, r.code, 0)
 		eq(t, s.calls()[0].s("access"), "read")
@@ -40,6 +41,7 @@ func TestExtend(t *testing.T) {
 		match(t, r.stderr, `(?m)^ask [\w-]+ · note · hook chatty · failed: printed something other than JSON$`)
 		match(t, r.stderr, `(?m)^ask [\w-]+ · note · hook typo · ignored a change to "write"$`)
 		match(t, r.stderr, `(?m)^ask [\w-]+ · note · hook typo · ignored a change to "dir"$`)
+		match(t, r.stderr, `(?m)^ask [\w-]+ · note · hook vague · ignored "refuse": expected a string$`)
 	})
 	t.Run("a result hook can ask the same agent for a follow-up, and the rounds make one result", func(t *testing.T) {
 		s := fresh(t)
@@ -113,6 +115,39 @@ func TestExtend(t *testing.T) {
 		eq(t, s.ask("hello").stdout, "hello v2\n")
 		match(t, s.ask("remove", "tools").stderr, `removed local/team/tools`)
 		eq(t, s.ask("hello").code, 2)
+	})
+	t.Run("install refuses sources that leave the packages folder, hide their host or look like options", func(t *testing.T) {
+		s := fresh(t)
+		for _, source := range []string{"https://../../code", "https://example.com/../tools", "evil.example:x@github.com:acme/tools", "-oProxyCommand=x:acme/tools"} {
+			r := s.ask("install", "--", source)
+			eq(t, r.code, 2)
+			match(t, r.stderr, `cannot tell where`)
+		}
+	})
+	t.Run("OWNER/REPO means GitHub even beside a folder of that name", func(t *testing.T) {
+		s := fresh(t)
+		repo := filepath.Join(s.tmp, "acme", "tools")
+		s.mkdir(repo)
+		git := s.gitAt(repo)
+		git("init", "-q", "-b", "main")
+		git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "v1")
+		github := map[string]string{"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "url." + s.tmp + "/.insteadOf", "GIT_CONFIG_VALUE_0": "https://github.com/"}
+		match(t, s.run([]string{"install", "acme/tools"}, "", github).stderr, `installed github.com/acme/tools`)
+	})
+	t.Run("install refuses a source other than the one installed in its place", func(t *testing.T) {
+		s := fresh(t)
+		for _, owner := range []string{"a", "b"} {
+			repo := filepath.Join(s.tmp, owner, "team", "tools")
+			s.mkdir(repo)
+			git := s.gitAt(repo)
+			git("init", "-q", "-b", "main")
+			git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "v1")
+		}
+		match(t, s.ask("install", filepath.Join(s.tmp, "a", "team", "tools")).stderr, `installed local/team/tools`)
+		r := s.ask("install", filepath.Join(s.tmp, "b", "team", "tools"))
+		eq(t, r.code, 2)
+		match(t, r.stderr, `local/team/tools is installed from .*/a/team/tools; remove it first`)
+		match(t, s.ask("install", filepath.Join(s.tmp, "a", "team", "tools")).stderr, `local/team/tools: up to date`)
 	})
 	t.Run("every agent, hook and command gets the contract version as ASK_CONTRACT", func(t *testing.T) {
 		s := fresh(t)

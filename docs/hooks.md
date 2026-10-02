@@ -39,7 +39,7 @@ hook to ask for a follow-up or to fail the result decides, and the rest wait for
 
 **Hooks fail open.** A hook that cannot start, crashes, takes more than 10 minutes, or prints something that
 isn't a JSON object changes nothing; ask notes it and carries on. Only an explicit `refuse` or
-`fail` stops a task. Every note and follow-up shows as a status line:
+`fail`, a string, stops a task; any other value is noted and ignored. Every note and follow-up shows as a status line:
 
 ```text
 ask add-sub-function-calc · started · Haiku 4.5 · write · ~/code/calc

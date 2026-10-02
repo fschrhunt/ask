@@ -27,7 +27,9 @@ github.com/fschrhunt/ask-tools	agents: claude, codex · commands: review · hook
 ```
 
 `ask install` clones into `~/.ask/packages/HOST/OWNER/REPO`, and updating pulls fast-forward only.
-Nothing runs at install time: no scripts, no prompts.
+Nothing runs at install time: no scripts, no prompts. `OWNER/REPO` always means GitHub; name a local
+repository by a path such as `./tools`, `../team/tools` or `~/code/tools`. Installing a source
+where another one is already installed, like a second local `team/tools`, fails: remove the first.
 
 ## Which one runs
 
