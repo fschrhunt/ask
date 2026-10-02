@@ -65,4 +65,6 @@ ones use Node.js 18+, standard library only).
   No line-by-line comments. Update the
   comments and docs a change touches.
 - One test per behavior change. Never call a network or a real model in a test.
-- A user-visible change gets a `CHANGELOG.md` entry under Unreleased.
+- A user-visible change gets a `CHANGELOG.md` entry under `## Unreleased` at the top (add the
+  heading when it's missing). Releasing turns it into `## vX.Y.Z · DATE` and pins a run record in
+  `test/fixtures/run-vX.Y.Z/`.
