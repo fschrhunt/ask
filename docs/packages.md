@@ -5,25 +5,30 @@ Packages are how people share what they built for ask and keep it up to date, wi
 or copying files by hand.
 
 ```text
-ask-claude/
-├── agents/     claude
-└── lib/        what the agent runs
+team-tools/
+├── agents/     my-cli
+├── hooks/      verify
+└── commands/   review
 ```
 
 ## Official agents
 
-ask ships no agents, but there is an official package for each common coding agent CLI. A bare
-name installs it:
+ask comes with an official package for each common coding agent CLI, in
+[`packages/`](../packages) of its repository and built into the binary. A bare name installs one,
+without the network:
 
 ```sh
-ask install claude                # fschrhunt/ask-claude: Claude Code
-ask install codex opencode        # fschrhunt/ask-codex and fschrhunt/ask-opencode
+ask install claude                # Claude Code
+ask install codex opencode        # Codex and Opencode
 ```
 
 ```text
-ask: installed github.com/fschrhunt/ask-claude: agents: claude
+ask: installed ask/packages/claude: agents: claude
 ask: claude is ready: 4 models, see ask models
 ```
+
+An installed official package always matches the ask that runs it: when ask updates, its
+packages update with it. `ask remove claude` removes one.
 
 After installing, ask checks each agent the package brings by asking it for its models. An agent
 that can't run says why, like a CLI that isn't installed, and `ask install` exits 1:
@@ -35,22 +40,24 @@ ask: codex is not ready: Codex not found: install it from https://developers.ope
 ## Install, update, remove
 
 ```sh
-ask install fschrhunt/ask-claude         # OWNER/REPO on GitHub
+ask install team/tools                   # OWNER/REPO on GitHub
 ask install https://gitlab.com/team/tools.git
 ask install ~/code/my-ask-tools          # a local repository, while you work on it
 ask install                              # update every installed package
 ask packages                             # what is installed, and what each offers
-ask remove ask-claude
+ask remove tools
 ```
 
 ```text
-github.com/fschrhunt/ask-claude  agents: claude
+ask/packages/claude         agents: claude
+github.com/team/tools       agents: my-cli · commands: review · hooks: verify
 ```
 
-`ask install` clones into `~/.ask/packages/HOST/OWNER/REPO`, and updating pulls fast-forward only.
-Nothing runs at install time except the readiness check: no scripts, no prompts. A bare NAME
-always means `fschrhunt/ask-NAME` and `OWNER/REPO` always means GitHub, whatever folders are
-here; name a local repository by a path such as `./tools`, `../team/tools` or `~/code/tools`.
+`ask install` clones into `~/.ask/packages/HOST/OWNER/REPO`, and updating pulls fast-forward only;
+official packages go to `~/.ask/packages/ask/packages/NAME`. Nothing runs at install time except
+the readiness check: no scripts, no prompts. A bare NAME always means an official package and
+`OWNER/REPO` always means GitHub, whatever folders are here; name a local repository by a path
+such as `./tools`, `../team/tools` or `~/code/tools`.
 Installing a source where another one is already installed, like a second local `team/tools`,
 fails: remove the first.
 

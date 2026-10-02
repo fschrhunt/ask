@@ -21,6 +21,10 @@ jobs:
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       - run: go test ./...
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - run: for d in packages/*/; do (cd "$d" && node --test) || exit 1; done
   macOS:
     runs-on: macos-latest
     steps:
@@ -33,3 +37,7 @@ jobs:
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       - run: go test ./...
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - run: for d in packages/*/; do (cd "$d" && node --test) || exit 1; done

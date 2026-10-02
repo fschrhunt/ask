@@ -4,8 +4,10 @@ An agent is a small executable that runs one coding agent's CLI for ask: Claude 
 Opencode, or anything else. ask itself knows nothing about any of them. Everything specific to one,
 from its flags to how it reports usage, lives in its agent, which is how ask supports any of them.
 
-Agents are local. ask ships none; you keep yours in `~/.ask/agents/`, one executable per coding
-agent, named for it. An agent named `claude` gives you models `claude:...`.
+ask comes with official agents for Claude Code, Codex and Opencode (`ask install claude`, see
+[Packages](packages.md#official-agents)); their source is in [`packages/`](../packages). Your own
+go in `~/.ask/agents/`, one executable per coding agent, named for it, and win over an official
+one of the same name. An agent named `claude` gives you models `claude:...`.
 
 ## The contract
 

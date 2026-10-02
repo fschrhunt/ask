@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- The official agents for Claude Code, Codex and Opencode live in ask's repository, in
+  `packages/`, and are built into the binary: `ask install claude` installs without the network,
+  to `~/.ask/packages/ask/packages/claude`, and an installed official agent is rewritten whenever
+  ask updates, so it always matches. A bare name that isn't an official agent is now an error.
+  The Opencode agent counts the usage of the step that writes the answer, which Opencode 2.0
+  no longer prints.
 - `ask setup`: in a terminal, a walkthrough the first time (agents for the CLIs it finds, a default
   model, where worktrees go, the ask skill for Claude Code, Codex, Opencode, Cursor and pi, and
   task titles in Claude Code) and your settings after. Flags do the same without asking:
@@ -10,7 +16,7 @@
 - `ask install NAME` always means the official agent, even beside a folder of that name; name a
   local repository by a path. One-letter words no longer end up in run names (`ask's` was `ask-s`).
 - `ask install claude`, `codex` or `opencode` installs the official agent package for that CLI
-  (`fschrhunt/ask-NAME`), and `ask install` takes several sources at once. After installing, ask
+  and `ask install` takes several sources at once. After installing, ask
   checks every agent a package brings and says whether it is ready, or why not, like a missing
   CLI; it exits 1 when one is not ready.
 - `~/.ask/settings.json` holds your defaults: `model` (so `-m` is optional), `timeout`, `jobs`,
