@@ -31,6 +31,9 @@
   it ends with the stopped line, like a single run. A batch's usage total leaves out cost when
   only some tasks reported one. A JSON line that does not parse is reported by its line in the
   input, counting leading blank lines, and `-t` above 2000000 seconds is rejected by name.
+||||||| bb4d816
+- Host titles read batch tasks from heredocs: piped to `ask batch -`, or written by `cat > FILE`
+  earlier in the same command, so a batch started that way is titled `Batch of N · Model · …`.
 - The live view shows tokens and cost while agents run, and a batch's footer keeps a running
   total. ask reads an agent's report as the agent rewrites it; agents that report usage only at
   the end show it at the end, as before. Plain status lines are unchanged.
