@@ -108,12 +108,17 @@ func (p Paths) ReadModels() (Models, error) {
 	return out, nil
 }
 
-// WriteModels saves models.json in its object form, sorted, with true or false for an entry that
-// has no cost limit.
-func (p Paths) WriteModels(m Models) error {
+// ModelsText returns models.json's text: agents and ids sorted, true or false for an entry with
+// no cost limit; no entries at all is "", no file.
+func ModelsText(m Models) string {
 	agents := []string{}
 	for a := range m {
-		agents = append(agents, a)
+		if len(m[a]) > 0 {
+			agents = append(agents, a)
+		}
+	}
+	if len(agents) == 0 {
+		return ""
 	}
 	sort.Strings(agents)
 	var b strings.Builder
@@ -142,12 +147,19 @@ func (p Paths) WriteModels(m Models) error {
 		b.WriteString("\n  }")
 	}
 	b.WriteString("\n}\n")
-	if e := os.MkdirAll(p.Home, 0700); e != nil {
-		return e
+	return b.String()
+}
+
+// WriteModels saves models.json, removing it when it holds nothing.
+func (p Paths) WriteModels(m Models) error { return p.writeText("models.json", ModelsText(m)) }
+
+// Clone copies models, so a draft can change them freely.
+func (m Models) Clone() Models {
+	out := Models{}
+	for a, ids := range m {
+		for id, x := range ids {
+			out.Set(a, id, x)
+		}
 	}
-	tmp := filepath.Join(p.Home, ".models.json.tmp")
-	if e := os.WriteFile(tmp, []byte(b.String()), 0600); e != nil {
-		return e
-	}
-	return os.Rename(tmp, filepath.Join(p.Home, "models.json"))
+	return out
 }

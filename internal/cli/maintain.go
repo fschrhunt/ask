@@ -138,14 +138,14 @@ func clean(p home.Paths, opts home.Object) (int, error) {
 		for _, w := range worktrees {
 			action := paint("2", "keep  ")
 			if w.Landed {
-				action = paint("33", "remove")
+				action = paint("31", "remove")
 				removing++
 			}
 			fmt.Fprintf(os.Stdout, "  %s  %s  %s\n", action, home.Tilde(w.Path), paint("2", w.Branch+" · "+w.Why))
 		}
 	}
 	if len(old) > 0 {
-		fmt.Fprintf(os.Stdout, "Runs\n  %s  %s older than %s days\n", paint("33", "remove"), status.Plural(len(old), "run"), home.String(days))
+		fmt.Fprintf(os.Stdout, "Runs\n  %s  %s older than %s days\n", paint("31", "remove"), status.Plural(len(old), "run"), home.String(days))
 		removing += len(old)
 	}
 	if removing == 0 {

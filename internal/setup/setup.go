@@ -65,7 +65,8 @@ description: Hand tasks to other coding agents - Claude Code, Codex, Opencode an
 ---
 ` + mark + `
 
-Run ` + "`ask --help`" + ` for usage and ` + "`ask models`" + ` for the models available here.
+Run ` + "`ask --help`" + ` for usage, ` + "`ask models`" + ` for the models available here, and
+` + "`ask docs PAGE`" + ` (or ` + "`ask docs --search TERM`" + `) for the full docs.
 
 - ` + "`ask -m MODEL \"question\"`" + `: a read-only answer from another agent, on stdout.
 - ` + "`ask -m MODEL -w \"task\"`" + `: let it change files; add ` + "`--worktree`" + ` to work on its own branch.
@@ -137,20 +138,35 @@ func HookOn() bool {
 	return false
 }
 
-// SetHook adds or removes ask's own title hook in Claude Code's settings, keeping every other
-// setting, its order and its text as they are. Hooks you wrote yourself are left alone.
+// SetHook adds or removes ask's own title hook in Claude Code's settings.
 func SetHook(on bool) error {
-	path := claudeSettings()
-	b, e := os.ReadFile(path)
-	if os.IsNotExist(e) {
-		b, e = []byte("{}"), nil
-	}
+	path, _, after, e := HookEdit(on)
 	if e != nil {
 		return e
 	}
+	if e := os.MkdirAll(filepath.Dir(path), 0755); e != nil {
+		return e
+	}
+	return os.WriteFile(path, after, 0644)
+}
+
+// HookEdit returns Claude Code's settings file with ask's own title hook added or removed, keeping
+// every other setting, its order and its text as they are, and the file's text now ("" when it
+// doesn't exist). Hooks you wrote yourself are left alone.
+func HookEdit(on bool) (path string, before, after []byte, err error) {
+	path = claudeSettings()
+	b, e := os.ReadFile(path)
+	if e == nil {
+		before = b
+	} else if os.IsNotExist(e) {
+		b, e = []byte("{}"), nil
+	}
+	if e != nil {
+		return path, nil, nil, e
+	}
 	keys, values, e := topLevel(b)
 	if e != nil {
-		return home.Usage("cannot read %s: %s", path, e)
+		return path, nil, nil, home.Usage("cannot read %s: %s", path, e)
 	}
 	hooks := map[string]any{}
 	at := -1
@@ -158,7 +174,7 @@ func SetHook(on bool) error {
 		if k == "hooks" {
 			at = i
 			if e := json.Unmarshal(values[i], &hooks); e != nil {
-				return home.Usage("cannot read the hooks in %s: %s", path, e)
+				return path, nil, nil, home.Usage("cannot read the hooks in %s: %s", path, e)
 			}
 		}
 	}
@@ -202,13 +218,10 @@ func SetHook(on bool) error {
 	out.WriteString("}")
 	var pretty bytes.Buffer
 	if e := json.Indent(&pretty, out.Bytes(), "", "  "); e != nil {
-		return e
+		return path, nil, nil, e
 	}
 	pretty.WriteString("\n")
-	if e := os.MkdirAll(filepath.Dir(path), 0755); e != nil {
-		return e
-	}
-	return os.WriteFile(path, pretty.Bytes(), 0644)
+	return path, before, pretty.Bytes(), nil
 }
 
 // isOurs reports whether a PreToolUse entry is exactly the one SetHook adds.

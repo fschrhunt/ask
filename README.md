@@ -62,8 +62,9 @@ ask login-test-fail · ok · Sonnet 5.5 · 48.0s · 31.0k in · 812 out · $0.09
 ```
 
 Every run is named after its prompt and recorded: `ask runs` lists this repository's, `ask show
-RUN` prints one again, and `ask stop RUN` stops one. [Settings](docs/settings.md) hold your
-defaults, like a model so `-m` is optional, or where worktrees go.
+RUN` prints one again, and `ask stop RUN` stops one. `ask settings` changes your agents and
+defaults, like a model so `-m` is optional, and shows every change before it saves. `ask docs`
+has these docs built in.
 
 ### Make it yours
 

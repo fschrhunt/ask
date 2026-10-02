@@ -43,7 +43,7 @@ Turn off what you don't use, so `ask models`, help and the agents that pick from
 the rest:
 
 ```sh
-ask setup opencode                                  # pick in a list you can filter
+ask settings opencode                               # pick in a list you can filter
 ask models codex:gpt-5.6-sol opencode:gpt-4o --disable
 ask models codex:gpt-5.6-sol --enable
 ```
@@ -71,7 +71,7 @@ keeps a model an agent stopped offering; `ask models --all` is always the full l
 
 `false` turns a model off. `true` adds a model the agent doesn't list, like `sonnet-5`, an older
 Claude model. An object sets `enabled` and `max_cost`, its own [cost limit](usage.md#cost-limits).
-`ask setup NAME` and `ask models MODEL --enable|--disable|--max-cost` write the file for you, or
+`ask settings NAME` and `ask models MODEL --enable|--disable|--max-cost` write the file for you, or
 edit it. The older form, a list of ids per agent (`{"opencode": ["glm-5.3-flash"]}`), still works
 and adds those models. If the file exists it must be valid JSON; mistakes name the agent and model.
 

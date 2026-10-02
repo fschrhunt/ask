@@ -18,7 +18,9 @@ ones use Node.js 18+, standard library only).
 
 - `cmd/ask/main.go`: entry point only; calls `internal/cli` and holds the release version.
 - `internal/`: ask itself, which knows no particular agent. Packages by purpose:
-  - `cli`: help text, options per command, the commands, exit codes.
+  - `cli`: help text, options per command, the commands, exit codes; `settings.go` holds the
+    settings draft (nothing is written until its review is saved), `setup.go` the first run,
+    `docs.go` `ask docs`.
   - `runs`: runs on disk (ids, `RUN/TASK` references, lock, results), preparing tasks
     (validation, follow-ups), running them in parallel, stopping.
   - `task`: one task: worktree, prompt, agent run, what changed, JSON checks.
@@ -32,7 +34,8 @@ ones use Node.js 18+, standard library only).
   - `status`: status lines and the `ask runs` table.
   - `setup`: what `ask setup` offers: official agents and their CLIs, the ask skill per app,
     Claude Code's title hook.
-  - `tui`: gh-style terminal prompts (confirm, select, multi-select, input) and raw mode.
+  - `tui`: terminal prompts (confirm, select, multi-select, input, all filterable), raw mode, and
+    the review diff. Black, white and greys; color only means something: diffs and outcomes.
   - `schema`: the `--schema` check.
   - `home`: `~/.ask` paths, the contract environment, `models.json` and `settings.json`, atomic JSON writes,
     typed JSON records and readable encoding, `UsageError`.
@@ -46,7 +49,8 @@ ones use Node.js 18+, standard library only).
   (a sh launcher that finds Node.js), `lib/NAME.mjs` (the agent), `test/` and `README.md`.
   `packages.go` embeds them; `ask install NAME` writes one to `~/.ask/packages/ask/packages/NAME`,
   and ask rewrites an installed copy whenever its build differs.
-- `docs/`: user docs with examples. Update them with any user-visible change.
+- `docs/`: user docs with examples, built into ask by `docs.go` for `ask docs`. Update them with
+  any user-visible change; every help topic's footer names its page.
 - `assets/`: the logo, wordmark and lockup SVGs in black and white; see `assets/README.md`.
 
 ## Conventions

@@ -118,7 +118,7 @@ ask -m codex:gpt-6.1-sol -w -t 3600 "Upgrade the project to Node 24 and fix what
 A cost limit stops a task that spends more than you meant to. It is off unless you set one:
 
 ```sh
-ask setup --max-cost 2                            # every task: at most $2 (the max_cost setting)
+ask settings set max_cost 2                       # every task: at most $2 (the max_cost setting)
 ask models claude:opus-5.5 --max-cost 10          # this model: its own limit, instead
 ask -m claude:opus-5.5 --max-cost 25 "Port the parser to Rust."   # this run only
 ```

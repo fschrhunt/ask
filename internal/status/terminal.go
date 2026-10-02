@@ -42,3 +42,9 @@ func fallbackWidth() int {
 	}
 	return 80
 }
+
+// TerminalSize is stdout's width and height, or 80 by 24 when it isn't a terminal.
+func TerminalSize() (int, int) {
+	w, h, _ := terminalSize(os.Stdout)
+	return w, h
+}
