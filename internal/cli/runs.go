@@ -197,3 +197,86 @@ func clean(p home.Paths, opts home.Object) (int, error) {
 	}
 	return code, nil
 }
+
+// show prints a saved answer or complete result without running its agent again.
+func show(p home.Paths, opts home.Object, words []string) (int, error) {
+	if len(words) != 1 {
+		return 0, home.Usage("ask show takes one run, like ask show login-checked")
+	}
+	r, i, e := runs.Open(p, words[0])
+	if e != nil {
+		return 0, e
+	}
+	if i < 0 {
+		fmt.Fprintln(os.Stderr, status.StyledLine(status.BatchSaved(r), os.Stderr))
+		fmt.Fprintln(os.Stdout, home.JSON(home.ResultRecords(r.Results), true))
+		for _, result := range r.Results {
+			if !result.B("ok") {
+				return 1, nil
+			}
+		}
+		return 0, nil
+	}
+	result := r.Results[i]
+	if result == nil {
+		return 0, home.Usage("%s has not finished; see `ask runs`", words[0])
+	}
+	fmt.Fprintln(os.Stderr, status.StyledLine(status.Done(result), os.Stderr))
+	if opts.B("--json") {
+		fmt.Fprintln(os.Stdout, home.JSON(home.ResultRecords([]home.Object{result})[0], true))
+	} else if result.B("ok") {
+		fmt.Fprintln(os.Stdout, answerText(r.Tasks[i], result))
+	}
+	if !result.B("ok") {
+		return 1, nil
+	}
+	return 0, nil
+}
+
+// stop resolves a run and reports whether its owner was stopped.
+func stop(p home.Paths, words []string) (int, error) {
+	if len(words) != 1 {
+		return 0, home.Usage("ask stop takes one run, like ask stop login-checked")
+	}
+	r, _, e := runs.Open(p, words[0])
+	if e != nil {
+		return 0, e
+	}
+	stopped, e := runs.Stop(r)
+	if e != nil {
+		return 0, e
+	}
+	if stopped {
+		fmt.Fprintf(os.Stderr, "ask %s · stopped\n", r.Label())
+		return 0, nil
+	}
+	fmt.Fprintf(os.Stderr, "ask %s · not running\n", r.Label())
+	return 1, nil
+}
+
+// listRuns prints the newest readable records as a status table: in a git repository only
+// runs that worked in one of its checkouts, unless --all.
+func listRuns(p home.Paths, opts home.Object) (int, error) {
+	limit := 20
+	if opts.B("-n") {
+		n, e := number("-n", opts.S("-n"), true)
+		if e != nil {
+			return 0, e
+		}
+		limit = integer(n)
+	}
+	var keep func(*runs.Run) bool
+	dir, _ := os.Getwd()
+	if checkouts := git.Checkouts(dir); checkouts != nil && !opts.B("--all") {
+		keep = func(r *runs.Run) bool { return runs.In(r, checkouts) }
+	}
+	list := runs.Recent(p, limit, keep)
+	if len(list) == 0 && keep != nil {
+		fmt.Fprintln(os.Stderr, "ask: no runs in this repository yet; ask runs --all lists every run")
+	} else if len(list) == 0 {
+		fmt.Fprintln(os.Stderr, "ask: no runs yet")
+	} else {
+		fmt.Fprintln(os.Stdout, status.Table(list, time.Now(), status.CanStyle(os.Stdout)))
+	}
+	return 0, nil
+}

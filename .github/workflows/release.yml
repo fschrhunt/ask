@@ -30,11 +30,8 @@ jobs:
         run: |
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "$TAG is not on main" >&2; exit 1; }
           grep -q "^## $TAG " CHANGELOG.md || { echo "CHANGELOG.md has no ## $TAG section" >&2; exit 1; }
-      - run: test -z "$(gofmt -l .)"
-      - run: go vet ./...
-      - run: go test ./...
-      - run: for d in packages/*/; do (cd "$d" && node --test) || exit 1; done
-      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+      - run: ./x check
+      - run: ./x audit
 
   release:
     needs: check

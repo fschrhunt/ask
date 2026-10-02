@@ -38,4 +38,11 @@ func TestCompat(t *testing.T) {
 		eq(t, s.calls()[0].s("session"), "s-fixture-2")
 		eq(t, s.calls()[0].s("max_cost"), "25")
 	})
+	t.Run("every agent, hook and command gets the contract version as ASK_CONTRACT", func(t *testing.T) {
+		s := fresh(t)
+		s.hook("seen", []string{"task"}, `printf '{"note":"contract %s"}\n' "$ASK_CONTRACT"`)
+		r := s.ask("-m", "fake:small", "go")
+		eq(t, s.calls()[0].s("contract"), "1")
+		match(t, r.stderr, `hook seen · contract 1`)
+	})
 }
