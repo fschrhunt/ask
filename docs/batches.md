@@ -24,7 +24,7 @@ A batch is a JSON array, or one JSON object per line:
 | --- | --- |
 | `prompt` | The task. Required. |
 | `id` | A name for the result. Default: the task's position, from 1. |
-| `model` | `agent:id[#effort]`. Required unless the batch's `-m` gives a default or the task continues a run. |
+| `model` | `agent:id[#effort]`. Required unless the batch's `-m`, a follow-up or the `model` [setting](settings.md) gives one. |
 | `write` | `true` for read and write. Default: the batch's `-w`, else read only. |
 | `worktree` | `true` to work in its own git worktree and branch (creating one needs write). Default: the batch's `--worktree`. |
 | `continue` | A run to follow up, like `"login-test-fail"` or `"summarize-public-api-src/api"` (see [Runs](runs.md#follow-ups)). |
@@ -40,7 +40,7 @@ Options given to `ask batch` are defaults; a task's own fields win.
 ask batch -j 4 -m claude:haiku-4.5 tasks.json
 ```
 
-`-j` is how many tasks run at once (default 4). In a terminal, stderr shows live task rows (queued, running with elapsed time and usage so far,
+`-j` is how many tasks run at once (default 4, or the `jobs` [setting](settings.md)). In a terminal, stderr shows live task rows (queued, running with elapsed time and usage so far,
 ok or failed) above a running total of usage and cost, then a summary. The total leaves out cost when a task reported usage without one. In pipes, the same status lines go to stderr as tasks start and end:
 
 ```text

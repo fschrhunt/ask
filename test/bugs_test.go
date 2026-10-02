@@ -85,7 +85,7 @@ func TestHookStartStatus(t *testing.T) {
 
 // TestSurplusArguments rejects extra operands of built-in commands before doing any work.
 func TestSurplusArguments(t *testing.T) {
-	for _, command := range []string{"models", "runs", "packages", "show", "stop", "install", "remove"} {
+	for _, command := range []string{"models", "runs", "packages", "show", "stop", "remove"} {
 		s := fresh(t)
 		args := []string{command, "extra"}
 		if !strings.Contains("models runs packages", command) {

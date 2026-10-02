@@ -70,7 +70,7 @@ func Unique(p home.Paths, name string) string {
 		_, id, runName := folder(n)
 		used[id], used[runName] = true, true
 	}
-	for _, n := range find.List(p.Worktrees) {
+	for _, n := range p.WorktreeNames() {
 		used[n] = true
 	}
 	for i, next := 2, name; ; i++ {

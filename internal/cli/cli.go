@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/fschrhunt/ask/internal/agent"
 	"github.com/fschrhunt/ask/internal/find"
+	"github.com/fschrhunt/ask/internal/git"
 	"github.com/fschrhunt/ask/internal/home"
 	"github.com/fschrhunt/ask/internal/hooks"
 	"github.com/fschrhunt/ask/internal/packages"
@@ -26,8 +28,8 @@ import (
 var options = map[string][]string{
 	"run":   {"-m", "-r", "-w", "--worktree", "-c", "--json", "--schema", "-C", "-t", "--no-hooks"},
 	"batch": {"-m", "-r", "-w", "--worktree", "--json", "--schema", "-C", "-t", "-j", "--resume", "--no-hooks"},
-	"title": {"--command", "--description"},
-	"show":  {"--json"}, "runs": {"-n"}, "stop": {}, "models": {"--names"}, "help": {}, "install": {}, "packages": {}, "remove": {},
+	"title": {"--command", "--description", "--hook"},
+	"show":  {"--json"}, "runs": {"-n", "--all"}, "stop": {}, "models": {"--names"}, "help": {}, "install": {}, "packages": {}, "remove": {},
 }
 var long = map[string]string{"--model": "-m", "--read": "-r", "--write": "-w", "--continue": "-c", "--dir": "-C", "--timeout": "-t"}
 var value = map[string]bool{"-m": true, "-c": true, "--schema": true, "-C": true, "-t": true, "-j": true, "-n": true, "--resume": true, "--command": true, "--description": true}
@@ -227,7 +229,9 @@ func readTasks(text string) ([]any, error) {
 
 // prepare validates task fields and resolves follow-ups without starting model processes.
 func prepare(a *agent.Registry, items []any, defaults home.Object, label string, single bool) ([]home.Object, error) {
-	return runs.Prepare(a.Paths, items, defaults, label, single, func(where string) error { return home.Usage("%s needs a model (-m)", where) })
+	return runs.Prepare(a.Paths, items, defaults, label, single, func(where string) error {
+		return home.Usage("%s needs a model: give -m MODEL, or set \"model\" in ~/.ask/settings.json", where)
+	})
 }
 
 // runName names a new run before its tasks are prepared, so worktrees and branches carry it:
@@ -354,6 +358,11 @@ func runOne(a *agent.Registry, opts home.Object, words []string) (int, error) {
 // batch records or resumes tasks and prints all results in task order.
 func batch(a *agent.Registry, opts home.Object, words []string) (int, error) {
 	jobs := 4
+	if settings, e := a.Paths.ReadSettings(); e != nil {
+		return 0, e
+	} else if settings.Has("jobs") {
+		jobs = int(settings.N("jobs"))
+	}
 	if opts.B("-j") {
 		n, e := number("-j", opts.S("-j"), true)
 		if e != nil {
@@ -504,7 +513,8 @@ func stop(p home.Paths, words []string) (int, error) {
 	return 1, nil
 }
 
-// listRuns prints the newest readable records as a status table.
+// listRuns prints the newest readable records as a status table: in a git repository only
+// runs that worked in one of its checkouts, unless --all.
 func listRuns(p home.Paths, opts home.Object) (int, error) {
 	limit := 20
 	if opts.B("-n") {
@@ -514,8 +524,15 @@ func listRuns(p home.Paths, opts home.Object) (int, error) {
 		}
 		limit = integer(n)
 	}
-	list := runs.Recent(p, limit)
-	if len(list) == 0 {
+	var keep func(*runs.Run) bool
+	dir, _ := os.Getwd()
+	if checkouts := git.Checkouts(dir); checkouts != nil && !opts.B("--all") {
+		keep = func(r *runs.Run) bool { return runs.In(r, checkouts) }
+	}
+	list := runs.Recent(p, limit, keep)
+	if len(list) == 0 && keep != nil {
+		fmt.Fprintln(os.Stderr, "ask: no runs in this repository yet; ask runs --all lists every run")
+	} else if len(list) == 0 {
 		fmt.Fprintln(os.Stderr, "ask: no runs yet")
 	} else {
 		fmt.Fprintln(os.Stdout, status.Table(list, time.Now(), status.CanStyle(os.Stdout)))
@@ -534,7 +551,7 @@ func models(a *agent.Registry, names bool) (int, error) {
 		fmt.Fprintln(os.Stderr, "ask: could not list the models of "+e)
 	}
 	if len(ids) == 0 {
-		fmt.Fprintf(os.Stderr, "ask: no models; add an agent to %s (see docs/agents.md)\n", a.Paths.Agents)
+		fmt.Fprintln(os.Stderr, "ask: no models; ask install claude, codex or opencode adds an agent (see ask help agents)")
 	}
 	previous := ""
 	for _, id := range ids {
@@ -567,24 +584,28 @@ func models(a *agent.Registry, names bool) (int, error) {
 	return 0, nil
 }
 
-// install clones one source or updates every package, retaining individual update failures.
+// install clones or updates each named source and checks the agents it brings, or with no
+// sources updates every package, retaining individual update failures.
 func install(p home.Paths, words []string) (int, error) {
-	if len(words) > 1 {
-		return 0, home.Usage("ask install takes one source, like ask install owner/repo")
-	}
-	if len(words) > 0 {
-		line, e := packages.Install(p, words[0])
+	code := 0
+	for _, source := range words {
+		line, e := packages.Install(p, source)
 		if e != nil {
 			return 0, e
 		}
 		fmt.Fprintln(os.Stderr, "ask: "+line)
-		return 0, nil
+		_, dir, _ := packages.Locate(p, source)
+		if !checkAgents(p, dir) {
+			code = 1
+		}
+	}
+	if len(words) > 0 {
+		return code, nil
 	}
 	all := packages.Installed(p)
 	if len(all) == 0 {
 		fmt.Fprintln(os.Stderr, "ask: no packages installed; ask install OWNER/REPO adds one")
 	}
-	code := 0
 	for _, x := range all {
 		line, e := packages.Update(p, x.Path)
 		if e != nil {
@@ -595,6 +616,42 @@ func install(p home.Paths, words []string) (int, error) {
 		}
 	}
 	return code, nil
+}
+
+// checkAgents lists each agent a package brings, as ask will run it, and reports whether it is
+// ready: whether yours or another package's agent of that name wins, and otherwise whether
+// NAME models succeeds, with its reason when not. It returns false when an agent is not ready.
+func checkAgents(p home.Paths, dir string) bool {
+	ready := true
+	for _, name := range find.List(filepath.Join(dir, "agents")) {
+		path := filepath.Join(dir, "agents", name)
+		if used := find.Path(p, "agents", name); used != path {
+			fmt.Fprintf(os.Stderr, "ask: %s: %s is used instead of this package's; remove it to use this one\n", name, home.Tilde(used))
+			continue
+		}
+		r := process.Run(path, []string{"models"}, process.Options{Env: p.Env(nil), Timeout: 60 * time.Second})
+		if r.Code != 0 {
+			why := process.Reason(r.Stderr)
+			if why == "" {
+				why = fmt.Sprintf("%s models exited %d", name, r.Code)
+			}
+			fmt.Fprintf(os.Stderr, "ask: %s is not ready: %s\n", name, why)
+			ready = false
+			continue
+		}
+		ids := 0
+		for _, l := range strings.Split(home.Trim(r.Stdout), "\n") {
+			if home.Trim(l) != "" {
+				ids++
+			}
+		}
+		if ids == 0 {
+			fmt.Fprintf(os.Stderr, "ask: %s is ready; it lists no models, so name the ones you use, like ask -m %s:MODEL (see ask help models)\n", name, name)
+		} else {
+			fmt.Fprintf(os.Stderr, "ask: %s is ready: %s, see ask models\n", name, status.Plural(ids, "model"))
+		}
+	}
+	return ready
 }
 
 // listPackages prints each installation and its directory contents.
@@ -681,8 +738,11 @@ func main(argv []string, version string) (int, error) {
 	a := agent.New(p)
 	switch command {
 	case "title":
-		if len(words) != 0 || !opts.Has("--command") {
-			return 0, home.Usage("ask title needs --command STRING and optional --description TEXT")
+		if opts.B("--hook") && len(words) == 0 && !opts.Has("--command") && !opts.Has("--description") {
+			return hookTitle(a)
+		}
+		if len(words) != 0 || !opts.Has("--command") || opts.B("--hook") {
+			return 0, home.Usage("ask title needs --command STRING and optional --description TEXT, or --hook alone")
 		}
 		if title := commandTitle(a, opts.S("--command"), opts.S("--description")); title != "" {
 			fmt.Fprintln(os.Stdout, title)

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -421,6 +422,9 @@ func invocationTitle(a *agent.Registry, argv []string, description, dir string, 
 							model = r.Results[i].S("model")
 						}
 					}
+					if model == "" {
+						model = defaultModel(a)
+					}
 					m, err := agent.Parse(a.Paths, model)
 					if err != nil {
 						known = false
@@ -459,6 +463,9 @@ func invocationTitle(a *agent.Registry, argv []string, description, dir string, 
 			if prompt == "" || prompt == "-" {
 				prompt = old.S("prompt")
 			}
+		}
+		if model == "" {
+			model = defaultModel(a)
 		}
 		m, err := agent.Parse(a.Paths, model)
 		if err != nil {
@@ -522,4 +529,38 @@ func commandTitle(a *agent.Registry, command, description string) string {
 		return title
 	}
 	return ""
+}
+
+// hookTitle answers a PreToolUse hook event on stdin, the format Claude Code uses: for a shell
+// command that runs ask, it prints the tool input with the title as its description and
+// run_in_background set; for anything else, or input it cannot read, it prints nothing.
+// It always exits 0, so a host never blocks a command on a title.
+func hookTitle(a *agent.Registry) (int, error) {
+	b, _ := io.ReadAll(os.Stdin)
+	if !strings.Contains(string(b), "ask") {
+		return 0, nil
+	}
+	v, err := home.ParseJSON(home.UTF8(b))
+	event, _ := v.(home.Object)
+	input, _ := event.Get("tool_input").(home.Object)
+	command, _ := input.Get("command").(string)
+	if err != nil || command == "" {
+		return 0, nil
+	}
+	description, _ := input.Get("description").(string)
+	title := commandTitle(a, command, description)
+	if title == "" {
+		return 0, nil
+	}
+	updated := input.Clone()
+	updated.Set("description", title)
+	updated.Set("run_in_background", true)
+	fmt.Fprintln(os.Stdout, home.JSON(home.O("hookSpecificOutput", home.O("hookEventName", "PreToolUse", "updatedInput", updated)), false))
+	return 0, nil
+}
+
+// defaultModel is the model setting, or "" when there is none or settings.json is unreadable.
+func defaultModel(a *agent.Registry) string {
+	s, _ := a.Paths.ReadSettings()
+	return s.S("model")
 }

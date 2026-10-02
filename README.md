@@ -44,6 +44,7 @@ is on your `PATH`. See [Install](docs/install.md) for checksums and updates.
 ### Use
 
 ```sh
+ask install claude codex                            # agents for the CLIs you use
 ask models                                          # what you can run here
 ask -m claude:sonnet-5.5 "Why does the login test fail?"  # read-only, the default
 ask -c login-test-fail -w "Fix it, then run the test." # follow up: same agent, same conversation
@@ -60,14 +61,16 @@ ask login-test-fail · started · Sonnet 5.5 · read · ~/code/app
 ask login-test-fail · ok · Sonnet 5.5 · 48.0s · 31.0k in · 812 out · $0.09
 ```
 
-Every run is named after its prompt and recorded: `ask runs` lists them, `ask show RUN` prints one
-again, and `ask stop RUN` stops one.
+Every run is named after its prompt and recorded: `ask runs` lists this repository's, `ask show
+RUN` prints one again, and `ask stop RUN` stops one. [Settings](docs/settings.md) hold your
+defaults, like a model so `-m` is optional, or where worktrees go.
 
 ### Make it yours
 
 ask stays small and you add to it with executables in `~/.ask`, in any language:
 
 - **agents/** run each coding agent's CLI: Claude Code, Codex, Opencode, or any other.
+  `ask install claude`, `codex` or `opencode` adds the official one.
 - **hooks/** change tasks and check results: add context, guard writes, run the tests and have the
   agent fix what fails.
 - **commands/** add `ask NAME` workflows, like a review by several models.
@@ -79,7 +82,7 @@ stay stable across releases.
 ### Docs
 
 [Install](docs/install.md) · [Usage](docs/usage.md) · [Runs](docs/runs.md) ·
-[Batches](docs/batches.md) · [Models](docs/models.md) · [Agents](docs/agents.md) ·
+[Batches](docs/batches.md) · [Models](docs/models.md) · [Settings](docs/settings.md) · [Agents](docs/agents.md) ·
 [Hosts](docs/hosts.md) · [Hooks](docs/hooks.md) · [Commands](docs/commands.md) · [Packages](docs/packages.md) ·
 [Compatibility](docs/compatibility.md)
 

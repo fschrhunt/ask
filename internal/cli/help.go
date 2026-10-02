@@ -24,7 +24,7 @@ func modelLines(a *agent.Registry) string {
 	ids, failures := a.List(config)
 	agents := find.Sorted(a.Paths, "agents")
 	if len(agents) == 0 {
-		return "  None; see ask help agents"
+		return "  None yet; ask install claude, codex or opencode adds one"
 	}
 	width := 0
 	for _, entry := range agents {
@@ -203,17 +203,18 @@ Examples
 		return `ask runs · list recent runs, newest first
 
 Usage
-  ask runs [-n N]
+  ask runs [-n N] [--all]
 
 Options
-  -n N   How many (default: 20)
+  -n N    How many (default: 20)
+  --all   Every run, not only this repository's
 
 Output
   RUN  ID  STARTED  STATUS  MODEL  TIME  TASK
 
 Examples
   ask runs
-  ask runs -n 50` + "\n\ndocs  " + docsURL + "/runs.md"
+  ask runs --all -n 50` + "\n\ndocs  " + docsURL + "/runs.md"
 	case "stop":
 		return `ask stop · stop a run and its agents
 
@@ -245,10 +246,12 @@ Examples
 
 Usage
   ask title --command STRING [--description TEXT]
+  ask title --hook        A PreToolUse hook event on stdin, as Claude Code sends it
 
 Output
   stdout   MODEL · JOB, plus · write or · worktree when it applies;
            nothing when the command runs no task
+  --hook   The tool input with the title as its description, in the background
   exit     0, or 2 when ask title itself is misused
 
 Hooks
@@ -257,17 +260,23 @@ Hooks
 Example
   ask title --command 'ask -m claude:haiku-4.5 "Check tests"' --description "check tests"` + "\n\ndocs  " + docsURL + "/hosts.md"
 	case "install":
-		return `ask install · install a package, or update every package
+		return `ask install · install agents and packages, or update every package
 
 Usage
-  ask install [SOURCE]
+  ask install [SOURCE...]
 
 Source
+  NAME         An official agent: claude, codex, opencode (fschrhunt/ask-NAME)
   OWNER/REPO   A GitHub repository
   URL          Any git repository
   PATH         A local git repository, like ./tools or ~/code/tools
 
+Output
+  stderr   What was installed, and whether each agent it brings is ready
+  exit     0 ready · 1 an agent is not ready · 2 usage error
+
 Examples
+  ask install claude codex
   ask install owner/repo
   ask install` + "\n\ndocs  " + docsURL + "/packages.md"
 	case "packages":
@@ -293,7 +302,20 @@ Hooks are executables in ~/.ask/hooks. The docs have the contract and examples.`
 	case "agents":
 		return `ask agents · run a coding agent's CLI for ask
 
-Agents are executables in ~/.ask/agents. The docs have the contract and examples.` + "\n\ndocs  " + docsURL + "/agents.md"
+ask install claude, codex or opencode adds an official agent. Your own are executables in
+~/.ask/agents; the docs have the contract and examples.` + "\n\ndocs  " + docsURL + "/agents.md"
+	case "settings":
+		return `ask settings · your defaults, in ~/.ask/settings.json
+
+Keys
+  model       The model when -m gives none, like "claude:sonnet-5.5"
+  timeout     Seconds per task (default: 900)
+  jobs        Batch tasks at once (default: 4)
+  worktrees   Where --worktree works, like "~/code/worktrees/ask-{name}"
+  branches    A worktree's branch, like "ask/{name}" (the default)
+
+Example
+  {"model": "claude:sonnet-5.5", "worktrees": "~/code/worktrees/ask-{name}"}` + "\n\ndocs  " + docsURL + "/settings.md"
 	}
 	return ""
 }

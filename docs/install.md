@@ -42,9 +42,18 @@ cp ask ~/.local/bin/ask
 
 ## Add an agent
 
-ask runs each coding agent through an agent: an executable in `~/.ask/agents/` that runs that
-agent's CLI. ask ships none: write one for each CLI you use, installed and logged in. [Agents](agents.md) has
-the contract and examples; a minimal one is a few lines of shell.
+ask runs each coding agent through an agent: a small executable that runs that agent's CLI. ask
+ships none, but installs the official ones by name:
+
+```sh
+ask install claude        # Claude Code
+ask install codex         # Codex
+ask install opencode      # Opencode
+```
+
+Each needs its CLI installed and logged in, and Node.js 18 or newer. The agent finds the CLI even
+when it isn't on your `PATH`, and `ask install` says what is missing if anything is. To write
+your own, see [Agents](agents.md): a minimal one is a few lines of shell.
 
 Then check what ask can reach:
 
@@ -80,6 +89,7 @@ Everything ask uses is in `~/.ask` (set `ASK_HOME` to move it):
 ├── commands/     your own ask commands (see commands.md)
 ├── packages/     installed packages (see packages.md)
 ├── models.json   extra model ids per agent (see models.md)
+├── settings.json your defaults: model, timeout, worktree folders (see settings.md)
 ├── runs/         recorded runs (see runs.md)
 └── worktrees/    isolated write runs (see usage.md)
 ```

@@ -82,8 +82,8 @@ func line(ref string, parts ...string) string {
 	return "ask " + strings.Join(all, " · ")
 }
 
-// plural formats counts for changed files and commits.
-func plural(n int, word string) string {
+// Plural formats a count with its noun, like "1 file" or "3 models".
+func Plural(n int, word string) string {
 	s := ""
 	if n != 1 {
 		s = "s"
@@ -154,10 +154,10 @@ func Done(r home.Object) string {
 		a, _ := r.Get("changes").([]any)
 		parts := []string{}
 		if len(a) > 0 {
-			parts = append(parts, plural(len(a), "file")+" changed")
+			parts = append(parts, Plural(len(a), "file")+" changed")
 		}
 		if r.N("commits") != 0 {
-			parts = append(parts, plural(int(r.N("commits")), "commit"))
+			parts = append(parts, Plural(int(r.N("commits")), "commit"))
 		}
 		changed = strings.Join(parts, ", ")
 		if changed == "" {

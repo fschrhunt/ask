@@ -46,7 +46,7 @@ func Parse(p home.Paths, spec string) (Model, error) {
 		if text == "" {
 			text = "none"
 		}
-		return Model{}, home.Usage("no agent \"%s\" in %s; installed: %s; see docs/agents.md", m[1], p.Agents, text)
+		return Model{}, home.Usage("no agent \"%s\" in %s; installed: %s; add one with ask install claude, codex or opencode, or see docs/agents.md", m[1], p.Agents, text)
 	}
 	return Model{spec, m[1], m[2], m[3]}, nil
 }

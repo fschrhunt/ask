@@ -34,13 +34,25 @@ func git(args []string, dir string) (string, error) {
 }
 
 var shorthand = regexp.MustCompile(`^\w[\w-]*/[\w.-]+$`)
+
+// official names the agent packages ask install NAME means: claude is fschrhunt/ask-claude.
+var official = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
+
+// Official is the GitHub owner and name prefix of the official agent packages.
+const Official = "fschrhunt/ask-"
+
 var sourcePattern = regexp.MustCompile(`^(?:[a-z][a-z0-9+.-]*://(?:[^@/]+@)?|[\w.-]+@)?([\w.-]+)[/:]([\w.-]+)/([\w.-]+?)(?:\.git)?/?$`)
 
-// Locate resolves GitHub shorthand, a git URL or a local path to its installation directory.
-// OWNER/REPO always means GitHub; any other source that exists on disk is a local repository.
+// Locate resolves an official agent name, GitHub shorthand, a git URL or a local path to its
+// installation directory. A bare NAME that is not a folder here means the official package
+// fschrhunt/ask-NAME; OWNER/REPO always means GitHub; any other source that exists on disk is a
+// local repository.
 // A URL's host, owner and repository become the directory's three names, so none may be
 // empty, "." or "..", or start with "-", and the directory always stays inside packages.
 func Locate(p home.Paths, source string) (string, string, error) {
+	if _, e := os.Stat(source); e != nil && official.MatchString(source) {
+		source = Official + source
+	}
 	if shorthand.MatchString(source) {
 		source = "https://github.com/" + source
 	} else if _, e := os.Stat(source); e == nil {

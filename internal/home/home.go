@@ -153,3 +153,129 @@ func (p Paths) ReadModels() (Object, error) {
 	}
 	return o, nil
 }
+
+// Settings are the keys settings.json may hold, each replacing a built-in default:
+// model (the default -m), timeout (seconds per task), jobs (batch tasks at once), worktrees (a path
+// whose last part holds {name}) and branches (a worktree's branch name, holding {name}).
+var Settings = []string{"model", "timeout", "jobs", "worktrees", "branches"}
+
+// ReadSettings reads the optional settings.json, like {"worktrees": "~/code/worktrees/ask-{name}"}.
+// Unknown keys and malformed values are errors.
+func (p Paths) ReadSettings() (Object, error) {
+	path := filepath.Join(p.Home, "settings.json")
+	b, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return Object{}, nil
+	}
+	if err != nil {
+		return nil, Usage("cannot read %s: %s", path, FileError(err, "open", path))
+	}
+	v, err := ParseJSON(UTF8(b))
+	if err != nil {
+		return nil, Usage("cannot parse %s: %s", path, err)
+	}
+	o, ok := v.(Object)
+	if !ok {
+		return nil, Usage(`%s must be a JSON object, like {"worktrees": "~/code/worktrees/ask-{name}"}`, path)
+	}
+	for key, val := range o {
+		bad := ""
+		switch key {
+		case "model":
+			if s, ok := val.(string); !ok || Trim(s) == "" {
+				bad = `a model like "claude:sonnet-5.5"`
+			}
+		case "timeout":
+			if n, ok := val.(float64); !ok || !(n > 0 && n <= 2000000) {
+				bad = "a number of seconds above 0"
+			}
+		case "jobs":
+			if n, ok := val.(float64); !ok || n < 1 || n != float64(int(n)) {
+				bad = "a whole number of tasks, 1 or more"
+			}
+		case "worktrees":
+			if _, e := p.worktreeTemplate(val); e != nil {
+				return nil, e
+			}
+		case "branches":
+			if s, ok := val.(string); !ok || strings.Count(s, "{name}") != 1 || strings.ContainsAny(s, " ~^:?*[\\") || strings.HasPrefix(s, "-") || strings.HasPrefix(s, "/") {
+				bad = `a branch name holding {name} once, like "ask/{name}"`
+			}
+		default:
+			return nil, Usage("%s has an unknown setting %q; settings: %s", path, key, strings.Join(Settings, ", "))
+		}
+		if bad != "" {
+			return nil, Usage("%s: %q must be %s", path, key, bad)
+		}
+	}
+	return o, nil
+}
+
+// Branch returns the branch for the worktree named name: the branches setting with {name}
+// replaced, or ask/NAME.
+func (p Paths) Branch(name string) (string, error) {
+	s, e := p.ReadSettings()
+	if e != nil {
+		return "", e
+	}
+	tmpl := "ask/{name}"
+	if s.Has("branches") {
+		tmpl = s.S("branches")
+	}
+	return strings.Replace(tmpl, "{name}", name, 1), nil
+}
+
+// worktreeTemplate validates a worktrees setting and returns it absolute, with ~ expanded.
+func (p Paths) worktreeTemplate(v any) (string, error) {
+	s, _ := v.(string)
+	if s == "~" || strings.HasPrefix(s, "~/") {
+		h, _ := os.UserHomeDir()
+		s = filepath.Join(h, s[1:])
+	}
+	dir, last := filepath.Split(filepath.Clean(s))
+	if !filepath.IsAbs(s) || strings.Count(s, "{name}") != 1 || !strings.Contains(last, "{name}") || dir == "" {
+		return "", Usage(`%s: "worktrees" must be an absolute or ~ path whose last part holds {name} once, like "~/code/worktrees/ask-{name}"`, filepath.Join(p.Home, "settings.json"))
+	}
+	return filepath.Clean(s), nil
+}
+
+// Worktree returns where the worktree named name goes: the worktrees setting with {name}
+// replaced, or worktrees/NAME in ask's home.
+func (p Paths) Worktree(name string) (string, error) {
+	tmpl, e := p.worktreesSetting()
+	if e != nil {
+		return "", e
+	}
+	return strings.Replace(tmpl, "{name}", name, 1), nil
+}
+
+// WorktreeNames returns the names of the worktrees already in the worktrees location.
+func (p Paths) WorktreeNames() []string {
+	tmpl, e := p.worktreesSetting()
+	if e != nil {
+		return nil
+	}
+	dir, last := filepath.Split(tmpl)
+	prefix, suffix, _ := strings.Cut(last, "{name}")
+	names := []string{}
+	entries, _ := os.ReadDir(dir)
+	for _, d := range entries {
+		n := d.Name()
+		if len(n) > len(prefix)+len(suffix) && strings.HasPrefix(n, prefix) && strings.HasSuffix(n, suffix) {
+			names = append(names, n[len(prefix):len(n)-len(suffix)])
+		}
+	}
+	return names
+}
+
+// worktreesSetting is the configured worktrees template, or ask's own worktrees folder.
+func (p Paths) worktreesSetting() (string, error) {
+	s, e := p.ReadSettings()
+	if e != nil {
+		return "", e
+	}
+	if !s.Has("worktrees") {
+		return filepath.Join(p.Worktrees, "{name}"), nil
+	}
+	return p.worktreeTemplate(s.Get("worktrees"))
+}

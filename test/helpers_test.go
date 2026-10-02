@@ -54,6 +54,7 @@ func (o object) b(k string) bool    { x, _ := o[k].(bool); return x }
 type setup struct {
 	t              *testing.T
 	tmp, home, log string
+	cwd            string // where ask runs; s.tmp when empty
 	env            map[string]string
 }
 
@@ -125,6 +126,9 @@ func (s *setup) start(args []string, input string, extra map[string]string) *run
 	s.t.Helper()
 	cmd := exec.Command(askBin, args...)
 	cmd.Dir = s.tmp
+	if s.cwd != "" {
+		cmd.Dir = s.cwd
+	}
 	env := map[string]string{}
 	for k, v := range s.env {
 		env[k] = v
