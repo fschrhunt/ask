@@ -15,8 +15,8 @@
   review diffs measure wide text correctly. Machine output stays unchanged.
 
 - `ask bench` compares models on the same tasks: every task on every `-m` model, `-n` times, each
-  passing when the agent finishes and the task's own `check` command exits 0. A check runs as you,
-  so only write tasks may have one. Write attempts get fresh worktrees from the same commit. It prints passes, median time, tokens and cost per model,
+  passing when the agent finishes and the task's own `check` command exits 0. Write attempts get
+  fresh worktrees from the same commit. It prints passes, median time, tokens and cost per model,
   and `ask show` prints a bench again. A command of yours named `bench` is now hidden by it.
 - Install with `curl -fsSL https://fschrhunt.com/ask/install.sh | sh` (checksum-verified, into
   `~/.local/bin`) or Homebrew, from ask's own repository: `brew tap fschrhunt/ask

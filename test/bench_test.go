@@ -11,7 +11,7 @@ import (
 func TestBench(t *testing.T) {
 	t.Run("every task runs on every model -n times, and its check, given the answer, decides a pass", func(t *testing.T) {
 		s := fresh(t)
-		tasks := `[{"id":"says","prompt":"hello","write":true,"check":"grep -q 'fake: hello'"},{"id":"never","prompt":"x","write":true,"check":"echo nope; exit 3"}]`
+		tasks := `[{"id":"says","prompt":"hello","check":"grep -q 'fake: hello'"},{"id":"never","prompt":"x","check":"echo nope; exit 3"}]`
 		r := s.run([]string{"bench", "-m", "fake:small", "-m", "fake:big", "-n", "2", "-"}, tasks, nil)
 		eq(t, r.code, 0)
 		eq(t, len(s.calls()), 8)

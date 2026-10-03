@@ -40,6 +40,13 @@ func TestBatch(t *testing.T) {
 		eq(t, sorted(stringsField(s.calls(), "access")), []string{"read", "write"})
 		eq(t, fields(s.runFile("tasks.json"), "write"), [][]any{{true}, {false}})
 	})
+	t.Run("an explicit -r is a ceiling: a task asking for write is refused, not run with it", func(t *testing.T) {
+		s := fresh(t)
+		r := s.run([]string{"batch", "-r", "-m", "fake:small"}, `[{"prompt":"a"},{"prompt":"b","write":true}]`, nil)
+		eq(t, r.code, 2)
+		match(t, r.stderr, `asks for "write": true, but -r makes every task read-only`)
+		eq(t, len(s.calls()), 0)
+	})
 	t.Run("a batch task without a model is a usage error that lists the models", func(t *testing.T) {
 		s := fresh(t)
 		r := s.run([]string{"batch"}, `[{"prompt":"a"}]`, nil)

@@ -24,17 +24,13 @@ model. Each task may add a `check`:
 ```json
 [
   { "id": "parser", "prompt": "Fix the failing test in parser/.", "write": true, "check": "go test ./parser/..." },
-  { "id": "entry", "prompt": "Which file defines main? Answer with its path only." }
+  { "id": "entry", "prompt": "Which file defines main? Answer with its path only.", "check": "grep -qx 'cmd/app/main.go'" }
 ]
 ```
 
 | Field | Meaning |
 | --- | --- |
 | `check` | A shell command run in the folder the agent worked in, with the answer on stdin. Exit 0 passes. Without one, an attempt passes when its agent finishes (and its answer matches `schema`, when there is one). |
-
-A check runs as you, so only a write task may have one (`"write": true`, or `-w` for every task):
-write access already lets the model run commands, while a read task must run none. A read task
-with a check is refused, and so is a task asking for write under `-r`.
 
 Every other field works as in a batch: `prompt`, `id`, `write`, `dir`, `json`, `schema`, `timeout`
 and `max_cost`. A check has the task's timeout.
