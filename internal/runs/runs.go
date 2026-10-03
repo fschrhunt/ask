@@ -256,7 +256,8 @@ func lock(r *Run) (*os.File, error) {
 // fill in what neither the task nor its defaults give. A task's cost limit is its own max_cost,
 // else the limit of the run it follows up, else its model's in models.json, else the max_cost
 // setting; 0 means none. A model that
-// models.json turns off is refused.
+// models.json turns off is refused. An explicit -r in defaults is a ceiling: a task asking for
+// write access is refused rather than run with it. The model is stored as agent.Parse spells it.
 func Prepare(p home.Paths, items []any, defaults home.Object, label string, single bool, missing func(string) error) ([]home.Object, error) {
 	settings, e := p.ReadSettings()
 	if e != nil {
@@ -291,6 +292,9 @@ func Prepare(p home.Paths, items []any, defaults home.Object, label string, sing
 					return nil, home.Usage("%s: \"%s\" must be true or false", where, key)
 				}
 			}
+		}
+		if defaults.Has("write") && !defaults.B("write") && t.B("write") {
+			return nil, home.Usage("%s asks for \"write\": true, but -r makes every task read-only", where)
 		}
 		for _, key := range []string{"model", "dir", "continue"} {
 			if t.Has(key) {
@@ -398,6 +402,7 @@ func Prepare(p home.Paths, items []any, defaults home.Object, label string, sing
 		if e != nil {
 			return nil, e
 		}
+		x.Set("model", m.Spec)
 		entry, _ := models.Get(m.Agent, m.ID)
 		if entry.Off {
 			return nil, home.Usage("%s: %s:%s is off in models.json; turn it on with ask models %s:%s --enable", where, m.Agent, m.ID, m.Agent, m.ID)

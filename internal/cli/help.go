@@ -171,7 +171,8 @@ its agent finishes and the task's check exits 0.
 
 Tasks · a batch file, without model, plus
   check      Shell command run where the agent worked, the answer
-             on stdin; exit 0 passes (default: finishing passes)
+             on stdin; exit 0 passes (default: finishing passes).
+             Runs as you, so only write tasks may have one
 
 Options
   -m MODEL       A model to compare; give one -m per model

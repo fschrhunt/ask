@@ -28,12 +28,12 @@ An effort (`claude:opus-5.5#high`) is passed as `--effort`.
 
 ## Read and write
 
-- **Read runs** use Claude Code's default permission mode with only Read, Grep and Glob and a short
-  list of inspection commands (`git diff`, `git log`, `git show`, `git status`, `git blame`,
-  `git ls-files`, `rg`, `grep`, `ls`, `wc`, `cat`, `head`, `tail`). Commands with redirects, pipes,
-  chaining, substitution, quoting, escaping or options that write files are refused, and so are
-  Edit, Write and NotebookEdit. The prompt starts with an instruction to answer from the files in
-  the working directory and never guess.
+- **Read runs** use Claude Code's default permission mode with only Read, Grep and Glob. Bash,
+  Edit, Write and NotebookEdit are denied, so no shell command runs, not even `git log`: rules over
+  a command's text cannot follow everything a shell expands. Git runs Claude Code starts itself
+  take no optional locks and no fsmonitor (`GIT_OPTIONAL_LOCKS=0`, `core.fsmonitor=false`), so
+  reading git status never rewrites the index. The prompt starts with an instruction to answer from
+  the files in the working directory and never guess.
 - **Write runs** (`ask -w`) bypass permissions: the agent edits files and runs commands freely.
 
 A `--schema` is passed to Claude Code's `--json-schema`, and the answer is its structured output.

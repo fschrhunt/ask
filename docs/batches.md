@@ -25,7 +25,7 @@ A batch is a JSON array, or one JSON object per line:
 | `prompt` | The task. Required. |
 | `id` | A name for the result. Default: the task's position, from 1. |
 | `model` | `agent:id[#effort]`. Required unless the batch's `-m`, a follow-up or the `model` [setting](settings.md) gives one. |
-| `write` | `true` for read and write. Default: the batch's `-w`, else read only. |
+| `write` | `true` for read and write. Default: the batch's `-w`, else read only. With the batch's `-r`, `true` is refused. |
 | `worktree` | `true` to work in its own git worktree and branch (creating one needs write). Default: the batch's `--worktree`. |
 | `continue` | A run to follow up, like `"login-test-fail"` or `"summarize-public-api-src/api"` (see [Runs](runs.md#follow-ups)). |
 | `dir` | Directory the agent works in. Default: the batch's `-C`, else the current directory. |
@@ -33,7 +33,8 @@ A batch is a JSON array, or one JSON object per line:
 | `timeout` | Seconds for this task. Default: the batch's `-t`, else 900. |
 | `max_cost` | Dollars this task may spend; 0 for no limit. Default: the batch's `--max-cost`, else its model's limit or your setting (see [Usage](usage.md#cost-limits)). |
 
-Options given to `ask batch` are defaults; a task's own fields win.
+Options given to `ask batch` are defaults; a task's own fields win, except that a task cannot
+widen an explicit `-r` to write.
 
 ## Running
 

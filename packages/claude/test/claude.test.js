@@ -97,17 +97,14 @@ test('read runs get the read-only flags', async () => {
   assert.equal(r.code, 0);
   const [call] = r.calls;
   assert.equal(after(call.argv, '--permission-mode'), 'default');
-  assert.match(after(call.argv, '--allowedTools'), /Read,Grep,Glob,Bash\(git diff:\*\)/);
-  assert.match(after(call.argv, '--disallowedTools'), /^Edit,Write,NotebookEdit,/);
+  assert.equal(after(call.argv, '--allowedTools'), 'Read,Grep,Glob');
+  assert.equal(after(call.argv, '--disallowedTools'), 'Bash,Edit,Write,NotebookEdit');
 });
 
-test('read runs refuse writing options, quoting and escaping, and git grep', async () => {
+test('read runs refuse shell access entirely', async () => {
   const [call] = (await run('look')).calls;
-  const denied = after(call.argv, '--disallowedTools').split(',');
-  for (const token of ['>', '|', ';', '&', '`', '$', '--output', '--ext-diff', '--textconv', '--pre', '--hostname-bin', "'", '"', '{']) assert.ok(denied.includes(`Bash(*${token}*)`), token);
-  // Claude Code only matches a backslash written as four in its rule.
-  assert.ok(denied.includes('Bash(*\\\\\\\\*)'));
-  assert.ok(!after(call.argv, '--allowedTools').includes('git grep'));
+  assert.equal(after(call.argv, '--disallowedTools'), 'Bash,Edit,Write,NotebookEdit');
+  assert.equal(after(call.argv, '--allowedTools'), 'Read,Grep,Glob');
 });
 
 test('a new read run is told to answer from the files; write runs and follow-ups get the prompt as is', async () => {

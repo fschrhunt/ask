@@ -18,15 +18,16 @@ type Model struct {
 // models unless it is off.
 type Models map[string]map[string]Model
 
-// Get returns an entry, and whether models.json has one.
+// Get returns an entry, and whether models.json has one. Ids are keyed lowercase, so a model's
+// entry applies however its id is spelled.
 func (m Models) Get(agent, id string) (Model, bool) {
-	x, ok := m[agent][id]
+	x, ok := m[agent][strings.ToLower(id)]
 	return x, ok
 }
 
 // Delete removes an entry, so the model is on with your default cost limit again.
 func (m Models) Delete(agent, id string) {
-	delete(m[agent], id)
+	delete(m[agent], strings.ToLower(id))
 	if len(m[agent]) == 0 {
 		delete(m, agent)
 	}
@@ -37,11 +38,12 @@ func (m Models) Set(agent, id string, x Model) {
 	if m[agent] == nil {
 		m[agent] = map[string]Model{}
 	}
-	m[agent][id] = x
+	m[agent][strings.ToLower(id)] = x
 }
 
 // ReadModels reads models.json. Each agent maps model ids to true (on), false (off) or
 // {"enabled": bool, "max_cost": USD}; an agent's list of ids, the older form, turns them on.
+// Ids ignore case, so one spelled two ways is refused rather than guessing which entry applies.
 func (p Paths) ReadModels() (Models, error) {
 	path := filepath.Join(p.Home, "models.json")
 	out := Models{}
@@ -73,6 +75,9 @@ func (p Paths) ReadModels() (Models, error) {
 			}
 		case Object:
 			for id, entry := range list {
+				if _, dup := out.Get(agent, id); dup {
+					return nil, Usage(`%s: %s:%s is named twice; model ids ignore case`, path, agent, id)
+				}
 				switch e := entry.(type) {
 				case bool:
 					out.Set(agent, id, Model{Off: !e})

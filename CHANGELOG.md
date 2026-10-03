@@ -2,13 +2,21 @@
 
 ## Unreleased
 
+- Read runs are tighter. On Claude Code and Opencode they get only file reading and search tools,
+  no shell commands (the inspection-command list could be widened by shell expansion), and git
+  runs those CLIs start take no optional locks and no fsmonitor. An explicit `-r` on `ask batch`
+  or `ask bench` refuses a task with `"write": true` instead of running it with write access.
+- Model ids ignore case everywhere: ask lowercases them before checking `models.json`, recording a
+  run and passing `ASK_MODEL`, so `claude:Opus-5.5` can no longer slip past an entry that turns
+  `opus-5.5` off. A `models.json` naming one id twice in different case is refused. An agent whose
+  ids depend on case now receives them lowercase.
 - Migrate terminal prompts and live status to Bubble Tea, with monochrome prompt styling,
   resize-aware choices, cursor editing and bracketed paste. Updates show transient progress;
   review diffs measure wide text correctly. Machine output stays unchanged.
 
 - `ask bench` compares models on the same tasks: every task on every `-m` model, `-n` times, each
-  passing when the agent finishes and the task's own `check` command exits 0. Write attempts get
-  fresh worktrees from the same commit. It prints passes, median time, tokens and cost per model,
+  passing when the agent finishes and the task's own `check` command exits 0. A check runs as you,
+  so only write tasks may have one. Write attempts get fresh worktrees from the same commit. It prints passes, median time, tokens and cost per model,
   and `ask show` prints a bench again. A command of yours named `bench` is now hidden by it.
 - Install with `curl -fsSL https://fschrhunt.com/ask/install.sh | sh` (checksum-verified, into
   `~/.local/bin`) or Homebrew, from ask's own repository: `brew tap fschrhunt/ask

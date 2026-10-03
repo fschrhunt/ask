@@ -12,7 +12,8 @@ codex:gpt-6.1-sol
   [Agents](agents.md)).
 - **id** is the model as the agent names it. By convention that is the lowercase family,
   version and variant, like `gpt-6.1-sol` or `sonnet-5.5`, never an alias like `latest` (see
-  [Naming models](agents.md#naming-models)).
+  [Naming models](agents.md#naming-models)). Ids ignore case: ask lowercases them, so
+  `claude:Sonnet-5.5` is `claude:sonnet-5.5`, with its `models.json` entry.
 - **effort** is passed to the agent, which passes it on in its CLI's own form.
 
 ## Listing
@@ -53,7 +54,8 @@ A model that is off is refused: `-m codex:gpt-5.6-sol` says it is off and how to
 ## models.json
 
 Your choices are in `~/.ask/models.json`, by agent: the models you turned off, the ones you added,
-and the ones with their own cost limit. Everything else is on, so the file stays short and never
+and the ones with their own cost limit. Ids ignore case; a file naming one id twice in different
+case is refused. Everything else is on, so the file stays short and never
 keeps a model an agent stopped offering; `ask models --all` is always the full list.
 
 ```json
