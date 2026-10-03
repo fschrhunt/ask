@@ -1,6 +1,6 @@
 # ask releases
 
-## Unreleased
+## v0.2.0 · 2026-10-03
 
 - Read runs are tighter. On Claude Code and Opencode they get only file reading and search tools,
   no shell commands (the inspection-command list could be widened by shell expansion), and git
