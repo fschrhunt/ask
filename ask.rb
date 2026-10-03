@@ -13,23 +13,23 @@ class Ask < Formula
 
   on_macos do
     on_arm do
-      url "https://github.com/fschrhunt/ask/releases/download/v0.1.0/ask_v0.1.0_darwin_arm64.tar.gz"
-      sha256 "ac09104a7643366905c453562a7f1d5bcfb47497b696a1f553dc9433caa833a9"
+      url "https://github.com/fschrhunt/ask/releases/download/v0.2.0/ask_v0.2.0_darwin_arm64.tar.gz"
+      sha256 "67d182a9e0e3d0f10792b799867fdb1ad82dab7691f980138a77617571d2f907"
     end
     on_intel do
-      url "https://github.com/fschrhunt/ask/releases/download/v0.1.0/ask_v0.1.0_darwin_amd64.tar.gz"
-      sha256 "e15d0ac48709f130c3c2be7da9ecf675407372a11c0f27f7fc0ac05a92f98fdd"
+      url "https://github.com/fschrhunt/ask/releases/download/v0.2.0/ask_v0.2.0_darwin_amd64.tar.gz"
+      sha256 "9527a9ff1ff5d06c8ca7d32f7ac677006f25428460001571e60da0f722881ae2"
     end
   end
 
   on_linux do
     on_arm do
-      url "https://github.com/fschrhunt/ask/releases/download/v0.1.0/ask_v0.1.0_linux_arm64.tar.gz"
-      sha256 "03a2798b383fb287e3c4e1797d2bd5822a25c26fb87b0e69cc53e6239c78f89d"
+      url "https://github.com/fschrhunt/ask/releases/download/v0.2.0/ask_v0.2.0_linux_arm64.tar.gz"
+      sha256 "f54322466b5807e24f201f4b0c68705311a8bd9570a71179103ed121efaecece"
     end
     on_intel do
-      url "https://github.com/fschrhunt/ask/releases/download/v0.1.0/ask_v0.1.0_linux_amd64.tar.gz"
-      sha256 "aa209106f19be3600914dd7eb7a6b47a0c12ad32da783a834c25d4c66ba651bb"
+      url "https://github.com/fschrhunt/ask/releases/download/v0.2.0/ask_v0.2.0_linux_amd64.tar.gz"
+      sha256 "8d8aa0784a802b5440bb0ef4adec36ec8f5e59af700b54a98fba9faddcdc6de4"
     end
   end
 
@@ -44,6 +44,6 @@ class Ask < Formula
   end
 
   test do
-    assert_equal "v0.1.0", shell_output("#{bin}/ask --version").strip
+    assert_equal "v0.2.0", shell_output("#{bin}/ask --version").strip
   end
 end
