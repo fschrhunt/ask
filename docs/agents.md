@@ -39,7 +39,8 @@ Name each model by what it is, the same way in every agent, so `ask models` read
 - **Match without regard to case,** so `GPT-6.1-Sol` finds `gpt-6.1-sol`.
 
 ask doesn't enforce this; a model id is whatever your agent accepts. It is the convention for
-agents you share.
+agents you share. ask does treat ids without regard to case: it lowercases them, so a run, its
+record, `models.json` and `ASK_MODEL` all use one spelling.
 
 ### Running: `NAME`
 
@@ -48,7 +49,7 @@ ask runs the agent with no arguments, in the directory the agent should work in 
 | Input | |
 | --- | --- |
 | stdin | The prompt, complete. ask adds only the JSON instruction for `--json` or `--schema`. |
-| `ASK_MODEL` | The model id, without the agent or effort: `sonnet-5.5`. |
+| `ASK_MODEL` | The model id, without the agent or effort, in lowercase: `sonnet-5.5`. |
 | `ASK_EFFORT` | The effort from `#effort`, or empty. |
 | `ASK_ACCESS` | `read` or `write`. |
 | `ASK_SCHEMA` | Set only with `--schema`: a file holding the JSON Schema, for CLIs that enforce one. |
@@ -105,9 +106,9 @@ ask passes `ASK_ACCESS=read` for read runs and trusts the agent to keep it. How 
 CLI:
 
 - **An OS sandbox** is the strongest: the agent may run any command, but nothing can write.
-- **Tool and command rules**: allow only reading tools and a short list of inspection commands,
-  and refuse anything with redirects, pipes, chaining, quoting or substitution. Rules read the
-  command text, so they are weaker than a sandbox.
+- **Tool rules**: allow only reading and search tools, and deny the shell. Rules that match a
+  command's text cannot follow everything a shell expands (substitution, globs, quoting), so an
+  allow-list of "safe" commands is not a boundary; the official agents allow none in read runs.
 - **Neither**: refuse read runs. Exit 1 with a reason rather than run with write access.
 
 ask sends the prompt exactly as given. A read run is usually a question about the code, so an

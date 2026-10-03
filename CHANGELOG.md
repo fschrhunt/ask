@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Read runs are tighter. On Claude Code and Opencode they get only file reading and search tools,
+  no shell commands (the inspection-command list could be widened by shell expansion), and git
+  runs those CLIs start take no optional locks and no fsmonitor. An explicit `-r` on `ask batch`
+  or `ask bench` refuses a task with `"write": true` instead of running it with write access.
+- Model ids ignore case everywhere: ask lowercases them before checking `models.json`, recording a
+  run and passing `ASK_MODEL`, so `claude:Opus-5.5` can no longer slip past an entry that turns
+  `opus-5.5` off. A `models.json` naming one id twice in different case is refused. An agent whose
+  ids depend on case now receives them lowercase.
 - Migrate terminal prompts and live status to Bubble Tea, with monochrome prompt styling,
   resize-aware choices, cursor editing and bracketed paste. Updates show transient progress;
   review diffs measure wide text correctly. Machine output stays unchanged.

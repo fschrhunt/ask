@@ -40,9 +40,12 @@ ask -m claude:sonnet-5.5 -w "Add tests for parseFlags, then run them" # write
 
 ask passes your prompt to the agent as you wrote it, with the access in `ASK_ACCESS`. The agent
 enforces read-only in its CLI's own way, and may add its own guidance for read runs, like
-"search and read the files before answering"; see [Agents](agents.md#read-only).
+"search and read the files before answering"; see [Agents](agents.md#read-only). With the official
+agents, a read run on Claude Code or Opencode can only read and search files, and runs no shell
+commands at all, not even `git log`; one on Codex may run commands in Codex's read-only sandbox.
 
-Running tests or builds writes files, so it needs `-w`.
+Running tests or builds writes files, so it needs `-w`. In a batch or bench, an explicit `-r` is a
+ceiling: a task with `"write": true` is refused, not run with write access.
 
 ## What a write run changed
 

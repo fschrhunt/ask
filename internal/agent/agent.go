@@ -20,12 +20,13 @@ import (
 	"github.com/fschrhunt/ask/internal/process"
 )
 
-// Model splits the agent:model#effort specification without changing its spelling.
+// Model splits the agent:model#effort specification. ID is lowercase, the one spelling of a model
+// that models.json lookups, run records and the agent (ASK_MODEL) all see; Spec is rebuilt from it.
 type Model struct{ Spec, Agent, ID, Effort string }
 
 var specPattern = regexp.MustCompile(`^([a-z0-9][a-z0-9_-]*):([^#\s]+)(?:#(\S+))?$`)
 
-// Parse validates a model specification and requires its agent to be installed.
+// Parse validates a model specification, lowercases its id, and requires its agent to be installed.
 func Parse(p home.Paths, spec string) (Model, error) {
 	m := specPattern.FindStringSubmatch(spec)
 	if m != nil {
@@ -50,7 +51,12 @@ func Parse(p home.Paths, spec string) (Model, error) {
 		}
 		return Model{}, home.Usage("no agent \"%s\" in %s; installed: %s; run ask setup, or ask install %s if it is an official agent", m[1], p.Agents, text, m[1])
 	}
-	return Model{spec, m[1], m[2], m[3]}, nil
+	id := strings.ToLower(m[2])
+	spec = m[1] + ":" + id
+	if m[3] != "" {
+		spec += "#" + m[3]
+	}
+	return Model{spec, m[1], id, m[3]}, nil
 }
 
 type listedModel struct{ id, name string }
@@ -100,7 +106,7 @@ func (a *Registry) models(name string) listing {
 					continue
 				}
 				bits := strings.Split(line, "\t")
-				m := listedModel{id: home.Trim(bits[0])}
+				m := listedModel{id: strings.ToLower(home.Trim(bits[0]))}
 				if len(bits) > 1 {
 					m.name = home.Trim(bits[1])
 				}

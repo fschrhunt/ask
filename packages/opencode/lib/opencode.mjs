@@ -1,8 +1,9 @@
 /*
  * The Opencode agent: runs `opencode run --standalone`, so stopping the run also ends its session.
  * Opencode has no read-only flag, and a global allow-everything rule overrides its built-in plan
- * agent, so read runs inject rules for plan: file tools plus the read-only inspection commands.
- * Injected config is applied last and the last matching rule wins. Write runs use build with the
+ * agent, so read runs inject rules for plan: the read, grep and glob tools and nothing else, no
+ * shell. Injected config is applied last and the last matching rule wins. Read runs also keep git
+ * from taking optional locks or running fsmonitor (see readEnv). Write runs use build with the
  * user's own permissions. It lists every model of the providers you have set up in Opencode;
  * turn off the ones you don't use with ask models or ask settings opencode. Models are named like the other agents',
  * family-version-variant in lowercase (deepseek-4.1-flash for opencode-go/deepseek-v4.1-flash),
@@ -89,31 +90,27 @@ function exported(session) {
 // Agent iterations before it must answer in text: lookups measured 1-13, a runaway 107.
 const STEPS = { read: 25, write: 100 };
 
-/* The agent config injected through OPENCODE_CONFIG_CONTENT: plan with read-only rules, or build. */
+/*
+ * The agent config injected through OPENCODE_CONFIG_CONTENT: plan with read-only rules, or build.
+ * Read runs get no shell: rules over a command's text cannot follow everything a shell expands.
+ */
 function config(write) {
   const rule = (action, resource, effect) => ({ action, resource, effect });
-  const readOnly = [
-    rule('*', '*', 'deny'),
-    ...['read', 'grep', 'glob'].map((action) => rule(action, '*', 'allow')),
-    ...INSPECT.flatMap((command) => [rule('shell', command, 'allow'), rule('shell', `${command} *`, 'allow')]),
-    ...[...UNSAFE, ...WRITERS].map((token) => rule('shell', `*${token}*`, 'deny')),
-  ];
+  const readOnly = [rule('*', '*', 'deny'), ...['read', 'grep', 'glob'].map((action) => rule(action, '*', 'allow'))];
   return JSON.stringify({
     agents: write ? { build: { steps: STEPS.write } } : { plan: { steps: STEPS.read, permissions: readOnly } },
   });
 }
 
 /*
- * Read runs may run only INSPECT commands, written as plain words: a command containing an
- * UNSAFE character (one that redirects, pipes, chains, substitutes, expands, quotes or escapes, any
- * of which could also spell a refused option past a rule) or a WRITER option (one that writes files
- * or runs another program) is refused. Rules match text, so commands that take abbreviated or
- * bundled options, like git grep, are left out; the agent has its own grep tool. Tests and builds
- * write files, so they need -w.
+ * The environment of a read run's CLI, for the git it runs on its own: no optional locks, so
+ * status never rewrites the index, and core.fsmonitor off, so the repository's config cannot start
+ * a command. Added after any GIT_CONFIG_* the user set.
  */
-const INSPECT = ['git diff', 'git log', 'git show', 'git status', 'git blame', 'git ls-files', 'rg', 'grep', 'ls', 'wc', 'cat', 'head', 'tail'];
-const UNSAFE = ['>', '|', ';', '&', '`', '$', '\\', "'", '"', '{'];
-const WRITERS = ['--output', '--ext-diff', '--textconv', '--pre', '--hostname-bin'];
+function readEnv() {
+  const n = Number(process.env.GIT_CONFIG_COUNT) || 0;
+  return { GIT_OPTIONAL_LOCKS: '0', GIT_CONFIG_COUNT: String(n + 1), [`GIT_CONFIG_KEY_${n}`]: 'core.fsmonitor', [`GIT_CONFIG_VALUE_${n}`]: 'false' };
+}
 
 /*
  * Runs an agent CLI in the current directory with `input` on stdin, calling onLine with each line of
@@ -238,7 +235,7 @@ await adapter({
       } else if (step && !finished.has(step)) unfinished.add(step);
       if (event.type === 'text' && typeof event.part?.text === 'string' && !event.part.synthetic) text = event.part.text;
     };
-    const r = await exec(CLI, args, { input: prompt, env: { OPENCODE_CONFIG_CONTENT: config(write) }, onLine });
+    const r = await exec(CLI, args, { input: prompt, env: { ...(write ? {} : readEnv()), OPENCODE_CONFIG_CONTENT: config(write) }, onLine });
     // Opencode 2.0 prints no step_finish for the step that answers; its stored message has the
     // usage, saved a moment after Opencode exits, so the export is retried for up to 1.5 seconds.
     if (unfinished.size && sessionId) {

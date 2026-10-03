@@ -27,16 +27,25 @@ type attempt struct {
 
 // bench runs every task of a batch file on every -m model, -n times each, as one run. An attempt
 // passes when its agent finishes and the task's "check" exits 0 in the folder it worked in (with
-// the answer on stdin). Write tasks get a fresh worktree each, discarded after its check unless
-// --keep. It prints a table per model, or JSON, and saves it as bench.json for ask show.
+// the answer on stdin). A check is your command, from your bench file, so it runs for read tasks
+// too: -r limits what the model can do, and the model only supplies the answer the check reads.
+// Write tasks get a fresh worktree each, discarded after its check unless --keep. It prints a
+// table per model, or JSON, and saves it as bench.json for ask show.
 func bench(a *agent.Registry, opts home.Object, words []string) (int, error) {
 	if len(words) != 1 {
 		return 0, home.Usage("ask bench takes one file of tasks, like ask bench tasks.json -m claude:sonnet-5.5 -m codex:gpt-6.1-sol")
 	}
 	models := []string{}
 	for _, m := range strings.Split(opts.S("-m"), ",") {
-		if m = home.Trim(m); m != "" && !slices.Contains(models, m) {
-			models = append(models, m)
+		if m = home.Trim(m); m == "" {
+			continue
+		}
+		spec, e := agent.Parse(a.Paths, m)
+		if e != nil {
+			return 0, e
+		}
+		if !slices.Contains(models, spec.Spec) {
+			models = append(models, spec.Spec)
 		}
 	}
 	if len(models) == 0 {
@@ -82,6 +91,7 @@ func bench(a *agent.Registry, opts home.Object, words []string) (int, error) {
 		if t.Has("check") && !ok {
 			return 0, home.Usage("task %d: \"check\" must be a shell command, like \"go test ./...\"", i+1)
 		}
+		write := t.B("write") || (!t.Has("write") && defaults.B("write"))
 		id := strconv.Itoa(i + 1)
 		if t.Get("id") != nil {
 			id = home.String(t.Get("id"))
@@ -92,7 +102,7 @@ func bench(a *agent.Registry, opts home.Object, words []string) (int, error) {
 				x.Delete("check")
 				x.Set("id", id)
 				x.Set("model", m)
-				if x.B("write") || (!x.Has("write") && defaults.B("write")) {
+				if write {
 					x.Set("worktree", true)
 				}
 				expanded = append(expanded, x)

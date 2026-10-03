@@ -36,11 +36,11 @@ across all providers. When several providers offer it, the agent takes the one i
 
 Opencode has no read-only flag, so read runs inject permission rules for its `plan` agent:
 
-- **Read runs** may use only the read, grep and glob tools and a short list of inspection commands
-  (`git diff`, `git log`, `git show`, `git status`, `git blame`, `git ls-files`, `rg`, `grep`, `ls`,
-  `wc`, `cat`, `head`, `tail`). Commands with redirects, pipes, chaining, substitution, quoting,
-  escaping or options that write files are refused. The prompt starts with an instruction to answer
-  from the files in the working directory and never guess. They stop after 25 steps.
+- **Read runs** may use only the read, grep and glob tools; the shell is denied, so no command
+  runs, not even `git log`: rules over a command's text cannot follow everything a shell expands.
+  Git runs Opencode starts itself take no optional locks and no fsmonitor. The prompt starts with
+  an instruction to answer from the files in the working directory and never guess. They stop
+  after 25 steps.
 - **Write runs** (`ask -w`) use the `build` agent with your own Opencode permissions, for up to 100
   steps.
 

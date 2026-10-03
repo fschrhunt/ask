@@ -77,14 +77,15 @@ test('read runs use the plan agent with injected read-only permissions', async (
   const { steps, permissions } = call.config.agents.plan;
   assert.equal(steps, 25);
   assert.deepEqual(permissions[0], { action: '*', resource: '*', effect: 'deny' });
-  assert.ok(permissions.some((p) => p.action === 'shell' && p.resource === 'git diff *' && p.effect === 'allow'));
+  assert.deepEqual(permissions.slice(1), ['read', 'grep', 'glob'].map((action) => ({ action, resource: '*', effect: 'allow' })));
 });
 
-test('read runs refuse writing options, quoting and escaping, and git grep', async () => {
+test('read runs refuse shell access entirely', async () => {
   const [call] = (await run('look')).calls;
-  const denied = call.config.agents.plan.permissions.filter((p) => p.effect === 'deny').map((p) => p.resource);
-  for (const token of ['>', '|', ';', '&', '`', '$', '\\', '--output', '--ext-diff', '--textconv', '--pre', '--hostname-bin', "'", '"', '{']) assert.ok(denied.includes(`*${token}*`), token);
-  assert.ok(!call.config.agents.plan.permissions.some((p) => p.resource.startsWith('git grep')));
+  assert.deepEqual(call.config.agents.plan.permissions, [
+    { action: '*', resource: '*', effect: 'deny' },
+    ...['read', 'grep', 'glob'].map((action) => ({ action, resource: '*', effect: 'allow' })),
+  ]);
 });
 
 test('write runs use the build agent with the larger step cap', async () => {

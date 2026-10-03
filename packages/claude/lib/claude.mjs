@@ -1,8 +1,9 @@
 /*
  * The Claude Code agent: runs `claude -p` with streamed JSON output, reporting tokens as each model
  * call starts and finishes (Claude Code gives cost only at the end). Read runs use the default permission
- * mode with only file tools and the read-only inspection commands allowed, so the user's own
- * default mode cannot widen them; write runs bypass permissions. Models are named family-version,
+ * mode with only the Read, Grep and Glob tools: shell commands and edits are denied outright, so
+ * the user's own default mode and allow rules cannot widen them, and git takes no optional locks
+ * and runs no fsmonitor (see readEnv); write runs bypass permissions. Models are named family-version,
  * like sonnet-5.5 (Claude Code's claude-sonnet-5-5), or by full Claude Code id; never by Claude
  * Code's aliases (opus, sonnet), which change meaning as new models ship. Add older or newer models
  * in ~/.ask/models.json. The report names the model that ran (claude-opus-5-5 -> Opus 5.5). Every run gets
@@ -59,16 +60,14 @@ function displayName(id) {
 }
 
 /*
- * Read runs may run only INSPECT commands, written as plain words: a command containing an
- * UNSAFE character (one that redirects, pipes, chains, substitutes, expands, quotes or escapes, any
- * of which could also spell a refused option past a rule) or a WRITER option (one that writes files
- * or runs another program) is refused. Rules match text, so commands that take abbreviated or
- * bundled options, like git grep, are left out; the agent has its own grep tool. Tests and builds
- * write files, so they need -w.
+ * The environment of a read run's CLI, for the git it runs on its own (Claude Code reads git
+ * status for context): no optional locks, so status never rewrites the index, and core.fsmonitor
+ * off, so the repository's config cannot start a command. Added after any GIT_CONFIG_* the user set.
  */
-const INSPECT = ['git diff', 'git log', 'git show', 'git status', 'git blame', 'git ls-files', 'rg', 'grep', 'ls', 'wc', 'cat', 'head', 'tail'];
-const UNSAFE = ['>', '|', ';', '&', '`', '$', '\\', "'", '"', '{'];
-const WRITERS = ['--output', '--ext-diff', '--textconv', '--pre', '--hostname-bin'];
+function readEnv() {
+  const n = Number(process.env.GIT_CONFIG_COUNT) || 0;
+  return { GIT_OPTIONAL_LOCKS: '0', GIT_CONFIG_COUNT: String(n + 1), [`GIT_CONFIG_KEY_${n}`]: 'core.fsmonitor', [`GIT_CONFIG_VALUE_${n}`]: 'false' };
+}
 
 /*
  * Runs an agent CLI in the current directory with `input` on stdin, calling onLine with each line of
@@ -154,15 +153,9 @@ await adapter({
     // Claude Code reports cost only when it ends, so it enforces ask's limit itself.
     if (maxCost) args.push('--max-budget-usd', String(maxCost));
     if (schema) args.push('--json-schema', JSON.stringify(schema));
-    // Claude Code matches rules against the command text, and only a pattern with four backslashes matches one.
+    // Rules over a command's text cannot follow everything a shell expands, so a read run gets no shell at all.
     if (write) args.push('--permission-mode', 'bypassPermissions');
-    else
-      args.push(
-        '--permission-mode', 'default',
-        '--allowedTools', ['Read', 'Grep', 'Glob', ...INSPECT.map((command) => `Bash(${command}:*)`)].join(','),
-        '--disallowedTools',
-        ['Edit', 'Write', 'NotebookEdit', ...[...UNSAFE, ...WRITERS].map((token) => `Bash(*${token.replaceAll('\\', '\\\\\\\\')}*)`)].join(','),
-      );
+    else args.push('--permission-mode', 'default', '--allowedTools', 'Read,Grep,Glob', '--disallowedTools', 'Bash,Edit,Write,NotebookEdit');
     // Each model call's usage arrives as it starts (message_start) and, with its output, as it
     // finishes (message_delta); the result event closes the run.
     const calls = new Map();
@@ -186,7 +179,7 @@ await adapter({
       for (const u of calls.values()) for (const [key, n] of Object.entries(tokens(u))) so[key] += n;
       report(so);
     };
-    const r = await exec(CLI, args, { input: prompt, onLine });
+    const r = await exec(CLI, args, { input: prompt, env: write ? {} : readEnv(), onLine });
     if (!result) return { ok: false, error: r.stderr.trim().split('\n').pop() || `unreadable output (exit ${r.code})` };
     // A run stopped at its budget ends with empty usage; the streamed counts are the real ones then.
     const final = tokens(result.usage || {});

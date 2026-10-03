@@ -24,6 +24,15 @@ func TestModels(t *testing.T) {
 		s.write(filepath.Join(s.home, "models.json"), `{"fake": ["extra"]}`)
 		match(t, s.ask("models").stdout, `(?m)^fake:extra$`)
 	})
+	t.Run("model ids ignore case, so a model turned off can't be reached by spelling it differently", func(t *testing.T) {
+		s := fresh(t)
+		s.ask("models", "fake:small", "--disable")
+		r := s.ask("-m", "fake:SMALL", "hi")
+		eq(t, r.code, 2)
+		match(t, r.stderr, `fake:small is off in models.json`)
+		s.write(filepath.Join(s.home, "models.json"), `{"fake": {"big": true, "BIG": false}}`)
+		match(t, s.ask("models").stderr, `fake:(big|BIG) is named twice; model ids ignore case`)
+	})
 	t.Run("a cost limit is the run's, else its model's, else the setting; past it ask stops the agent and says how to continue", func(t *testing.T) {
 		s := fresh(t)
 		s.write(filepath.Join(s.home, "settings.json"), `{"max_cost": 2}`)
