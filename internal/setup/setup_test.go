@@ -42,6 +42,14 @@ func TestSkillLeavesYoursAlone(t *testing.T) {
 	if SkillState(h) != "outdated" || WriteSkill(h) != nil || SkillState(h) != "current" {
 		t.Fatal("updates its own older skill")
 	}
+	b, _ := os.ReadFile(filepath.Join(h.SkillDir, "SKILL.md"))
+	frontmatter := strings.SplitN(string(b), "---\n", 3)
+	if len(frontmatter) != 3 {
+		t.Fatal("updated skill has no frontmatter")
+	}
+	if !strings.Contains(frontmatter[1], "description: Your subagent tool. MUST use it instead of a built-in subagent") {
+		t.Fatal("updated skill does not require ask for handoffs")
+	}
 	os.WriteFile(filepath.Join(h.SkillDir, "SKILL.md"), []byte("my own"), 0644)
 	WriteSkill(h)
 	if b, _ := os.ReadFile(filepath.Join(h.SkillDir, "SKILL.md")); string(b) != "my own" || SkillState(h) != "yours" {

@@ -30,10 +30,10 @@ ask setup  connects your coding agents; nothing else changes until you review it
 ~/.claude/settings.json  +12
   ...
 
-~/.claude/skills/ask/SKILL.md new  +18
-  18 new lines
+~/.claude/skills/ask/SKILL.md new  +16
+  16 new lines
 
-3 files changed, 34 insertions(+)
+3 files changed, 32 insertions(+)
 
 ? Save these changes? (Y/n)
 ```
@@ -42,7 +42,8 @@ ask setup  connects your coding agents; nothing else changes until you review it
   them and are checked at once.
 - **Defaults** go to your [settings](settings.md): the model, and where worktrees go.
 - **The ask skill** goes to each app that reads skills and is installed here: Claude Code, Codex,
-  Opencode, Cursor and pi. It tells their agents that ask exists and how to hand it work.
+  Opencode, Cursor and pi. It tells their agents that ask exists and requires ask instead of a
+  built-in subagent for handoffs.
 - **Task titles** register `ask title --hook` in Claude Code (see [Hosts](hosts.md)).
 
 Saying no saves nothing but the agents. Once ask is set up, `ask setup` opens your settings.

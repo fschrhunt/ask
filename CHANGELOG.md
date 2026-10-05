@@ -1,5 +1,10 @@
 # ask releases
 
+## Unreleased
+
+- The ask skill now requires agents to use ask instead of a built-in subagent for handoffs; setup
+  updates older ask-written skills when accepted.
+
 ## v0.2.0 · 2026-10-03
 
 - Read runs are tighter. On Claude Code and Opencode they get only file reading and search tools,
