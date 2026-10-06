@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Clarify `./x` help and argument handling and simplify PR verification guidance;
+  keep offline Baymax in the shared check and use `./x build` for release builds.
+
 - Added Baymax (`./x baymax [AGENT...]`), the offline packaged-harness integration doctor.
   `./x check` includes it; `./x node` is a compatibility alias. Shared test plumbing replaces
   duplicated adapter runners while harness-specific assertions stay beside their packages.
