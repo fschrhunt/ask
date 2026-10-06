@@ -3,9 +3,24 @@ package setup
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/fschrhunt/ask/internal/packages"
 )
+
+// TestAgentsCoverBundledPackages keeps installable harnesses discoverable in ask setup.
+func TestAgentsCoverBundledPackages(t *testing.T) {
+	names := make([]string, 0, len(Agents))
+	for _, a := range Agents {
+		names = append(names, a.Name)
+	}
+	slices.Sort(names)
+	if want := packages.Builtins(); !slices.Equal(names, want) {
+		t.Fatalf("setup agents %v do not match bundled packages %v", names, want)
+	}
+}
 
 // TestSetHookKeepsEverythingElse adds and removes only ask's hook, keeping other settings in order.
 func TestSetHookKeepsEverythingElse(t *testing.T) {

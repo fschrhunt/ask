@@ -4,7 +4,7 @@
 
   <h3>Every model, as a subagent.</h3>
 
-  <p>Hand tasks to Claude Code, Codex and Opencode, on any model they run,<br>
+  <p>Hand tasks to your coding agents, on any model they run,<br>
   from your terminal or from another agent. One task or many at once, recorded, with live usage.</p>
 
   <p>
@@ -31,9 +31,10 @@ ask -m claude:sonnet-5.5 "Why does the login test fail?"
 ask -c login-test-fail -w "Fix it, then run the test."
 ```
 
-`ask setup` finds Claude Code, Codex and Opencode, connects the ones you pick, and shows what it
-will change before it saves. Each agent keeps its own login, tools and sandbox; ask just hands it
-the task and gives you the answer.
+`ask setup` finds supported coding CLIs, connects the ones you pick, and shows what it
+will change before it saves. Each agent keeps its own login; ask hands it the task and gives you
+the answer. See [official packages](packages/README.md) for each harness's tools, access controls
+and continuation support.
 
 <table>
   <tr>
@@ -108,6 +109,13 @@ your version.
 | [Usage](docs/usage.md) · [Runs](docs/runs.md) · [Batches](docs/batches.md) · [Bench](docs/bench.md) · [Models](docs/models.md) | Running tasks, following up, many at once, comparing models, cost limits |
 | [Agents](docs/agents.md) · [Hooks](docs/hooks.md) · [Commands](docs/commands.md) · [Packages](docs/packages.md) | Extending ask |
 | [Hosts](docs/hosts.md) · [Compatibility](docs/compatibility.md) | Other tools using ask, and what stays stable |
+
+## Baymax
+
+Baymax is ask's mascot and integration doctor. He checks packaged harnesses, writing behavior
+and package lifecycle through the real ask binary. Run `./x baymax` from a checkout, or
+`./x baymax copilot` for one harness. See [Baymax](docs/contributing/baymax.md) for coverage,
+requirements and limitations.
 
 <br>
 

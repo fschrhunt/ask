@@ -80,18 +80,18 @@ Showing a whole batch prints its outcome count on stderr and exits 1 if any task
 
 ## Waiting for runs
 
-`ask wait` blocks until runs finish, then prints them the way `ask show` does. Start runs in the
-background, keep working, and collect them when you need the answers:
+`ask wait` blocks until the first currently running run finishes, then prints its answer the way
+`ask show` does. It takes no names or options. Start runs in the background, keep working, and
+collect whichever answer arrives first:
 
 ```sh
 ask -m claude:sonnet-5.5 "Why does the login test fail?" &
 ask -m codex:gpt-6.1-sol "Review the session code for races." &
-ask wait login-test-fail                       # one run: its answer on stdout
-ask wait login-test-fail review-session-code   # several: their results as one JSON array
-ask wait fix-api -t 1800                        # give up after 30 minutes (exit 1)
+ask wait # first run to finish
 ```
 
-A run that was stopped before finishing exits 1 with how to continue it.
+If no run is active, it prints `ask: no runs are running` and exits 0. A run that was stopped before
+finishing exits 1 with how to continue it.
 
 ## Stopping a run
 
@@ -146,4 +146,4 @@ ask creates new run directories with mode 0700 and records with mode 0600. Delet
 whenever you like; nothing else refers to them.
 
 Hosts can name a background run with `ask title --command STRING --description TEXT`; see
-[Hosts](hosts.md) for title forms and a Claude Code integration.
+[Hosts](hosts.md) for title forms and agent-session naming.

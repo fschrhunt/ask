@@ -32,8 +32,8 @@ model. Each task may add a `check`:
 | --- | --- |
 | `check` | A shell command run in the folder the agent worked in, with the answer on stdin. Exit 0 passes. Without one, an attempt passes when its agent finishes (and its answer matches `schema`, when there is one). |
 
-Every other field works as in a batch: `prompt`, `id`, `write`, `dir`, `json`, `schema`, `timeout`
-and `max_cost`. A check has the task's timeout.
+Every other field works as in a batch: `prompt`, `id`, `title`, `write`, `dir`, `json`, `schema`,
+`timeout` and `max_cost`. A check has the task's timeout.
 
 Keep checks where the agent cannot read them when that matters: a check that names the expected
 answer in the repository gives it away.
@@ -57,7 +57,7 @@ setting (see [Usage](usage.md#cost-limits)).
 | --- | --- |
 | `-m MODEL` | A model to compare. Give one `-m` per model, or several separated by commas. |
 | `-n N` | Attempts per task and model. Default 1. |
-| `-w`, `-C`, `-t`, `--max-cost` | Defaults for every task, as in a batch. |
+| `-w`, `-C`, `-t`, `--title`, `--max-cost` | Defaults for every task, as in a batch. |
 | `-j N` | Attempts at once. Default 4, or the `jobs` [setting](settings.md). |
 | `--keep` | Keep write attempts' worktrees. |
 | `--json` | Print the report as JSON. The default when stdout is not a terminal. |

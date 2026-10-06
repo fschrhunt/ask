@@ -63,7 +63,7 @@ Code as `--max-budget-usd`, which stops after the model call that passes it. The
 | `ASK_CLAUDE_BIN` | The `claude` executable to run, instead of looking on `PATH` and in the usual places. |
 | `ASK_NODE` | The Node.js executable to run the agent with. |
 
-The agent also reads ask's contract variables: `ASK_MODEL`, `ASK_EFFORT`, `ASK_ACCESS`,
+The agent also reads ask's contract variables: `ASK_MODEL`, `ASK_EFFORT`, `ASK_ACCESS`, `ASK_TITLE`,
 `ASK_SCHEMA`, `ASK_SESSION` and `ASK_REPORT` (see [Agents](../../docs/agents.md)).
 
 ## Testing

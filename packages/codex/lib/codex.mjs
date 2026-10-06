@@ -91,6 +91,54 @@ function exec(command, args, { input = '', env, onLine } = {}) {
   });
 }
 
+/* Name a Codex thread through app-server, since its exec CLI has no thread-name flag. */
+function nameThread(command, threadId, title) {
+  return new Promise((resolve) => {
+    const child = spawn(command, ['app-server'], { stdio: ['pipe', 'pipe', 'ignore'] });
+    let buffer = '';
+    let id = 0;
+    let pending = 0;
+    let stage = 0;
+    let done = false;
+    const timer = setTimeout(() => finish(), 5000);
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      child.kill();
+      resolve();
+    };
+    const request = (method, params = {}) => {
+      pending = ++id;
+      child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: pending, method, params })}\n`);
+    };
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => {
+      buffer += chunk;
+      for (let end; (end = buffer.indexOf('\n')) !== -1;) {
+        const line = buffer.slice(0, end);
+        buffer = buffer.slice(end + 1);
+        let message;
+        try { message = JSON.parse(line); } catch { continue; }
+        if (message.id !== pending) continue;
+        if (message.error) return finish();
+        if (stage === 0) {
+          stage++;
+          child.stdin.write('{"jsonrpc":"2.0","method":"initialized","params":{}}\n');
+          request('thread/resume', { threadId });
+        } else if (stage === 1) {
+          stage++;
+          request('thread/name/set', { threadId, name: title });
+        } else finish();
+      }
+    });
+    child.on('error', finish);
+    child.stdin.on('error', finish);
+    child.on('close', finish);
+    request('initialize', { clientInfo: { name: 'ask', title: 'ask', version: '1' } });
+  });
+}
+
 /*
  * The agent contract from ask's docs/agents.md: `models` prints [id, name] pairs from models();
  * otherwise run() answers the prompt on stdin, GROUNDING first for a new read run, and returns
@@ -103,7 +151,7 @@ async function adapter({ models, run }) {
     for (const [id, name] of await models()) console.log(name ? `${id}\t${name}` : id);
     return;
   }
-  const { ASK_MODEL, ASK_EFFORT, ASK_ACCESS, ASK_SCHEMA, ASK_SESSION, ASK_REPORT } = process.env;
+  const { ASK_MODEL, ASK_EFFORT, ASK_ACCESS, ASK_SCHEMA, ASK_SESSION, ASK_REPORT, ASK_TITLE } = process.env;
   const reported = {};
   const report = (fields) => {
     Object.assign(reported, fields);
@@ -119,6 +167,7 @@ async function adapter({ models, run }) {
     write: ASK_ACCESS === 'write',
     schema: ASK_SCHEMA ? JSON.parse(readFileSync(ASK_SCHEMA, 'utf8')) : undefined,
     session: ASK_SESSION || undefined,
+    title: ASK_TITLE || undefined,
     dir: process.cwd(),
     report,
   });
@@ -139,7 +188,7 @@ if (!CLI) {
 await adapter({
   models: () => cachedModels().map((m) => [m.slug, displayName(m)]),
 
-  async run({ prompt, model, effort, write, schema, dir, session, report }) {
+  async run({ prompt, model, effort, write, schema, dir, session, title, report }) {
     model = model.toLowerCase();
     const work = mkdtempSync(join(tmpdir(), 'ask-codex-'));
     try {
@@ -158,8 +207,12 @@ await adapter({
       args.push(...(session ? [session, '-'] : ['-']));
       // --json streams events on stdout; each finished turn reports its tokens (Codex reports no cost).
       const usage = { input: 0, output: 0, cached: 0 };
+      let sessionId;
       const onLine = (line) => {
-        if (line.includes('"thread.started"')) report({ session: JSON.parse(line).thread_id });
+        if (line.includes('"thread.started"')) {
+          sessionId = JSON.parse(line).thread_id;
+          report({ session: sessionId });
+        }
         if (!line.includes('"turn.completed"')) return;
         try {
           const u = JSON.parse(line).usage || {};
@@ -170,6 +223,7 @@ await adapter({
         } catch {}
       };
       const r = await exec(CLI, args, { input: prompt, onLine });
+      if (title && sessionId) await nameThread(CLI, sessionId, title);
       const name = displayName(cachedModels().find((m) => m.slug === model));
       let text = '';
       try {

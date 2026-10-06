@@ -21,7 +21,7 @@ A hook is any executable. ask calls it with one argument, the event:
 | `NAME events` | none | The events it handles, one per line: `task`, `result`, `title`, `name` |
 | `NAME task` | `{"task": {...}}` | `{"task": {changes}}`, `{"refuse": "why"}`, `{"note": "text"}` |
 | `NAME name` | `{"name": "...", "prompts": ["..."]}` | `{"name": "replacement"}` |
-| `NAME title` | `{"title": "...", "command": ["ask", "..."], "description": "..."}` | `{"title": "replacement"}` |
+| `NAME title` | `{"title": "...", "command": ["ask", "..."], "description": "...", "task": {...}}` | `{"title": "replacement"}` |
 | `NAME result` | `{"task": {...}, "result": {...}}` | `{"followup": "prompt"}`, `{"fail": "why"}`, `{"note": "text"}` |
 
 - **`task`** is the task about to run: `id`, `prompt`, `model`, `write`, `json`, `schema`, `dir`,
@@ -128,9 +128,11 @@ every task's prompt. ask turns the replacement into lowercase words joined by `-
 number if an earlier run has the name. Follow-ups keep their conversation's name without asking.
 See [Naming runs](#naming-runs).
 
-The `title` event runs only for [host titles](hosts.md). `command` is the literal ask argv,
-without shell assignments or redirects; `description` is the host's original text. Hooks run
-in the invocation's directory without a run id. An empty replacement keeps the current title.
+The `title` event runs for agent session titles and [host titles](hosts.md). For agent sessions,
+`task` is the task record and `command` and `description` are empty. For host titles, `command` is
+the literal ask argv, without shell assignments or redirects, and `description` is the host's
+original text. Hooks run in the task's directory without a run id. An empty replacement keeps the
+current title.
 
 ## Naming runs
 

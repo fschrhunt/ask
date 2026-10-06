@@ -58,7 +58,7 @@ token anyway. Use `-t` to bound how long a run may take.
 | `ASK_NODE` | The Node.js executable to run the agent with. |
 | `CODEX_HOME` | Codex's home, for its model cache; `~/.codex` by default. |
 
-The agent also reads ask's contract variables: `ASK_MODEL`, `ASK_EFFORT`, `ASK_ACCESS`,
+The agent also reads ask's contract variables: `ASK_MODEL`, `ASK_EFFORT`, `ASK_ACCESS`, `ASK_TITLE`,
 `ASK_SCHEMA`, `ASK_SESSION` and `ASK_REPORT` (see [Agents](../../docs/agents.md)).
 
 ## Testing

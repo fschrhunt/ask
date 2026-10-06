@@ -1,17 +1,13 @@
 /*
- * The Opencode agent: runs `opencode run --standalone`, so stopping the run also ends its session.
- * Opencode has no read-only flag, and a global allow-everything rule overrides its built-in plan
- * agent, so read runs inject rules for plan: the read, grep and glob tools and nothing else, no
- * shell. Injected config is applied last and the last matching rule wins. Read runs also keep git
- * from taking optional locks or running fsmonitor (see readEnv). Write runs use build with the
- * user's own permissions. It lists every model of the providers you have set up in Opencode;
- * turn off the ones you don't use with ask models or ask settings opencode. Models are named like the other agents',
- * family-version-variant in lowercase (deepseek-4.1-flash for opencode-go/deepseek-v4.1-flash),
- * found in any provider; a provider/model id is used as it is. The session id of the first event is
- * reported at once; a follow-up continues it with --session. A new read run's prompt starts with
- * GROUNDING. Opencode is $ASK_OPENCODE_BIN, else on PATH, else where its installers put it.
- * Started by agents/opencode, which finds Node.js.
+ * The Opencode agent for v1 and v2, selected by the executable's --version. V2 uses a
+ * standalone server and plan permissions; v1 uses a fresh primary agent so merged plan config
+ * cannot retain tool-specific allows. Read runs permit only read, grep and glob, with no shell,
+ * and keep git from taking optional locks or running fsmonitor (see readEnv). Write runs use
+ * build with the user's permissions. Models have clean names or explicit provider/model ids.
+ * The first event reports the session for follow-ups; unfinished usage comes from the version's
+ * export command. Started by agents/opencode; ASK_OPENCODE_BIN overrides executable discovery.
  */
+import { randomUUID } from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
 import { accessSync, constants, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -36,6 +32,24 @@ function executable(path) {
   } catch {
     return false;
   }
+}
+
+/* Detect the supported CLI contract before listing models or running any task; never guess. */
+function cliVersion() {
+  let version;
+  try {
+    version = execFileSync(CLI, ['--version'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 10000 }).trim();
+  } catch {
+    throw new Error('could not detect Opencode version with --version; refusing to run');
+  }
+  const match = /^(?:opencode\s+)?v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/i.exec(version);
+  const major = Number(match?.[1]);
+  const minor = Number(match?.[2]);
+  const patch = Number(match?.[3]);
+  if (!match || ![1, 2].includes(major) || (major === 1 && (minor < 1 || (minor === 1 && patch < 65)))) {
+    throw new Error('unsupported or unparseable Opencode version; requires v1.1.65+ or v2; refusing to run');
+  }
+  return major;
 }
 
 /* The clean name of an Opencode model id: qwen3.8-flash -> qwen-3.8-flash, deepseek-v4.1-flash -> deepseek-4.1-flash. */
@@ -76,12 +90,14 @@ function opencodeId(model) {
 }
 
 /*
- * The messages of a session, from `opencode session export --standalone`: one assistant message per
- * step, with that step's tokens and cost. Returns [] when Opencode cannot export it.
+ * Assistant usage from v1's `export` (message.info) or v2's `session export --standalone`
+ * (flat messages). Returns [] when Opencode cannot export the session.
  */
 function exported(session) {
   try {
-    return JSON.parse(execFileSync(CLI, ['session', 'export', '--standalone', session], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1 << 28 })).messages || [];
+    const args = VERSION === 1 ? ['export', session] : ['session', 'export', '--standalone', session];
+    const messages = JSON.parse(execFileSync(CLI, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1 << 28 })).messages || [];
+    return VERSION === 1 ? messages.map((message) => message.info).filter(Boolean) : messages;
   } catch {
     return [];
   }
@@ -91,10 +107,18 @@ function exported(session) {
 const STEPS = { read: 25, write: 100 };
 
 /*
- * The agent config injected through OPENCODE_CONFIG_CONTENT: plan with read-only rules, or build.
+ * Version-specific config injected through OPENCODE_CONFIG_CONTENT for the selected agent.
  * Read runs get no shell: rules over a command's text cannot follow everything a shell expands.
  */
-function config(write) {
+function config(write, agent) {
+  if (VERSION === 1) {
+    return JSON.stringify({ agent: { [agent]: write ? { steps: STEPS.write } : {
+      description: 'Read files to answer without modifying the project',
+      mode: 'primary',
+      steps: STEPS.read,
+      permission: { '*': 'deny', read: 'allow', grep: 'allow', glob: 'allow' },
+    } } });
+  }
   const rule = (action, resource, effect) => ({ action, resource, effect });
   const readOnly = [rule('*', '*', 'deny'), ...['read', 'grep', 'glob'].map((action) => rule(action, '*', 'allow'))];
   return JSON.stringify({
@@ -154,7 +178,7 @@ async function adapter({ models, run }) {
     }
     return;
   }
-  const { ASK_MODEL, ASK_EFFORT, ASK_ACCESS, ASK_SCHEMA, ASK_SESSION, ASK_REPORT } = process.env;
+  const { ASK_MODEL, ASK_EFFORT, ASK_ACCESS, ASK_SCHEMA, ASK_SESSION, ASK_REPORT, ASK_TITLE } = process.env;
   const reported = {};
   const report = (fields) => {
     Object.assign(reported, fields);
@@ -170,6 +194,7 @@ async function adapter({ models, run }) {
     write: ASK_ACCESS === 'write',
     schema: ASK_SCHEMA ? JSON.parse(readFileSync(ASK_SCHEMA, 'utf8')) : undefined,
     session: ASK_SESSION || undefined,
+    title: ASK_TITLE || undefined,
     dir: process.cwd(),
     report,
   });
@@ -187,6 +212,14 @@ if (!CLI) {
   process.exit(1);
 }
 
+let VERSION;
+try {
+  VERSION = cliVersion();
+} catch (error) {
+  console.error(error.message);
+  process.exit(1);
+}
+
 await adapter({
   // Every model Opencode offers, by clean name, once each; turn off the ones you don't use with ask.
   models: () => {
@@ -195,10 +228,14 @@ await adapter({
     return [...new Set(all.listed.map((id) => clean(id.slice(id.indexOf('/') + 1))))].sort().map((name) => [name]);
   },
 
-  async run({ prompt, model, effort, write, session, report }) {
+  async run({ prompt, model, effort, write, session, title, report }) {
     const { id, error } = opencodeId(model);
     if (error) return { ok: false, error };
-    const args = ['run', '--standalone', '--agent', write ? 'build' : 'plan', '-m', effort ? `${id}#${effort}` : id, '--format', 'json'];
+    // A fresh v1 agent avoids deep-merging permission objects from a user's configured agent.
+    const agent = write ? 'build' : VERSION === 1 ? `ask-read-${randomUUID()}` : 'plan';
+    const args = ['run', ...(VERSION === 2 ? ['--standalone'] : []), '--agent', agent, '-m', VERSION === 2 && effort ? `${id}#${effort}` : id, '--format', 'json'];
+    if (VERSION === 1 && effort) args.push('--variant', effort);
+    if (title) args.push('--title', title);
     if (session) args.push('--session', session);
     // Events stream on stdout: the session on the first, and tokens and cost after every step.
     let sessionId;
@@ -235,11 +272,11 @@ await adapter({
       } else if (step && !finished.has(step)) unfinished.add(step);
       if (event.type === 'text' && typeof event.part?.text === 'string' && !event.part.synthetic) text = event.part.text;
     };
-    const r = await exec(CLI, args, { input: prompt, env: { ...(write ? {} : readEnv()), OPENCODE_CONFIG_CONTENT: config(write) }, onLine });
-    // Opencode 2.0 prints no step_finish for the step that answers; its stored message has the
-    // usage, saved a moment after Opencode exits, so the export is retried for up to 1.5 seconds.
+    const r = await exec(CLI, args, { input: prompt, env: { ...(write ? {} : readEnv()), OPENCODE_CONFIG_CONTENT: config(write, agent) }, onLine });
+    // Recover only unfinished messages, so streamed steps and earlier turns are never counted twice.
+    // V2 may save the answering message just after exit; retry export for up to 1.5 seconds.
     if (unfinished.size && sessionId) {
-      const saved = (m) => m.type === 'assistant' && unfinished.has(m.id) && (m.tokens?.input || 0) + (m.tokens?.cache?.read || 0) > 0;
+      const saved = (m) => (VERSION === 1 ? m.role : m.type) === 'assistant' && unfinished.has(m.id) && (m.tokens?.input || 0) + (m.tokens?.cache?.read || 0) > 0;
       for (let attempt = 1; ; attempt++) {
         const found = exported(sessionId).filter(saved);
         if (found.length === unfinished.size || attempt === 10) {

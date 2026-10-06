@@ -106,7 +106,7 @@ async function adapter({ models, run }) {
     for (const [id, name] of await models()) console.log(name ? `${id}\t${name}` : id);
     return;
   }
-  const { ASK_MODEL, ASK_EFFORT, ASK_ACCESS, ASK_SCHEMA, ASK_SESSION, ASK_REPORT } = process.env;
+  const { ASK_MODEL, ASK_EFFORT, ASK_ACCESS, ASK_SCHEMA, ASK_SESSION, ASK_REPORT, ASK_TITLE } = process.env;
   const reported = {};
   const report = (fields) => {
     Object.assign(reported, fields);
@@ -122,6 +122,7 @@ async function adapter({ models, run }) {
     write: ASK_ACCESS === 'write',
     schema: ASK_SCHEMA ? JSON.parse(readFileSync(ASK_SCHEMA, 'utf8')) : undefined,
     session: ASK_SESSION || undefined,
+    title: ASK_TITLE || undefined,
     maxCost: Number(process.env.ASK_MAX_COST) || undefined,
     dir: process.cwd(),
     report,
@@ -143,12 +144,13 @@ if (!CLI) {
 await adapter({
   models: () => MODELS.map((id) => [id, displayName(claudeId(id))]),
 
-  async run({ prompt, model, effort, write, schema, session, maxCost, report }) {
+  async run({ prompt, model, effort, write, schema, session, maxCost, title, report }) {
     if (ALIASES.includes(model.toLowerCase()))
       return { ok: false, error: `"${model}" is an alias; name the exact model, like claude:${MODELS.find((m) => m.startsWith(model.toLowerCase())) || MODELS[1]} (see ask models)` };
     const id = session || randomUUID();
     report({ session: id });
     const args = ['-p', '--model', claudeId(model), '--output-format', 'stream-json', '--verbose', '--include-partial-messages', ...(session ? ['--resume', session] : ['--session-id', id])];
+    if (title) args.push('--name', title);
     if (effort) args.push('--effort', effort);
     // Claude Code reports cost only when it ends, so it enforces ask's limit itself.
     if (maxCost) args.push('--max-budget-usd', String(maxCost));

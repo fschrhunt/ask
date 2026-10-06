@@ -6,48 +6,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"unicode"
 
 	"github.com/fschrhunt/ask/internal/agent"
 	"github.com/fschrhunt/ask/internal/find"
 	"github.com/fschrhunt/ask/internal/home"
 	"github.com/fschrhunt/ask/internal/hooks"
 	"github.com/fschrhunt/ask/internal/runs"
+	"github.com/fschrhunt/ask/internal/task"
 )
-
-// titleJob uses a supplied description, or a clipped first prompt line, as one safe line.
-// Leading " · " parts the label already says, like a host's own "Sonnet 5.5 · Fix it", are dropped.
-func titleJob(description, prompt, label string) string {
-	parts := strings.Split(strings.TrimSpace(description), " · ")
-	for len(parts) > 1 && saidIn(label, parts[0]) {
-		parts = parts[1:]
-	}
-	text := strings.TrimSpace(strings.Join(parts, " · "))
-	if text == "" {
-		text, _, _ = strings.Cut(strings.TrimSpace(prompt), "\n")
-		r := []rune(text)
-		if len(r) > 60 {
-			text = string(r[:59]) + "…"
-		}
-	}
-	text = strings.Join(strings.Fields(text), " ")
-	r := []rune(text)
-	if len(r) > 0 {
-		r[0] = unicode.ToUpper(r[0])
-	}
-	return string(r)
-}
-
-// saidIn reports whether part repeats one of label's parts, such as its model with or without effort.
-func saidIn(label, part string) bool {
-	part = strings.ToLower(strings.TrimSpace(part))
-	for _, have := range strings.Split(strings.ToLower(label), " · ") {
-		if part != "" && (have == part || strings.HasPrefix(have, part+" (")) {
-			return true
-		}
-	}
-	return false
-}
 
 // titlePath resolves literal host paths relative to preceding cd commands.
 func titlePath(dir, path string) string {
@@ -89,6 +55,9 @@ func invocationTitle(a *agent.Registry, argv []string, description, dir string, 
 				return "", nil
 			}
 		}
+	}
+	if opts.Has("--title") && strings.TrimSpace(opts.S("--title")) == "" {
+		return "", nil
 	}
 	invocationDir := dir
 	if opts.Has("-C") {
@@ -196,7 +165,11 @@ func invocationTitle(a *agent.Registry, argv []string, description, dir string, 
 			return "", nil
 		}
 		label = a.Name(m, "")
-		job := titleJob(description, prompt, label)
+		jobDescription := description
+		if opts.Has("--title") {
+			jobDescription = opts.S("--title")
+		}
+		job := task.JobTitle(jobDescription, prompt, label)
 		if job != "" && (prompt != "-" || strings.TrimSpace(description) != "") {
 			label += " · " + job
 		}
@@ -210,7 +183,11 @@ func invocationTitle(a *agent.Registry, argv []string, description, dir string, 
 		}
 		return label, opts
 	}
-	if job := titleJob(description, prompt, label); job != "" {
+	jobDescription := description
+	if opts.Has("--title") {
+		jobDescription = opts.S("--title")
+	}
+	if job := task.JobTitle(jobDescription, prompt, label); job != "" {
 		label += " · " + job
 	}
 	return label, opts
@@ -245,7 +222,7 @@ func commandTitle(a *agent.Registry, command, description string) string {
 		title, opts := invocationTitle(a, argv, description, dir, inputs[i], files)
 		if title != "" && !opts.B("--no-hooks") {
 			var notes []hooks.Note
-			title, notes = hooks.New(a.Paths).Title(title, argv, description, dir)
+			title, notes = hooks.New(a.Paths).Title(title, argv, description, dir, nil)
 			for _, n := range notes {
 				fmt.Fprintf(os.Stderr, "ask: hook %s · %s\n", n.Name, strings.Join(strings.Fields(n.Text), " "))
 			}

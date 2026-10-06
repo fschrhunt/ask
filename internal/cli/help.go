@@ -42,7 +42,7 @@ func modelLines(a *agent.Registry) string {
 			}
 		}
 		if len(words) > 12 {
-			words = []string{fmt.Sprintf("%d models; ask models lists them, ask setup %s chooses", len(words), entry.Name)}
+			words = []string{fmt.Sprintf("%d models; ask models --all lists; --enable/--disable toggles", len(words))}
 		}
 		if len(words) == 0 {
 			words = []string{"(lists none; give an id)"}
@@ -78,7 +78,7 @@ Commands
   batch      Run many tasks in parallel
   bench      Compare models on the same tasks
   show       Print a saved answer
-  wait       Wait for runs to finish, then print them
+  wait       Wait for the next run to finish, then print it
   runs       List recent runs
   stop       Stop a running run
   clean      Remove finished worktrees and old runs
@@ -143,6 +143,7 @@ Options
   --worktree           Work in a new git worktree and branch (with -w)
   -C, --dir DIR        Directory to work in (default: current)
   -t, --timeout S      Seconds per task (default: 900)
+  --title TEXT         Replace prompt text in agent session titles
   --max-cost USD       Stop a task that spends more (default: none, or your settings)
   --json               Require a JSON answer
   --schema FILE        Require JSON matching this schema
@@ -159,6 +160,7 @@ Runs
 
 Examples
   ask -m claude:haiku-4.5 "Where is login checked?"
+  ask -m codex:gpt-6.1-sol --title "Review login" "Inspect the login flow."
   ask -c login-checked -w "Fix it and run the test."` + "\n\ndocs  ask docs usage"
 	case "bench":
 		return `ask bench · compare models on the same tasks
@@ -178,6 +180,7 @@ Options
   -m MODEL       A model to compare; give one -m per model
   -n N           Attempts per task and model (default: 1)
   -w, -C, -t     Defaults for every task, as in batch
+  --title TEXT   Default session-title text for every attempt
   --max-cost USD Each attempt's cost limit
   -j N           Attempts at once (default: 4)
   --keep         Keep write attempts' worktrees (default: discarded)
@@ -209,6 +212,7 @@ Tasks · a JSON array, or one object per line
   worktree   Work in a new git worktree (default: --worktree)
   dir        Directory (default: -C)
   timeout    Seconds (default: -t, else 900)
+  title      Text used in this task's session title (default: prompt)
   max_cost   Dollars this task may spend (default: --max-cost, else your settings)
   json       Require a JSON answer
   schema     A JSON Schema, inline
@@ -226,6 +230,7 @@ Results · a JSON array on stdout, in task order
 
 Options
   -m, -w, --worktree, -C, -t   Defaults for every task
+  --title TEXT                 Default session-title text for every task
   --max-cost USD               Each task's cost limit
   -j N                         Tasks at once (default: 4)
   --no-hooks                   Skip your hooks
@@ -264,23 +269,17 @@ Examples
   ask runs
   ask runs --all -n 50` + "\n\ndocs  ask docs runs"
 	case "wait":
-		return `ask wait · wait for runs to finish, then print them
+		return `ask wait · wait for the next run to finish, then print it
 
 Usage
-  ask wait RUN [RUN...] [-t S] [--json]
-
-Options
-  -t S     Give up after S seconds (exit 1)
-  --json   One run's whole result, as with ask show
+	  ask wait
 
 Output
-  one run     Its answer on stdout, its status line on stderr, like ask show
-  several     Their results as one JSON array on stdout
-  exit        0 all ok · 1 one failed, stopped or still running · 2 usage error
+	  The first running run's answer on stdout, its status line on stderr, like ask show
+	  exit        0 answer received, or no runs running · 1 failed or stopped
 
 Examples
-  ask wait login-test-fail
-  ask wait fix-api fix-tests -t 1800` + "\n\ndocs  ask docs runs"
+	  ask wait` + "\n\ndocs  ask docs runs"
 	case "clean":
 		return `ask clean · remove worktrees whose work has landed, and old runs
 
@@ -334,7 +333,7 @@ Examples
   ask models --all
   ask models codex:gpt-5.6-sol opencode:gpt-4o --disable
   ask models claude:opus-5.5 --max-cost 10
-  ask settings opencode              Choose in a filterable list` + "\n\ndocs  ask docs models"
+  ask settings NAME                  In a terminal, choose that agent's models` + "\n\ndocs  ask docs models"
 	case "title":
 		return `ask title · name a command for a host's task list
 
@@ -360,7 +359,7 @@ Usage
   ask install [SOURCE...]
 
 Source
-  NAME         An official agent, built into ask: claude, codex, opencode
+  NAME         An official agent, built into ask (see ask docs packages)
   OWNER/REPO   A GitHub repository
   URL          Any git repository
   PATH         A local git repository, like ./tools or ~/code/tools
@@ -438,8 +437,8 @@ Options
 
 Pages
   index, install, setup, settings, usage, runs, batches, models, agents, hosts,
-  hooks, commands, packages, compatibility, and the official agents: claude,
-  codex, opencode. A page's first letters are enough, like ask docs batch.
+  hooks, commands, packages, compatibility, and each official agent's own page.
+  A page's first letters are enough, like ask docs batch.
 
 Examples
   ask docs settings

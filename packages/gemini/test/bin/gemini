@@ -1,0 +1,36 @@
+#!/usr/bin/env node
+/*
+ * Fake `gemini` for the tests: prints Gemini CLI 0.62's `--output-format stream-json` events.
+ * Every call is appended to $FAKE_LOG as one JSON line {argv, stdin, cwd, gitLocks, policy},
+ * gitLocks being GIT_OPTIONAL_LOCKS and policy the --admin-policy file's content. The answer is
+ * $FAKE_ANSWER (default: the last prompt line) in two deltas, after a turn that narrates and calls
+ * a tool when $FAKE_TOOLS is set. A prompt containing $FAKE_FAIL fails with an error result.
+ */
+import { appendFileSync, readFileSync } from 'node:fs';
+
+const argv = process.argv.slice(2);
+const stdin = readFileSync(0, 'utf8');
+const { FAKE_LOG, FAKE_ANSWER, FAKE_FAIL, FAKE_TOOLS, GIT_OPTIONAL_LOCKS } = process.env;
+const after = (flag) => argv[argv.indexOf(flag) + 1];
+const policy = argv.includes('--admin-policy') ? readFileSync(after('--admin-policy'), 'utf8') : null;
+if (FAKE_LOG) appendFileSync(FAKE_LOG, JSON.stringify({ argv, stdin, cwd: process.cwd(), gitLocks: GIT_OPTIONAL_LOCKS ?? null, policy }) + '\n');
+const model = after('--model');
+const emit = (event) => console.log(JSON.stringify({ ...event, timestamp: new Date().toISOString() }));
+const stats = { total_tokens: 132, input_tokens: 120, output_tokens: 5, cached: 40, input: 80, duration_ms: 38, tool_calls: 0 };
+
+emit({ type: 'init', session_id: after('--session-id') || after('--resume'), model });
+emit({ type: 'message', role: 'user', content: stdin });
+if (FAKE_FAIL && stdin.includes(FAKE_FAIL)) {
+  emit({ type: 'result', status: 'error', error: { type: 'unknown', message: 'gemini boom' }, stats: { ...stats, models: {} } });
+  process.exitCode = 1;
+} else {
+  if (FAKE_TOOLS) {
+    emit({ type: 'message', role: 'assistant', content: 'Let me look.', delta: true });
+    emit({ type: 'tool_use', tool_name: 'read_file', tool_id: 't', parameters: { file_path: 'a' } });
+    emit({ type: 'tool_result', tool_id: 't', status: 'success', output: 'a' });
+  }
+  const answer = FAKE_ANSWER ?? `gemini: ${stdin.trim().split('\n').pop()}`;
+  emit({ type: 'message', role: 'assistant', content: answer.slice(0, 3), delta: true });
+  emit({ type: 'message', role: 'assistant', content: answer.slice(3), delta: true });
+  emit({ type: 'result', status: 'success', stats: { ...stats, models: { [model]: { total_tokens: 132, input_tokens: 120, output_tokens: 5, cached: 40, input: 80 } } } });
+}

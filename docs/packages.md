@@ -20,6 +20,9 @@ without the network:
 ```sh
 ask install claude                # Claude Code
 ask install codex opencode        # Codex and Opencode
+ask install copilot gemini
+ask install pi e cursor aider amp qwen kimi
+ask install goose cline kilo continue openhands vibe
 ```
 
 ```text
@@ -36,6 +39,82 @@ that can't run says why, like a CLI that isn't installed, and `ask install` exit
 ```text
 ask: codex is not ready: Codex not found: install it from https://developers.openai.com/codex, or set ASK_CODEX_BIN to its path
 ```
+
+An adapter is not a promise that every harness has the same features. Read-only runs must be
+enforced by tool restrictions or a sandbox, not just by instructions to the model. An adapter
+that cannot enforce them refuses a read run rather than silently granting writes. Native session
+titles, continuation, token counts and cost reporting depend on the harness; consult
+`ask docs NAME` before relying on them. ask validates JSON answers itself when the harness has no
+native schema flag.
+
+### Harness capabilities
+
+All packages are built into ask; `ask install NAME` connects an already installed CLI.
+`ask docs NAME` gives setup instructions, research sources and detailed limits.
+
+| Agent | Access | Continue | Native title | Usage |
+| --- | --- | --- | --- | --- |
+| claude | Read/write | Yes | Yes | Live tokens, final cost |
+| codex | Read/write | Yes | Best-effort | Live tokens |
+| opencode | Read/write | Yes | Yes | Live tokens/cost |
+| copilot | Read/write | Yes | New sessions | Final tokens |
+| gemini | Read/write¹ | Yes | No | Final tokens |
+| pi | Read/write | Yes | Yes | Live tokens/cost |
+| e | Read/write | Yes | Yes | Live tokens, final cost |
+| cursor | Write only | Yes | No | None |
+| aider | Write only | No | No | Final tokens/cost |
+| amp | Write only | Same mode | New threads | Live tokens |
+| qwen | Write only | Yes | No | Tokens |
+| kimi | Read/write | Same access | No | None |
+| goose | Write only | Yes | New sessions² | New-run totals only |
+| cline | Write only | Yes | No | None |
+| kilo | Read/write | Yes | Yes | Live tokens/cost |
+| continue | Write only | No | No | None |
+| openhands | Write only | Yes | No | None |
+| vibe | Write only | Yes | No | Native price cap, no usage |
+
+¹ Gemini refuses read runs when system policies prevent applying/verifying ask's restrictive
+admin policy. Trusted folders remain an upstream prerequisite.
+
+² Goose appends a unique suffix to the supplied title because it resumes sessions by name.
+Its follow-up usage is omitted rather than counting earlier turns again.
+
+No usage means cost limits cannot be measured by ask. Final-only cost can produce an overspend
+note but cannot stop a turn midway. Vibe's native price cap depends on the configured model
+pricing. Read access is a model-tool boundary unless the harness provides an OS sandbox; it
+does not make an installed CLI or plugin untrusted-code-safe.
+
+Several CLIs have no reliable machine-readable model list. Those adapters intentionally list
+no models; use the harness's own model listing and `ask models NAME:ID --enable` to add exact
+IDs. Continue needs `ASK_CONTINUE_CONFIG` (a JSON-encoded config), Vibe needs `VIBE_MODELS`,
+and Qwen reads its native `modelProviders` settings. e currently requires building upstream from
+source; it never changes directory-trust settings for you.
+
+### Choosing harnesses
+
+The October 2026 expansion surveyed Copilot, Gemini CLI, Pi, Cursor CLI, Aider, Goose, Cline,
+Kilo, Amp, Continue, OpenHands, Amazon Q/Kiro, Mistral Vibe, Qwen Code and Kimi Code;
+e was included by request.
+Selection considers adoption signals and a usable noninteractive CLI, not just whether an IDE
+extension can read ask's skill.
+
+For context, the [npm downloads API](https://api.npmjs.org/downloads/point/last-week/@github/copilot)
+reported about 1.72 million weekly downloads for Copilot, 870 thousand for Pi's former
+`@mariozechner/pi-coding-agent` package, 453 thousand for Gemini CLI, 33 thousand for Kilo and
+27 thousand for Amp for September 28–October 4, 2026. GitHub repositories also show substantial
+interest in Aider, Goose, Cline, Continue and OpenHands. Downloads and repository stars are
+imperfect adoption proxies, not counts of active CLI users; IDE/platform popularity alone does
+not establish that a CLI is mature. e is a requested development-stage integration, not a claim
+of widespread adoption.
+
+**Deferred: Amazon Q / Kiro.** Kiro has a real
+[headless CLI](https://kiro.dev/docs/cli/headless/) with model selection and JSON streaming,
+but its published docs do not define the event fields needed to separate answers from tool
+output and identify failed/interrupted runs. The retired
+[Amazon Q CLI source](https://github.com/aws/amazon-q-developer-cli) has a different argument and
+output contract and cannot establish Kiro's wire format. No placeholder adapter is installed;
+support needs a verified success/tool/failure stream fixture first. This is a contract-verification
+gap, not a claim that Kiro lacks headless mode.
 
 ## Install, update, remove
 

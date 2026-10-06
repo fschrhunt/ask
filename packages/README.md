@@ -7,11 +7,32 @@ built into the ask binary so `ask install NAME` needs no download:
 | --- | --- | --- |
 | [`claude/`](claude/) | Claude Code (`claude -p`) | `ask install claude` |
 | [`codex/`](codex/) | Codex (`codex exec`) | `ask install codex` |
-| [`opencode/`](opencode/) | Opencode (`opencode run`) | `ask install opencode` |
+| [`opencode/`](opencode/) | OpenCode v1.1.65+ or v2, detected automatically (`opencode run`) | `ask install opencode` |
+| [`copilot/`](copilot/) | GitHub Copilot CLI (`copilot`) | `ask install copilot` |
+| [`gemini/`](gemini/) | Gemini CLI (`gemini`) | `ask install gemini` |
+| [`pi/`](pi/) | Pi (`pi --mode json`) | `ask install pi` |
+| [`e/`](e/) | e (`e rpc`) | `ask install e` |
+| [`cursor/`](cursor/) | Cursor CLI (`cursor-agent` or `agent`) | `ask install cursor` |
+| [`aider/`](aider/) | Aider (`aider --message-file`) | `ask install aider` |
+| [`amp/`](amp/) | Amp (`amp --execute`) | `ask install amp` |
+| [`qwen/`](qwen/) | Qwen Code (`qwen`) | `ask install qwen` |
+| [`kimi/`](kimi/) | Kimi Code (`kimi --prompt`) | `ask install kimi` |
+| [`goose/`](goose/) | Goose (`goose run`) | `ask install goose` |
+| [`cline/`](cline/) | Cline CLI (`cline --acp`) | `ask install cline` |
+| [`kilo/`](kilo/) | Kilo CLI (`kilo run`) | `ask install kilo` |
+| [`continue/`](continue/) | Continue CLI (`cn -p`) | `ask install continue` |
+| [`openhands/`](openhands/) | OpenHands CLI (`openhands --headless`) | `ask install openhands` |
+| [`vibe/`](vibe/) | Mistral Vibe (`vibe -p`) | `ask install vibe` |
 
 They get no special treatment: each uses only the agent contract in
 [docs/agents.md](../docs/agents.md), the same one anyone's agent uses. ask's core knows nothing
 about them; `scripts/guard.sh` checks that.
+
+Capabilities differ: not every harness supports enforced read access, native titles, usage or
+continuation. Read each package's README (also available as `ask docs NAME`) for prerequisites
+and limits. Amp chooses routing modes rather than a fixed backend model. e currently requires
+a source build. OpenCode remains one package and uses the installed executable, or
+`ASK_OPENCODE_BIN`; there are no separate v1/v2 model namespaces.
 
 ## Layout
 
@@ -30,9 +51,15 @@ an installed agent always matches the ask running it.
 ## Working on one
 
 ```sh
-./x node                      # every official agent's tests
+./x baymax                    # every official agent, offline through real ask
+./x baymax claude              # one harness, adapter tests and integration
 cd packages/claude && node --test
 ```
 
 The agents use Node.js built-ins only. A change to what users see goes in that folder's
 `README.md` and in `CHANGELOG.md`.
+
+[Baymax](../docs/contributing/baymax.md) replaces the old package-test loop (`./x node` remains
+an alias) and shares test process/report plumbing. Tests need no installed coding CLIs,
+credentials or running agents; harness-specific assertions and simulators remain beside each
+package. A pass verifies covered simulator contracts, not live provider compatibility.

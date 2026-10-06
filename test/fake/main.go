@@ -33,7 +33,7 @@ func main() {
 	stdin := string(b)
 	cwd, _ := os.Getwd()
 	call := map[string]any{"pid": os.Getpid(), "stdin": stdin, "cwd": cwd}
-	for key, env := range map[string]string{"access": "ASK_ACCESS", "model": "ASK_MODEL", "effort": "ASK_EFFORT", "session": "ASK_SESSION", "contract": "ASK_CONTRACT", "max_cost": "ASK_MAX_COST"} {
+	for key, env := range map[string]string{"access": "ASK_ACCESS", "model": "ASK_MODEL", "effort": "ASK_EFFORT", "session": "ASK_SESSION", "title": "ASK_TITLE", "contract": "ASK_CONTRACT", "max_cost": "ASK_MAX_COST"} {
 		if v, ok := os.LookupEnv(env); ok {
 			call[key] = v
 		}
