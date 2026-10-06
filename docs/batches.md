@@ -31,10 +31,11 @@ A batch is a JSON array, or one JSON object per line:
 | `dir` | Directory the agent works in. Default: the batch's `-C`, else the current directory. |
 | `json`, `schema` | Like `--json` and `--schema`; `schema` is the schema itself, not a file. |
 | `timeout` | Seconds for this task. Default: the batch's `-t`, else 900. |
+| `title` | Text used in the agent session title. Default: the prompt. |
 | `max_cost` | Dollars this task may spend; 0 for no limit. Default: the batch's `--max-cost`, else its model's limit or your setting (see [Usage](usage.md#cost-limits)). |
 
-Options given to `ask batch` are defaults; a task's own fields win, except that a task cannot
-widen an explicit `-r` to write.
+Options given to `ask batch` are defaults, including `--title`; a task's own fields win, except
+that a task cannot widen an explicit `-r` to write.
 
 ## Running
 

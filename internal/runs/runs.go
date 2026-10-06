@@ -296,10 +296,13 @@ func Prepare(p home.Paths, items []any, defaults home.Object, label string, sing
 		if defaults.Has("write") && !defaults.B("write") && t.B("write") {
 			return nil, home.Usage("%s asks for \"write\": true, but -r makes every task read-only", where)
 		}
-		for _, key := range []string{"model", "dir", "continue"} {
+		for _, key := range []string{"model", "dir", "continue", "title"} {
 			if t.Has(key) {
 				if _, ok := t.Get(key).(string); !ok {
 					return nil, home.Usage("%s: \"%s\" must be a string", where, key)
+				}
+				if key == "title" && home.Trim(t.S(key)) == "" {
+					return nil, home.Usage("%s: \"title\" must not be empty", where)
 				}
 			}
 		}
@@ -327,6 +330,9 @@ func Prepare(p home.Paths, items []any, defaults home.Object, label string, sing
 		}
 		dir, _ = filepath.Abs(dir)
 		x := home.O("id", taskID, "prompt", t.Get("prompt"), "model", t.Get("model"), "write", t.Get("write"))
+		if t.Has("title") {
+			x.Set("title", t.Get("title"))
+		}
 		x.Set("json", t.B("json"))
 		if t.Has("schema") {
 			x.Set("schema", t.Get("schema"))
@@ -564,7 +570,7 @@ func withHooks(a *agent.Registry, h *hooks.Hooks, t home.Object, ref string, rep
 			report(Event{Kind: "usage", Result: sum})
 		}
 	}
-	result := task.Run(a, t, started, progress)
+	result := task.Run(a, t, h, started, progress)
 	if process.Stopping() {
 		return nil
 	}
@@ -611,7 +617,7 @@ func withHooks(a *agent.Registry, h *hooks.Hooks, t home.Object, ref string, rep
 		next.Set("prompt", followup.Text)
 		next.Set("session", result.Get("session"))
 		earlier = result.Get("usage")
-		nextResult := task.Run(a, next, started, progress)
+		nextResult := task.Run(a, next, h, started, progress)
 		if process.Stopping() {
 			return nil
 		}

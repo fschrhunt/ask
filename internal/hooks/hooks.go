@@ -184,16 +184,17 @@ func (h *Hooks) After(t, result home.Object, ref string) (*Note, *Note, []Note) 
 	return nil, nil, all
 }
 
-// Title lets declared host hooks replace a title; failures preserve it and return notes.
-func (h *Hooks) Title(title string, command []string, description, dir string) (string, []Note) {
+// Title lets declared hooks replace host or agent-session titles; failures preserve them and return notes.
+func (h *Hooks) Title(title string, command []string, description, dir string, task home.Object) (string, []Note) {
 	all := []Note{}
 	found := h.forEvent("title")
 	for _, x := range found {
 		answer := h.call(x.Path, "title", struct {
-			Title       string   `json:"title"`
-			Command     []string `json:"command"`
-			Description string   `json:"description"`
-		}{title, command, description}, dir, "")
+			Title       string      `json:"title"`
+			Command     []string    `json:"command"`
+			Description string      `json:"description"`
+			Task        home.Object `json:"task,omitempty"`
+		}{title, command, description, task}, dir, "")
 		all = notes(answer, x.Name, all)
 		if next := strings.TrimSpace(answer.S("title")); next != "" && !answer.B("error") {
 			title = strings.Join(strings.Fields(next), " ")

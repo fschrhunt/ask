@@ -4,8 +4,9 @@ An agent is a small executable that runs one coding agent's CLI for ask: Claude 
 Opencode, or anything else. ask itself knows nothing about any of them. Everything specific to one,
 from its flags to how it reports usage, lives in its agent, which is how ask supports any of them.
 
-ask comes with official agents for Claude Code, Codex and Opencode (`ask install claude`, see
-[Packages](packages.md#official-agents)); their source is in [`packages/`](../packages). Your own
+ask bundles 18 official agents, including Copilot, Gemini CLI, Pi, e, Cursor, Aider, Goose,
+Cline, Kilo and more (`ask install NAME`, see [Packages](packages.md#official-agents)); their
+source is in [`packages/`](../packages). Your own
 go in `~/.ask/agents/`, one executable per coding agent, named for it, and win over an official
 one of the same name. An agent named `claude` gives you models `claude:...`.
 
@@ -42,6 +43,11 @@ ask doesn't enforce this; a model id is whatever your agent accepts. It is the c
 agents you share. ask does treat ids without regard to case: it lowercases them, so a run, its
 record, `models.json` and `ASK_MODEL` all use one spelling.
 
+Harness limitations are explicit exceptions, not inferred backend versions: Amp accepts routing
+modes, and Kimi's native `kimi-for-coding` service name does not pin a version. Pi and e require
+native `provider/model` IDs to disambiguate providers. Check each agent's page for its naming
+rules and configuration prerequisites.
+
 ### Running: `NAME`
 
 ask runs the agent with no arguments, in the directory the agent should work in (`-C`).
@@ -52,6 +58,7 @@ ask runs the agent with no arguments, in the directory the agent should work in 
 | `ASK_MODEL` | The model id, without the agent or effort, in lowercase: `sonnet-5.5`. |
 | `ASK_EFFORT` | The effort from `#effort`, or empty. |
 | `ASK_ACCESS` | `read` or `write`. |
+| `ASK_TITLE` | One-line title for the agent's session/thread, e.g. `GPT-6.1 Sol · Fix tests · write`; `--title` or a task's `title` field replaces the prompt text. |
 | `ASK_SCHEMA` | Set only with `--schema`: a file holding the JSON Schema, for CLIs that enforce one. |
 | `ASK_SESSION` | Set only for a follow-up: the session to continue (see [Sessions](#sessions)). |
 | `ASK_REPORT` | A file path for the optional report. |
@@ -73,7 +80,9 @@ usage you rewrite as it grows shows live in the terminal. Write a temporary file
 the report, so ask never reads half a file; ask skips a report it can't parse until the next one.
 
 ask handles everything else: timeouts, stopping, batches, recording runs, follow-ups, worktrees,
-reporting what changed and checking JSON answers.
+reporting what changed and checking JSON answers. Official agents apply `ASK_TITLE` when their
+harness provides a session-naming CLI or API; agents without one leave native titles unchanged.
+Each agent's page documents its support.
 It runs each agent in its own process group, so stopping a run also stops the CLI your agent
 started. Once the agent exits, ask kills any descendants still in that group so their output
 pipes cannot delay completion. Don't detach the CLI from that group.

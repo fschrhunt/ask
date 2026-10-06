@@ -5,7 +5,7 @@ set -eu
 cd "$(dirname "$0")"
 
 usage() {
-    echo "usage: ./x [check|fmt|lint|test|node|shell|guard|audit|dev|hooks] [args...]" >&2
+    echo "usage: ./x [check|fmt|lint|test|baymax|node|shell|guard|audit|dev|hooks] [args...]" >&2
     exit 2
 }
 
@@ -19,7 +19,7 @@ case "$command" in
         ./x fmt --check
         ./x lint
         ./x test
-        ./x node
+        ./x baymax
         ./x shell
         ./x guard
         ;;
@@ -40,9 +40,9 @@ case "$command" in
         if [ "$#" -eq 0 ]; then set -- ./...; fi
         go test "$@"
         ;;
-    # The official agents' own tests, against the fake CLIs in each package's test/bin.
-    node)
-        for d in packages/*/; do (cd "$d" && node --test) || exit 1; done
+    # Baymax owns offline adapter and real-ask integration checks; node is the old alias.
+    baymax|node)
+        exec node test/baymax/runner.mjs "$@"
         ;;
     shell)
         command -v shellcheck >/dev/null 2>&1 || { echo "shell: shellcheck is not on PATH" >&2; exit 2; }

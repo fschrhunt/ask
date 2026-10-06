@@ -9,7 +9,8 @@ library only. The official agents use Node.js 18+, built-ins only.
 ## Commands
 
 ```sh
-./x check                          # what a pull request must pass: fmt, vet, tests, node, shellcheck, guard
+./x check                          # what a pull request must pass: fmt, vet, tests, Baymax, shellcheck, guard
+./x baymax copilot                  # offline integration checks for Copilot
 ./x test ./test -run 'TestRuns'    # one feature; add /subtest_name for one behavior
 ./x dev runs                       # build this checkout and run it
 ./x hooks                          # once per clone: gofmt and vet before each commit

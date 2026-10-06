@@ -24,6 +24,13 @@ func taskOptions(opts home.Object) (home.Object, error) {
 	if opts.B("-m") {
 		t.Set("model", opts.Get("-m"))
 	}
+	if opts.Has("--title") {
+		title := strings.Join(strings.Fields(opts.S("--title")), " ")
+		if title == "" {
+			return nil, home.Usage("--title needs a nonempty title")
+		}
+		t.Set("title", title)
+	}
 	if opts.B("-r") || opts.B("-w") {
 		t.Set("write", opts.B("-w"))
 	}

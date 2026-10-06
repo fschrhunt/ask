@@ -8,6 +8,7 @@ import "encoding/json"
 type TaskRecord struct {
 	ID        string          `json:"id"`
 	Prompt    string          `json:"prompt"`
+	Title     string          `json:"title,omitempty"`
 	Model     string          `json:"model"`
 	Write     bool            `json:"write"`
 	JSON      bool            `json:"json"`

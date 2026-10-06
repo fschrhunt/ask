@@ -40,5 +40,5 @@ jobs:
       # The platform-specific parts; formatting, shellcheck and the guard don't change by system.
       - run: ./x lint
       - run: ./x test
-      - run: ./x node
+      - run: ./x baymax
       - run: sh install.sh --dir "$RUNNER_TEMP/ask" && "$RUNNER_TEMP/ask/ask" --version
