@@ -5,6 +5,9 @@
 - Clarify docs, setup instructions and CLI help, with consistent `ask help COMMAND` guidance,
   accurate benchmark and setup behavior, and clearer examples and prerequisites. Help flags
   remain supported.
+- Keep review diffs off the command line to support large changes, qualify benchmark position
+  selectors for nonnumeric task ids, and document batch follow-ups' access, directory and cost
+  inheritance.
 - Installer help now works when the script is piped to `sh`, and lists version and directory
   options without installing anything.
 

@@ -26,8 +26,6 @@ comment and make it executable.
 
 ## Example: a review by several models
 
-Create `~/.ask/commands/` before saving these examples.
-
 ```sh
 #!/bin/sh
 # ~/.ask/commands/review: three models review a range of commits; prints their findings.
@@ -35,8 +33,8 @@ Create `~/.ask/commands/` before saving these examples.
 range="${1:-HEAD~1..HEAD}"
 diff=$(git diff "$range") || exit 1
 for model in claude:opus-5.5 codex:gpt-6.1-sol opencode:glm-5.3-flash; do
-  jq -cn --arg model "$model" --arg range "$range" --arg diff "$diff" \
-    '{id: $model, model: $model, prompt: ("Review this diff for " + $range + ". List real bugs only, with file and line.\n\n" + $diff)}'
+  printf '%s' "$diff" | jq -Rsc --arg model "$model" --arg range "$range" \
+    '{id: $model, model: $model, prompt: ("Review this diff for " + $range + ". List real bugs only, with file and line.\n\n" + .)}'
 done | "$ASK_BIN" batch - | jq -r '.[] | "## \(.name)\n\(.answer // .error)\n"'
 ```
 
@@ -46,7 +44,8 @@ ask review main..HEAD
 ```
 
 The script supplies the diff because Claude Code and Opencode read runs cannot execute
-`git diff`. Each command example prints results through `jq`; its exit status is `jq`'s, so
+`git diff`. It feeds the diff to `jq` on stdin to avoid command-line argument size limits.
+Each command example prints results through `jq`; its exit status is `jq`'s, so
 inspect failures in the output rather than treating exit 0 as success for every task.
 
 ## Example: a council

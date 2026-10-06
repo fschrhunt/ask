@@ -28,16 +28,19 @@ A batch is a JSON array, or one JSON object per line. Save this example as `task
 | `prompt` | The task. Required. |
 | `id` | A name for the result. Default: the task's position, from 1. |
 | `model` | `agent:id[#effort]`. Required unless the batch's `-m`, a follow-up or the `model` [setting](settings.md) gives one. |
-| `write` | `true` for read and write. Default: the batch's `-w`, else read only. With the batch's `-r`, `true` is refused. |
+| `write` | `true` for read and write. Default: the batch's `-r`/`-w`, then the followed-up task's access, else read only. With the batch's `-r`, `true` is refused. |
 | `worktree` | `true` to work in its own git worktree and branch (creating one needs write). Default: the batch's `--worktree`. |
 | `continue` | A run to follow up, like `"login-test-fail"` or `"summarize-public-api-src/api"` (see [Runs](runs.md#follow-ups)). |
-| `dir` | Directory the agent works in. Default: the batch's `-C`, else the current directory. |
+| `dir` | Directory the agent works in. For new tasks: this field, then the batch's `-C`, else the current directory. A follow-up always uses its previous directory or worktree, ignoring `dir` and `-C`. |
 | `json`, `schema` | Like `--json` and `--schema`; `schema` is the schema itself, not a file. |
 | `timeout` | Seconds for this task. Default: the batch's `-t`, then your `timeout` setting, else 900. |
-| `max_cost` | Dollars this task may spend; 0 for no limit. Default: the batch's `--max-cost`, else its model's limit or your setting (see [Usage](usage.md#cost-limits)). |
+| `max_cost` | Dollars this task may spend; 0 for no limit. Default: the batch's `--max-cost`, then a positive recorded limit from the followed-up task, then its model's limit or your setting (see [Usage](usage.md#cost-limits)). |
 
 Options given to `ask batch` are defaults; a task's own fields win, except that a task cannot
-widen an explicit `-r` to write.
+widen an explicit `-r` to write, and a follow-up's directory stays fixed. Omitting `write`
+on a follow-up can retain write access; use `-r` or `"write": false` to request read-only
+access. A prior unlimited run has no positive recorded cost limit to inherit, so model or
+settings limits apply unless you explicitly give `max_cost` again.
 
 ## Running
 

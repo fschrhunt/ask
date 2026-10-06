@@ -90,7 +90,12 @@ prints its table again (`--json` for the report). The report is a JSON object:
 ```
 
 `ok` says the agent finished; `passed` says it also passed its check. `note` says why an attempt did
-not pass. Each attempt's full result is saved in the run. Repeated attempts share task ids, so
-use `ask show RUN/POSITION` to select one by its position, from 1: tasks expand in file order,
-then `-m` order, then attempt number. For the example above, `ask show RUN/2 --json` shows the
-second Sonnet attempt on `parser`. Replace `RUN` with the bench's printed name or id.
+not pass. Each attempt's full result is saved in the run. Repeated attempts share task ids.
+Give every task an explicit nonnumeric `id`, like `parser` and `entry` above, so
+`ask show RUN/POSITION` can select an attempt by its position, from 1. Numeric task ids
+(including the defaults when `id` is omitted) take precedence over positions and can make
+a selector ambiguous or select a different attempt.
+
+Tasks expand in file order, then `-m` order, then attempt number. For the example above,
+`ask show RUN/2 --json` shows the second Sonnet attempt on `parser`. Replace `RUN` with the
+bench's printed name or id.

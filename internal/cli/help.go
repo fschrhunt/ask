@@ -158,8 +158,8 @@ Runs
   RUN is named from the prompt, like login-checked; a follow-up
   keeps the name. The run's id, like k3f9a2, works too.
   Use the RUN printed on stderr; examples below assume that name.
-  Follow-ups keep their directory and inherit model, access and cost limit.
-  Without an inherited limit, the model's limit wins, then your settings.
+  Follow-ups keep their directory and inherit model and access.
+  A positive recorded cost limit is inherited; else model, then settings.
   Pipe a prompt on stdin, or use - in place of PROMPT.
 
 Examples
@@ -212,12 +212,12 @@ Tasks · a JSON array, or one object per line
   id         Result id (default: position)
   model      agent:id[#effort] (default: -m, then followed-up run, then settings)
   continue   RUN or RUN/TASK to follow up
-  write      Allow edits (default: -w)
+  write      Allow edits (default: -r/-w, then followed-up run, else read)
   worktree   Work in a new git worktree (default: --worktree)
-  dir        Directory (default: -C)
+  dir        Directory (default: -C); follow-ups keep their previous directory
   timeout    Seconds (default: -t, then your settings, else 900)
   max_cost   Dollars this task may spend; 0 for no limit
-             (default: --max-cost, then followed-up run, then model/settings)
+             (default: --max-cost, then prior positive limit, then model/settings)
   json       Require a JSON answer
   schema     A JSON Schema, inline
 

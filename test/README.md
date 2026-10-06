@@ -4,6 +4,9 @@ ask's behavior, tested from the outside: each test runs the real `ask` binary in
 against a fake agent, and checks what a person or a script would see (stdout, stderr, exit codes,
 files on disk). No test calls a model or the network.
 
+The documented review-command test uses `jq` and skips when it is not installed; the other
+Go tests need only Go, git and a POSIX shell.
+
 ```sh
 ./x test                                    # everything, including internal/ unit tests
 ./x test ./test -run 'TestRuns'             # one feature
@@ -27,7 +30,7 @@ docs page for that feature.
 | `agents_test.go` | The agent contract: stdin, environment, schema files, reports | agents.md |
 | `models_test.go` | `models.json`, models on and off, cost limits | models.md |
 | `hooks_test.go` | Task and result hooks: order, refusals, follow-ups, failing open | hooks.md |
-| `commands_test.go` | Your own `ask NAME` commands | commands.md |
+| `commands_test.go` | Your own `ask NAME` commands and the documented large-diff review example | commands.md |
 | `packages_test.go` | `ask install` (including package updates), `remove`; official agents; refused sources | packages.md |
 | `setup_test.go` | `ask setup`: its report, exit status and flags | setup.md |
 | `settings_test.go` | `settings.json` and `ask settings`: review, save, bad values | settings.md |
