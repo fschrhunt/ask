@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Clarify `./x` help and argument handling and simplify PR verification guidance;
+  keep offline Baymax in the shared check and use `./x build` for release builds.
 - Made long run options primary in help and docs (`--model`, `--write`, `--continue`,
   `--directory`, `--timeout`); kept short forms and added `--directory` while retaining `--dir`.
   `--title` remains long-only; `-t` still means timeout.
