@@ -98,7 +98,7 @@ claude:haiku-4.5
 And try a first run:
 
 ```sh
-ask -m claude:haiku-4.5 "What does this project do?"
+ask --model claude:haiku-4.5 "What does this project do?"
 ```
 
 ## Update

@@ -57,7 +57,7 @@ setting (see [Usage](usage.md#cost-limits)).
 | --- | --- |
 | `-m MODEL` | A model to compare. Give one `-m` per model, or several separated by commas. |
 | `-n N` | Attempts per task and model. Default 1. |
-| `-w`, `-C`, `-t`, `--title`, `--max-cost` | Defaults for every task, as in a batch. |
+| `--write`, `--directory`, `--timeout`, `--title`, `--max-cost` | Defaults for every task, as in a batch. |
 | `-j N` | Attempts at once. Default 4, or the `jobs` [setting](settings.md). |
 | `--keep` | Keep write attempts' worktrees. |
 | `--json` | Print the report as JSON. The default when stdout is not a terminal. |
