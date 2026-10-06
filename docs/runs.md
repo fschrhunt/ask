@@ -20,10 +20,10 @@ A task in a batch is `RUN/TASK`, using the task's id (or its position, from 1):
 `-c RUN` continues that run's agent conversation: the agent remembers what it read, said and did.
 
 ```sh
-ask -m claude:sonnet-5.5 "Why does the login test fail?"
+ask --model claude:sonnet-5.5 "Why does the login test fail?"
 # ask login-test-fail · ok · Sonnet 5.5 · 48.0s · ...
-ask -c login-test-fail -w "Fix it, then run the test."
-ask -c login-test-fail "Now add a test for the expired-token case."
+ask --continue login-test-fail --write "Fix it, then run the test."
+ask --continue login-test-fail "Now add a test for the expired-token case."
 ```
 
 A follow-up is a new run that takes over the conversation's name, so the name always reaches the
@@ -85,8 +85,8 @@ Showing a whole batch prints its outcome count on stderr and exits 1 if any task
 collect whichever answer arrives first:
 
 ```sh
-ask -m claude:sonnet-5.5 "Why does the login test fail?" &
-ask -m codex:gpt-6.1-sol "Review the session code for races." &
+ask --model claude:sonnet-5.5 "Why does the login test fail?" &
+ask --model codex:gpt-6.1-sol "Review the session code for races." &
 ask wait # first run to finish
 ```
 

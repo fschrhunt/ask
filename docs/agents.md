@@ -50,7 +50,7 @@ rules and configuration prerequisites.
 
 ### Running: `NAME`
 
-ask runs the agent with no arguments, in the directory the agent should work in (`-C`).
+ask runs the agent with no arguments, in the directory the agent should work in (`--directory`).
 
 | Input | |
 | --- | --- |

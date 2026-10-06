@@ -18,7 +18,7 @@ directly and supplies the exit status.
   `ASK_HOME` and `ASK_CONTRACT` (see [Compatibility](compatibility.md)).
 - A line containing `ask-command: TEXT` near the top of the file is its description in `ask --help`.
 - ask's own commands (`batch`, `show`, `runs`, `models`, ...) always win over yours of the same name.
-  To run a prompt that starts with a command's name, put `--` first: `ask -m claude:sonnet-5.5 -- review`.
+  To run a prompt that starts with a command's name, put `--` first: `ask --model claude:sonnet-5.5 -- review`.
 
 ## Example: a review by several models
 

@@ -16,7 +16,12 @@ import (
 
 // TestRun pins option validation, prompt/answer formatting and process shutdown.
 func TestRun(t *testing.T) {
-	t.Run("no arguments print the help", func(t *testing.T) { s := fresh(t); r := s.ask(); eq(t, r.code, 0); match(t, r.stdout, `ask -m MODEL`) })
+	t.Run("no arguments print the help", func(t *testing.T) {
+		s := fresh(t)
+		r := s.ask()
+		eq(t, r.code, 0)
+		match(t, r.stdout, `ask --model MODEL`)
+	})
 	t.Run("a missing -m is a usage error that lists the models", func(t *testing.T) {
 		s := fresh(t)
 		s.json(filepath.Join(s.home, "models.json"), object{"fake": []string{"extra"}})
@@ -71,6 +76,13 @@ func TestRun(t *testing.T) {
 		s := fresh(t)
 		s.mkdir(filepath.Join(s.tmp, "work"))
 		s.ask("-m", "fake:small", "-C", filepath.Join(s.tmp, "work"), "hi")
+		eq(t, s.calls()[0].s("cwd"), filepath.Join(s.tmp, "work"))
+	})
+	t.Run("long model, directory and timeout options are accepted together", func(t *testing.T) {
+		s := fresh(t)
+		s.mkdir(filepath.Join(s.tmp, "work"))
+		r := s.ask("--model", "fake:small", "--directory", filepath.Join(s.tmp, "work"), "--timeout", "30", "hello")
+		eq(t, r.code, 0)
 		eq(t, s.calls()[0].s("cwd"), filepath.Join(s.tmp, "work"))
 	})
 	t.Run("the prompt is read from stdin when none is given", func(t *testing.T) {

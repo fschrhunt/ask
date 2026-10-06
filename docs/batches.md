@@ -28,7 +28,7 @@ A batch is a JSON array, or one JSON object per line:
 | `write` | `true` for read and write. Default: the batch's `-w`, else read only. With the batch's `-r`, `true` is refused. |
 | `worktree` | `true` to work in its own git worktree and branch (creating one needs write). Default: the batch's `--worktree`. |
 | `continue` | A run to follow up, like `"login-test-fail"` or `"summarize-public-api-src/api"` (see [Runs](runs.md#follow-ups)). |
-| `dir` | Directory the agent works in. Default: the batch's `-C`, else the current directory. |
+| `dir` | Directory the agent works in. Default: the batch's `--directory`, else the current directory. |
 | `json`, `schema` | Like `--json` and `--schema`; `schema` is the schema itself, not a file. |
 | `timeout` | Seconds for this task. Default: the batch's `-t`, else 900. |
 | `title` | Text used in the agent session title. Default: the prompt. |
