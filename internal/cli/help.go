@@ -69,8 +69,8 @@ func overview(a *agent.Registry) string {
 	lines := []string{`ask · hand tasks to coding agents
 
 Usage
-  ask -m MODEL [options] PROMPT    Run a task
-  ask -c RUN [options] PROMPT      Follow up in the same conversation
+  ask --model MODEL [options] PROMPT       Run a task
+  ask --continue RUN [options] PROMPT      Follow up in the same conversation
 
 Commands
   setup      Set ask up the first time
@@ -111,17 +111,17 @@ Commands
 		lines = append(lines, strings.Join(own, "\n"))
 	}
 	lines = append(lines, `Options
-  -m, --model MODEL    agent:id[#effort]
-  -w, --write          Allow edits and commands (default: read only)
-  --worktree           Work in a new git worktree (with -w)
-  -C, --dir DIR        Directory to work in
-  -t, --timeout S      Seconds per task (default: 900)
+  --model MODEL        agent:id[#effort]
+  --write              Allow edits and commands (default: read only)
+  --worktree           Work in a new git worktree (with --write)
+  --directory DIR      Directory to work in
+  --timeout SECONDS    Seconds per task (default: 900)
   --max-cost USD       Stop a task that spends more (default: none, or your settings)
   --json, --schema F   Require JSON, or JSON matching a schema
   --no-hooks           Skip your hooks
 
 Models
-`+modelLines(a), "ask help run for run options · ask COMMAND --help for the rest\ndocs  ask docs")
+`+modelLines(a), "Short forms: -m, -w, -c, -C, -t · ask help run · ask COMMAND --help for the rest\ndocs  ask docs")
 	return strings.Join(lines, "\n\n")
 }
 
@@ -133,16 +133,16 @@ func topicHelp(topic string) string {
 		return `ask · run one task, or follow up on one
 
 Usage
-  ask -m MODEL [options] PROMPT
-  ask -c RUN [options] PROMPT
+  ask --model MODEL [options] PROMPT
+  ask --continue RUN [options] PROMPT
 
 Options
-  -m, --model MODEL    agent:id[#effort], from ask models
-  -c, --continue RUN   Follow up on RUN or RUN/TASK, in its conversation
-  -w, --write          Allow edits and commands (default: read only)
-  --worktree           Work in a new git worktree and branch (with -w)
-  -C, --dir DIR        Directory to work in (default: current)
-  -t, --timeout S      Seconds per task (default: 900)
+  --model MODEL        agent:id[#effort], from ask models
+  --continue RUN       Follow up on RUN or RUN/TASK, in its conversation
+  --write              Allow edits and commands (default: read only)
+  --worktree           Work in a new git worktree and branch (with --write)
+  --directory DIR      Directory to work in (default: current; alias: --dir, -C)
+  --timeout SECONDS    Seconds per task (default: 900; alias: -t)
   --title TEXT         Replace prompt text in agent session titles
   --max-cost USD       Stop a task that spends more (default: none, or your settings)
   --json               Require a JSON answer
@@ -159,14 +159,14 @@ Runs
   keeps the name. The run's id, like k3f9a2, works too.
 
 Examples
-  ask -m claude:haiku-4.5 "Where is login checked?"
-  ask -m codex:gpt-6.1-sol --title "Review login" "Inspect the login flow."
-  ask -c login-checked -w "Fix it and run the test."` + "\n\ndocs  ask docs usage"
+  ask --model claude:haiku-4.5 "Where is login checked?"
+  ask --model codex:gpt-6.1-sol --title "Review login" "Inspect the login flow."
+  ask --continue login-checked --write "Fix it and run the test."` + "\n\nShort forms: -m, -w, -c, -C, -t\ndocs  ask docs usage"
 	case "bench":
 		return `ask bench · compare models on the same tasks
 
 Usage
-  ask bench -m MODEL -m MODEL [options] FILE|-
+  ask bench --model MODEL --model MODEL [options] FILE|-
 
 Every task runs on every model, -n times each. An attempt passes when
 its agent finishes and the task's check exits 0.
@@ -177,9 +177,11 @@ Tasks · a batch file, without model, plus
              Runs as you, so only write tasks may have one
 
 Options
-  -m MODEL       A model to compare; give one -m per model
+  --model MODEL  A model to compare; repeat for each model
   -n N           Attempts per task and model (default: 1)
-  -w, -C, -t     Defaults for every task, as in batch
+  --write        Allow edits and commands
+  --directory DIR  Directory for every task
+  --timeout SECONDS  Time limit per task
   --title TEXT   Default session-title text for every attempt
   --max-cost USD Each attempt's cost limit
   -j N           Attempts at once (default: 4)
@@ -194,7 +196,7 @@ Output
   exit     0 when the bench ran, whatever passed · 2 usage error
 
 Examples
-  ask bench -m claude:sonnet-5.5 -m codex:gpt-6.1-sol -n 3 bench.json
+  ask bench --model claude:sonnet-5.5 --model codex:gpt-6.1-sol -n 3 bench.json
   ask show RUN                     the table again` + "\n\ndocs  ask docs bench"
 	case "batch":
 		return `ask batch · run tasks in parallel
@@ -206,12 +208,12 @@ Usage
 Tasks · a JSON array, or one object per line
   prompt     The task (required)
   id         Result id (default: position)
-  model      agent:id[#effort] (default: -m)
+  model      agent:id[#effort] (default: --model)
   continue   RUN or RUN/TASK to follow up
-  write      Allow edits (default: -w)
+  write      Allow edits (default: --write)
   worktree   Work in a new git worktree (default: --worktree)
-  dir        Directory (default: -C)
-  timeout    Seconds (default: -t, else 900)
+  dir        Directory (default: --directory)
+  timeout    Seconds (default: --timeout, else 900)
   title      Text used in this task's session title (default: prompt)
   max_cost   Dollars this task may spend (default: --max-cost, else your settings)
   json       Require a JSON answer
@@ -229,14 +231,14 @@ Results · a JSON array on stdout, in task order
   followups         Follow-ups your hooks asked for
 
 Options
-  -m, -w, --worktree, -C, -t   Defaults for every task
+  --model, --write, --worktree, --directory, --timeout   Defaults for each task
   --title TEXT                 Default session-title text for every task
   --max-cost USD               Each task's cost limit
   -j N                         Tasks at once (default: 4)
   --no-hooks                   Skip your hooks
 
 Examples
-  ask batch -j 4 -m claude:haiku-4.5 tasks.json
+  ask batch -j 4 --model claude:haiku-4.5 tasks.json
   ask batch --resume summarize-public-api` + "\n\ndocs  ask docs batches"
 	case "show":
 		return `ask show · print a run again, without starting its agent

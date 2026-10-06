@@ -18,7 +18,7 @@ with known models gets `Batch of N`, plus distinct display names when there are 
 unknown tasks get `Batch`. Tasks may also come from a literal heredoc, given to `ask batch -` or
 written by an earlier `cat > FILE <<'EOF'` in the same command, since that file doesn't exist yet
 when the host asks. A batch file path is resolved from the invocation
-directory, even when `-C` sets the tasks' working directory. Resumes get `Resume RUN`.
+directory, even when `--directory` sets the tasks' working directory. Resumes get `Resume RUN`.
 
 Job text comes from the trimmed description, with its first letter capitalized; leading
 ` · ` parts the title already says, like the model in `Sonnet 5.5 · Fix it`, are dropped. Without one,
@@ -66,7 +66,7 @@ session-naming API. Each official agent's page documents whether it applies the 
 host titles still work independently of that harness feature.
 
 ```sh
-ask -m codex:gpt-6.1-sol --title "Review login" "Inspect the login flow."
+ask --model codex:gpt-6.1-sol --title "Review login" "Inspect the login flow."
 ```
 
 ## Other hosts

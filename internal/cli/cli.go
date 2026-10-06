@@ -25,7 +25,7 @@ var options = map[string][]string{
 	"show": {"--json"}, "runs": {"-n", "--all"}, "wait": {}, "clean": {"--days", "--dry-run", "--yes"}, "stop": {}, "models": {"--names", "--all", "--enable", "--disable", "--max-cost"}, "help": {}, "install": {}, "packages": {}, "remove": {},
 }
 
-var long = map[string]string{"--model": "-m", "--read": "-r", "--write": "-w", "--continue": "-c", "--dir": "-C", "--timeout": "-t", "--jobs": "-j"}
+var long = map[string]string{"--model": "-m", "--read": "-r", "--write": "-w", "--continue": "-c", "--directory": "-C", "--dir": "-C", "--timeout": "-t", "--jobs": "-j"}
 
 var value = map[string]bool{"-m": true, "-c": true, "--schema": true, "-C": true, "-t": true, "-j": true, "-n": true, "--resume": true, "--command": true, "--description": true, "--agents": true, "--days": true, "--max-cost": true, "--title": true, "--search": true, "--worktrees": true, "--branches": true, "--skills": true}
 

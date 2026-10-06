@@ -1,7 +1,7 @@
 # Usage
 
 ```sh
-ask -m MODEL [options] PROMPT
+ask --model MODEL [options] PROMPT
 ```
 
 `ask --help` is a compact reference with the models installed here. `ask batch --help`,
@@ -11,8 +11,8 @@ Every run names its model. ask never picks one for you, the same way you name a 
 start a subagent.
 
 ```sh
-ask -m claude:sonnet-5.5 "Where is the retry logic, and what are its limits?"
-ask -m codex:gpt-6.1-sol#high "Review the last commit for bugs."
+ask --model claude:sonnet-5.5 "Where is the retry logic, and what are its limits?"
+ask --model codex:gpt-6.1-sol#high "Review the last commit for bugs."
 ```
 
 ## The prompt
@@ -21,9 +21,9 @@ Give it as arguments, or on stdin with `-` or no prompt at all. Words after `--`
 prompt, even ones that look like options:
 
 ```sh
-ask -m claude:sonnet-5.5 "Summarize src/"
-git diff | ask -m codex:gpt-6.1-sol -
-ask -m claude:sonnet-5.5 < task.md
+ask --model claude:sonnet-5.5 "Summarize src/"
+git diff | ask --model codex:gpt-6.1-sol -
+ask --model claude:sonnet-5.5 < task.md
 ```
 
 ## Read or write
@@ -34,8 +34,8 @@ ask -m claude:sonnet-5.5 < task.md
 | `-w`, `--write` | Read and write: the agent may edit files and run commands, as you. |
 
 ```sh
-ask -m claude:sonnet-5.5 "Which functions have no tests?"           # read
-ask -m claude:sonnet-5.5 -w "Add tests for parseFlags, then run them" # write
+ask --model claude:sonnet-5.5 "Which functions have no tests?"                 # read
+ask --model claude:sonnet-5.5 --write "Add tests for parseFlags, then run them" # write
 ```
 
 ask passes your prompt to the agent as you wrote it, with the access in `ASK_ACCESS`. The agent
@@ -73,7 +73,7 @@ so your own uncommitted work never shows up as the agent's.
 checkout and several write runs can go in parallel:
 
 ```sh
-ask -m claude:sonnet-5.5 -w --worktree -C ~/code/app "Add rate limiting to the login route."
+ask --model claude:sonnet-5.5 --write --worktree --directory ~/code/app "Add rate limiting to the login route."
 ```
 
 ```text
@@ -101,19 +101,19 @@ checkout are not in the worktree; ask says so when it starts.
 
 ## Where the agent works
 
-`-C DIR` sets the directory the agent works in (default: where you run ask):
+`--directory DIR` sets where the agent works (default: where you run ask). `--dir` and `-C` are aliases:
 
 ```sh
-ask -m claude:sonnet-5.5 -C ~/code/app "How does login work?"
+ask --model claude:sonnet-5.5 --directory ~/code/app "How does login work?"
 ```
 
 ## Time limit
 
-`-t SECONDS` stops a run that takes too long (default 900, at most 2000000). The run fails with `timed out`, and
+`--timeout SECONDS` stops a run that takes too long (default 900, at most 2000000). `-t` is its short form. The run fails with `timed out`, and
 everything the agent started is stopped.
 
 ```sh
-ask -m codex:gpt-6.1-sol -w -t 3600 "Upgrade the project to Node 24 and fix what breaks."
+ask --model codex:gpt-6.1-sol --write --timeout 3600 "Upgrade the project to Node 24 and fix what breaks."
 ```
 
 ## Cost limits
@@ -123,7 +123,7 @@ A cost limit stops a task that spends more than you meant to. It is off unless y
 ```sh
 ask settings set max_cost 2                       # every task: at most $2 (the max_cost setting)
 ask models claude:opus-5.5 --max-cost 10          # this model: its own limit, instead
-ask -m claude:opus-5.5 --max-cost 25 "Port the parser to Rust."   # this run only
+ask --model claude:opus-5.5 --max-cost 25 "Port the parser to Rust."   # this run only
 ```
 
 The run's own `--max-cost` wins, then the model's limit in models.json, then the setting; `0`
@@ -167,7 +167,7 @@ cat > findings.json <<'EOF'
   "required": ["bugs"]
 }
 EOF
-ask -m claude:sonnet-5.5 --schema findings.json "Find bugs in src/parser.js" | jq '.bugs[].file'
+ask --model claude:sonnet-5.5 --schema findings.json "Find bugs in src/parser.js" | jq '.bugs[].file'
 ```
 
 ask honors boolean schemas (`false` rejects every answer) and checks `type`, `enum`, `const`, `properties`, `required`, `additionalProperties: false` and `items` (including `items: false`). An
@@ -183,8 +183,8 @@ Every run gets a name from its prompt. Continue the same agent conversation with
 [Runs](runs.md).
 
 ```sh
-ask -m claude:sonnet-5.5 "Why does the login test fail?"
-ask -c login-test-fail -w "Fix it."
+ask --model claude:sonnet-5.5 "Why does the login test fail?"
+ask --continue login-test-fail --write "Fix it."
 ```
 
 ## Output

@@ -16,6 +16,10 @@ func TestHelp(t *testing.T) {
 			t.Fatal("help is too long")
 		}
 		match(t, r.stdout, `(?m)^  fake +small  +big$`)
+		match(t, r.stdout, `(?m)^  --model MODEL`)
+		match(t, r.stdout, `(?m)^  --directory DIR`)
+		match(t, r.stdout, `(?m)^  --timeout SECONDS`)
+		match(t, r.stdout, `Short forms: -m, -w, -c, -C, -t`)
 		match(t, r.stdout, `(?m)^  broken +\(could not list: not logged in\)$`)
 		eq(t, len(s.calls()), 0)
 		for topic, page := range map[string]string{"batch": "batches", "hooks": "hooks", "agents": "agents"} {
@@ -24,6 +28,13 @@ func TestHelp(t *testing.T) {
 			match(t, r.stdout, `(?m)^ask `+topic+` · `)
 			match(t, r.stdout, `\ndocs  ask docs `+page+`\n$`)
 		}
+	})
+	t.Run("run help keeps title long-only and timeout on -t", func(t *testing.T) {
+		s := fresh(t)
+		r := s.ask("run", "--help")
+		match(t, r.stdout, `--title TEXT`)
+		noMatch(t, r.stdout, `-t,? --title`)
+		match(t, r.stdout, `--timeout SECONDS.*alias: -t`)
 	})
 	t.Run("models show display names and keep ids for scripts", func(t *testing.T) {
 		s := fresh(t)
