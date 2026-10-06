@@ -30,6 +30,10 @@ ask: claude is ready: 4 models, see ask models
 An installed official package always matches the ask that runs it: when ask updates, its
 packages update with it. `ask remove claude` removes one.
 
+Installing these packages does not install their CLIs or Node.js. The official agents need
+Node.js 18 or newer and an authenticated CLI (Opencode needs a connected provider); see
+[Install](install.md#set-up).
+
 After installing, ask checks each agent the package brings by asking it for its models. An agent
 that can't run says why, like a CLI that isn't installed, and `ask install` exits 1:
 

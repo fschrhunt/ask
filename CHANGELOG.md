@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Clarify docs, setup instructions and CLI help, with consistent `ask help COMMAND` guidance,
+  accurate benchmark and setup behavior, and clearer examples and prerequisites. Help flags
+  remain supported.
+- Installer help now works when the script is piped to `sh`, and lists version and directory
+  options without installing anything.
+
 - The ask skill now requires agents to use ask instead of a built-in subagent for handoffs; setup
   updates older ask-written skills when accepted.
 

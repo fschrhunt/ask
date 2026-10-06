@@ -7,12 +7,16 @@ The official ask agent for [Opencode](https://opencode.ai). It runs
 
 ```sh
 ask install opencode
+ask models
 ```
 
 Requires Opencode, with at least one provider connected, and Node.js 18 or newer. The agent finds
 both even when they are not on ask's `PATH`: Opencode in `~/.opencode/bin`, `~/.local/bin`,
 `/opt/homebrew/bin`, `/usr/local/bin` or `~/.bun/bin`; Node.js in Homebrew, `/usr/local/bin`, Volta,
 nvm (the newest), fnm or `~/.local/bin`. Without one, `ask models` shows what to install.
+
+Installing the ask package does not install its CLI, Node.js or credentials. `ask models`
+checks model listing, not whether a task can authenticate and run.
 
 ## Models
 
@@ -56,7 +60,8 @@ with `--session`. A follow-up's prompt is passed as is.
 
 The agent rewrites ask's report after every step with the tokens and cost so far, so both show
 live. Opencode 2.0 prints no usage for the step that writes the answer, so once Opencode exits the
-agent reads that step's tokens and cost from `opencode session export` and adds them.
+agent tries to read that step's tokens and cost from `opencode session export --standalone`
+and add them. If export fails, usage can be incomplete.
 
 ## Cost limits
 

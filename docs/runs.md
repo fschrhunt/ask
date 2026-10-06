@@ -8,8 +8,9 @@ ask login-test-fail · started · Sonnet 5.5 · read · ~/code/app
 ask login-test-fail · ok · Sonnet 5.5 · 14.2s · 31.0k in · 812 out · $0.09
 ```
 
-`RUN` in commands is that name. A name stays apart from earlier runs with a number
-(`login-test-fail-2`), and a [name hook](hooks.md#naming-runs) can choose better ones. Every run
+`RUN` in commands is a placeholder for that name or the run's id. Use the name printed by your
+run rather than assuming an example's name matches. A name stays apart from earlier runs with
+a number (`login-test-fail-2`), and a [name hook](hooks.md#naming-runs) can choose better ones. Every run
 also has a fixed six-character id, like `k3f9a2`, that works wherever a name does.
 
 A task in a batch is `RUN/TASK`, using the task's id (or its position, from 1):
@@ -23,7 +24,7 @@ A task in a batch is `RUN/TASK`, using the task's id (or its position, from 1):
 ask -m claude:sonnet-5.5 "Why does the login test fail?"
 # ask login-test-fail · ok · Sonnet 5.5 · 48.0s · ...
 ask -c login-test-fail -w "Fix it, then run the test."
-ask -c login-test-fail "Now add a test for the expired-token case."
+ask -c login-test-fail -w "Now add a test for the expired-token case."
 ```
 
 A follow-up is a new run that takes over the conversation's name, so the name always reaches the
@@ -81,14 +82,15 @@ Showing a whole batch prints its outcome count on stderr and exits 1 if any task
 ## Waiting for runs
 
 `ask wait` blocks until runs finish, then prints them the way `ask show` does. Start runs in the
-background, keep working, and collect them when you need the answers:
+background, keep working, and collect them when you need the answers. Wait until their started
+lines appear before using the names; shell background jobs may not have created their run records yet:
 
 ```sh
 ask -m claude:sonnet-5.5 "Why does the login test fail?" &
 ask -m codex:gpt-6.1-sol "Review the session code for races." &
-ask wait login-test-fail                       # one run: its answer on stdout
-ask wait login-test-fail review-session-code   # several: their results as one JSON array
-ask wait fix-api -t 1800                        # give up after 30 minutes (exit 1)
+ask wait login-test-fail                         # one run: its answer on stdout
+ask wait login-test-fail review-session-code-races # several: their results as one JSON array
+ask wait review-session-code-races -t 1800        # give up after 30 minutes (exit 1)
 ```
 
 A run that was stopped before finishing exits 1 with how to continue it.
@@ -142,8 +144,9 @@ name (runs from before names have none):
 └── lock           held with an operating system lock while ask runs the run; the kernel names its pid
 ```
 
-ask creates new run directories with mode 0700 and records with mode 0600. Delete old folders
-whenever you like; nothing else refers to them.
+ask creates new run directories with mode 0700 and records with mode 0600. Deleting a finished
+run's folder removes its saved answers and ability to continue it. Use
+`ask clean` to account for kept worktrees before removing records.
 
 Hosts can name a background run with `ask title --command STRING --description TEXT`; see
 [Hosts](hosts.md) for title forms and a Claude Code integration.

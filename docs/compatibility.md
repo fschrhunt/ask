@@ -7,7 +7,7 @@ they may change.
 
 | Contract | Where it is described |
 | --- | --- |
-| The command line: commands, options, exit codes (0 ok, 1 a run failed, 2 a usage error), stdout carrying only answers | `ask --help`, [Usage](usage.md) |
+| The command line: commands, options, exit codes (0 ok, 1 a run failed, 2 a usage error), stdout carrying only answers | `ask help`, [Usage](usage.md) |
 | Plain status lines start with `ask RUN · outcome ·`, where RUN is the run's name, or its id when it has none; terminals may redraw live state | [Runs](runs.md) |
 | Result fields (`run`, `id`, `model`, `write`, `name`, `ok`, `answer`/`error`, `seconds`, `usage`, `session`, `dir`, `changes`, `commits`, `worktree`, `followups`) | [Batches](batches.md) |
 | Run records: `tasks.json` and `results.json` in `~/.ask/runs/STAMP-ID[-NAME]/` | [Runs](runs.md) |
@@ -40,5 +40,7 @@ result and record field names remain stable. Status lines now put `started`, `ok
 `failed` directly after the run id, followed by the model display name; hook lines use
 `note` or `follow-up`. The start-line `continues` label is now `follow-up`; the `-c`
 option and JSON `continue` field remain. Times are compact clocks above a minute and costs show cents at
-or above $0.01. `ask help COMMAND` and `ask COMMAND --help` are equivalent; `-h` works
-on every command, and `-V` aliases `--version`.
+or above $0.01. `ask help` is the overview, also available with `ask --help` or `ask -h`.
+`ask help COMMAND` and `ask COMMAND --help` are equivalent for built-in commands; `-h` works
+on built-in commands, and `-V` aliases `--version`. User commands handle their own help
+arguments.

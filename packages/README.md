@@ -9,6 +9,9 @@ built into the ask binary so `ask install NAME` needs no download:
 | [`codex/`](codex/) | Codex (`codex exec`) | `ask install codex` |
 | [`opencode/`](opencode/) | Opencode (`opencode run`) | `ask install opencode` |
 
+Installing these packages connects ask to existing CLIs; it does not install or authenticate
+them. All three agents need Node.js 18 or newer. See each package's README for prerequisites.
+
 They get no special treatment: each uses only the agent contract in
 [docs/agents.md](../docs/agents.md), the same one anyone's agent uses. ask's core knows nothing
 about them; `scripts/guard.sh` checks that.

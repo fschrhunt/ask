@@ -42,7 +42,7 @@ func modelLines(a *agent.Registry) string {
 			}
 		}
 		if len(words) > 12 {
-			words = []string{fmt.Sprintf("%d models; ask models lists them, ask setup %s chooses", len(words), entry.Name)}
+			words = []string{fmt.Sprintf("%d models; ask models lists them, ask settings %s chooses", len(words), entry.Name)}
 		}
 		if len(words) == 0 {
 			words = []string{"(lists none; give an id)"}
@@ -115,13 +115,13 @@ Commands
   -w, --write          Allow edits and commands (default: read only)
   --worktree           Work in a new git worktree (with -w)
   -C, --dir DIR        Directory to work in
-  -t, --timeout S      Seconds per task (default: 900)
-  --max-cost USD       Stop a task that spends more (default: none, or your settings)
+  -t, --timeout S      Seconds per task (default: 900, or your settings)
+  --max-cost USD       Cost limit per task (default: model or settings)
   --json, --schema F   Require JSON, or JSON matching a schema
   --no-hooks           Skip your hooks
 
 Models
-`+modelLines(a), "ask help run for run options · ask COMMAND --help for the rest\ndocs  ask docs")
+`+modelLines(a), "ask help run for run options · ask help COMMAND for the rest\ndocs  ask docs")
 	return strings.Join(lines, "\n\n")
 }
 
@@ -137,13 +137,14 @@ Usage
   ask -c RUN [options] PROMPT
 
 Options
-  -m, --model MODEL    agent:id[#effort], from ask models
+  -m, --model MODEL    agent:id[#effort], from ask models (or your default)
   -c, --continue RUN   Follow up on RUN or RUN/TASK, in its conversation
   -w, --write          Allow edits and commands (default: read only)
+  -r, --read           Explicitly require read-only access
   --worktree           Work in a new git worktree and branch (with -w)
   -C, --dir DIR        Directory to work in (default: current)
-  -t, --timeout S      Seconds per task (default: 900)
-  --max-cost USD       Stop a task that spends more (default: none, or your settings)
+  -t, --timeout S      Seconds per task (default: 900, or your settings)
+  --max-cost USD       Dollars per task; 0 for no limit
   --json               Require a JSON answer
   --schema FILE        Require JSON matching this schema
   --no-hooks           Skip your hooks
@@ -156,6 +157,10 @@ Output
 Runs
   RUN is named from the prompt, like login-checked; a follow-up
   keeps the name. The run's id, like k3f9a2, works too.
+  Use the RUN printed on stderr; examples below assume that name.
+  Follow-ups keep their directory and inherit model, access and cost limit.
+  Without an inherited limit, the model's limit wins, then your settings.
+  Pipe a prompt on stdin, or use - in place of PROMPT.
 
 Examples
   ask -m claude:haiku-4.5 "Where is login checked?"
@@ -172,18 +177,20 @@ its agent finishes and the task's check exits 0.
 Tasks · a batch file, without model, plus
   check      Shell command run where the agent worked, the answer
              on stdin; exit 0 passes (default: finishing passes).
-             Runs as you, so only write tasks may have one
+             Runs as you, even for read-only tasks; only use trusted checks
 
 Options
   -m MODEL       A model to compare; give one -m per model
   -n N           Attempts per task and model (default: 1)
-  -w, -C, -t     Defaults for every task, as in batch
+  -r, -w, -C, -t Defaults for every task, as in batch
   --max-cost USD Each attempt's cost limit
-  -j N           Attempts at once (default: 4)
+  -j N           Attempts at once (default: 4, or your settings)
   --keep         Keep write attempts' worktrees (default: discarded)
   --json         Print the report as JSON (default in a pipe)
   --yes          Start without asking in a terminal
   --no-hooks     Skip your hooks
+
+Write attempts get fresh worktrees, discarded after their checks unless --keep.
 
 Output
   stdout   A row per model: passed, median time, tokens, cost, $/pass
@@ -192,7 +199,7 @@ Output
 
 Examples
   ask bench -m claude:sonnet-5.5 -m codex:gpt-6.1-sol -n 3 bench.json
-  ask show RUN                     the table again` + "\n\ndocs  ask docs bench"
+  ask show RUN                     # the table again` + "\n\ndocs  ask docs bench"
 	case "batch":
 		return `ask batch · run tasks in parallel
 
@@ -203,13 +210,14 @@ Usage
 Tasks · a JSON array, or one object per line
   prompt     The task (required)
   id         Result id (default: position)
-  model      agent:id[#effort] (default: -m)
+  model      agent:id[#effort] (default: -m, then followed-up run, then settings)
   continue   RUN or RUN/TASK to follow up
   write      Allow edits (default: -w)
   worktree   Work in a new git worktree (default: --worktree)
   dir        Directory (default: -C)
-  timeout    Seconds (default: -t, else 900)
-  max_cost   Dollars this task may spend (default: --max-cost, else your settings)
+  timeout    Seconds (default: -t, then your settings, else 900)
+  max_cost   Dollars this task may spend; 0 for no limit
+             (default: --max-cost, then followed-up run, then model/settings)
   json       Require a JSON answer
   schema     A JSON Schema, inline
 
@@ -225,10 +233,13 @@ Results · a JSON array on stdout, in task order
   followups         Follow-ups your hooks asked for
 
 Options
-  -m, -w, --worktree, -C, -t   Defaults for every task
-  --max-cost USD               Each task's cost limit
-  -j N                         Tasks at once (default: 4)
-  --no-hooks                   Skip your hooks
+  -m, -r, -w, --worktree, -C, -t   Defaults for every task
+  --json, --schema FILE           Defaults for JSON answers or a schema
+  --max-cost USD                 Each task's cost limit
+  -j N                           Tasks at once (default: 4, or your settings)
+  --no-hooks                     Skip your hooks
+
+Use - for stdin; omitting FILE also reads stdin. Explicit -r refuses write tasks.
 
 Examples
   ask batch -j 4 -m claude:haiku-4.5 tasks.json
@@ -334,7 +345,7 @@ Examples
   ask models --all
   ask models codex:gpt-5.6-sol opencode:gpt-4o --disable
   ask models claude:opus-5.5 --max-cost 10
-  ask settings opencode              Choose in a filterable list` + "\n\ndocs  ask docs models"
+  ask settings opencode              # choose in a filterable list` + "\n\ndocs  ask docs models"
 	case "title":
 		return `ask title · name a command for a host's task list
 
@@ -392,25 +403,30 @@ Example
 	case "hooks":
 		return `ask hooks · change tasks before they run and check results after
 
-Hooks are executables in ~/.ask/hooks. The docs have the contract and examples.` + "\n\ndocs  ask docs hooks"
+Hooks are executables in ~/.ask/hooks. The docs have the contract and examples.
+This is a help topic, not an ask hooks command.` + "\n\ndocs  ask docs hooks"
 	case "agents":
 		return `ask agents · run a coding agent's CLI for ask
 
 ask setup connects the official agents for the CLIs you have, and ask settings NAME changes
 one. Your own are executables in
-~/.ask/agents; the docs have the contract and examples.` + "\n\ndocs  ask docs agents"
+~/.ask/agents; the docs have the contract and examples.
+This is a help topic, not an ask agents command.` + "\n\ndocs  ask docs agents"
 	case "setup":
 		return `ask setup · set ask up the first time, or check it
 
 Usage
-  ask setup             In a terminal: a walkthrough, then a review before anything is saved;
-                        once set up, your settings
+  ask setup             In a terminal: connect agents, then review settings and integrations;
+                        once set up, your settings. Without a terminal: report only
   ask setup --yes       The recommended setup without asking: agents for the CLIs found,
                         the ask skill, task titles in Claude Code; shows what it changes
-  ask setup --check     Report, and exit 1 while an installed agent can't run
+  ask setup --check     Report; exit 1 if no agent is ready or an installed agent can't run
 
 Options
   --json   With --check, the report as JSON
+
+Selected agents install during the walkthrough. The final review covers defaults
+and app integrations; declining it leaves those agents installed.
 
 Examples
   ask setup
@@ -434,10 +450,10 @@ Usage
 
 Options
   --raw     Markdown, even in a terminal
-  --url     The page on GitHub instead
+  --url     Print the page's GitHub URL (current main, not the bundled version)
 
 Pages
-  index, install, setup, settings, usage, runs, batches, models, agents, hosts,
+  index, install, setup, settings, usage, runs, batches, bench, models, agents, hosts,
   hooks, commands, packages, compatibility, and the official agents: claude,
   codex, opencode. A page's first letters are enough, like ask docs batch.
 

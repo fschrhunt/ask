@@ -10,16 +10,18 @@ ask bench -m claude:sonnet-5.5 -m codex:gpt-6.1-sol -m opencode:kimi-k3 -n 3 ben
 ```text
 model         pass   median   tokens in   cost    $/pass
 Sonnet 5.5    5/6    1:12     310k        $0.84   $0.17
-GPT-6.1 Sol   6/6    1:48     —           —       —
+GPT-6.1 Sol   6/6    1:48     420k        —       —
 Kimi K3       3/6    0:41     220k        $0.09   $0.03
 ```
 
-A dash means the agent did not report it; Codex reports no cost, for example.
+The numbers illustrate a report, not measured model rankings. Choose available model ids from
+`ask models`. A dash means no tokens were counted or cost was not reported for every attempt;
+the official Codex agent reports tokens but no cost.
 
 ## Tasks
 
 A bench file is a [batch](batches.md) file without `model`, since every task runs on every `-m`
-model. Each task may add a `check`:
+model. Each task may add a `check`. Save this example as `bench.json`:
 
 ```json
 [
@@ -33,7 +35,9 @@ model. Each task may add a `check`:
 | `check` | A shell command run in the folder the agent worked in, with the answer on stdin. Exit 0 passes. Without one, an attempt passes when its agent finishes (and its answer matches `schema`, when there is one). |
 
 Every other field works as in a batch: `prompt`, `id`, `write`, `dir`, `json`, `schema`, `timeout`
-and `max_cost`. A check has the task's timeout.
+and `max_cost`. A check has the task's timeout and runs as you, outside the agent's sandbox, even for a
+read-only task. `-r` limits the agent's access, not your check command.
+Only use bench files whose checks you trust.
 
 Keep checks where the agent cannot read them when that matters: a check that names the expected
 answer in the repository gives it away.
@@ -57,7 +61,7 @@ setting (see [Usage](usage.md#cost-limits)).
 | --- | --- |
 | `-m MODEL` | A model to compare. Give one `-m` per model, or several separated by commas. |
 | `-n N` | Attempts per task and model. Default 1. |
-| `-w`, `-C`, `-t`, `--max-cost` | Defaults for every task, as in a batch. |
+| `-r`, `-w`, `-C`, `-t`, `--max-cost` | Defaults for every task, as in a batch. An explicit `-r` refuses write tasks. |
 | `-j N` | Attempts at once. Default 4, or the `jobs` [setting](settings.md). |
 | `--keep` | Keep write attempts' worktrees. |
 | `--json` | Print the report as JSON. The default when stdout is not a terminal. |
@@ -86,4 +90,7 @@ prints its table again (`--json` for the report). The report is a JSON object:
 ```
 
 `ok` says the agent finished; `passed` says it also passed its check. `note` says why an attempt did
-not pass. Each attempt's full result is in the run, as in a batch: `ask show RUN/TASK`.
+not pass. Each attempt's full result is saved in the run. Repeated attempts share task ids, so
+use `ask show RUN/POSITION` to select one by its position, from 1: tasks expand in file order,
+then `-m` order, then attempt number. For the example above, `ask show RUN/2 --json` shows the
+second Sonnet attempt on `parser`. Replace `RUN` with the bench's printed name or id.

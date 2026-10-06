@@ -2,7 +2,7 @@
 
 A command is an executable in `~/.ask/commands/` that you run as `ask NAME`. Commands are for
 workflows: a review by three models, a council that weighs their answers, a triage of open issues.
-They run ask themselves, so everything they do is a recorded run you can show and follow up.
+When they call ask to run tasks, those tasks are recorded runs you can show and follow up.
 
 ```sh
 ask review HEAD~3..HEAD
@@ -16,20 +16,27 @@ ask council "Should we move the parser to a separate package?"
 directly and supplies the exit status.
 - The command gets `ASK_BIN`, the path of the running ask binary with symlinks resolved, so it calls the same ask; plus
   `ASK_HOME` and `ASK_CONTRACT` (see [Compatibility](compatibility.md)).
-- A line containing `ask-command: TEXT` near the top of the file is its description in `ask --help`.
+- A line containing `ask-command: TEXT` near the top of the file is its description in `ask help`.
 - ask's own commands (`batch`, `show`, `runs`, `models`, ...) always win over yours of the same name.
   To run a prompt that starts with a command's name, put `--` first: `ask -m claude:sonnet-5.5 -- review`.
 
+The examples need `jq` and the listed models (choose replacements from `ask models`). Create
+`~/.ask/commands/` first (`mkdir -p ~/.ask/commands`), save each script at the path in its
+comment and make it executable.
+
 ## Example: a review by several models
+
+Create `~/.ask/commands/` before saving these examples.
 
 ```sh
 #!/bin/sh
 # ~/.ask/commands/review: three models review a range of commits; prints their findings.
 # ask-command: review commits with several models, read-only
 range="${1:-HEAD~1..HEAD}"
+diff=$(git diff "$range") || exit 1
 for model in claude:opus-5.5 codex:gpt-6.1-sol opencode:glm-5.3-flash; do
-  printf '{"id": "%s", "model": "%s", "prompt": "Review the changes in %s (git diff %s). List real bugs only, with file and line."}\n' \
-    "$model" "$model" "$range" "$range"
+  jq -cn --arg model "$model" --arg range "$range" --arg diff "$diff" \
+    '{id: $model, model: $model, prompt: ("Review this diff for " + $range + ". List real bugs only, with file and line.\n\n" + $diff)}'
 done | "$ASK_BIN" batch - | jq -r '.[] | "## \(.name)\n\(.answer // .error)\n"'
 ```
 
@@ -37,6 +44,10 @@ done | "$ASK_BIN" batch - | jq -r '.[] | "## \(.name)\n\(.answer // .error)\n"'
 chmod +x ~/.ask/commands/review
 ask review main..HEAD
 ```
+
+The script supplies the diff because Claude Code and Opencode read runs cannot execute
+`git diff`. Each command example prints results through `jq`; its exit status is `jq`'s, so
+inspect failures in the output rather than treating exit 0 as success for every task.
 
 ## Example: a council
 

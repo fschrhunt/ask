@@ -4,16 +4,21 @@ A release is a `v*` tag on main. Everything after the tag is automatic.
 
 ## Cutting one
 
-From an up-to-date main checkout:
+From a clean, up-to-date main checkout, with git and the authenticated GitHub CLI (`gh`)
+installed. Choose a tag that has not been released:
 
 ```sh
-scripts/release.sh v0.2.0    # opens a PR naming CHANGELOG.md's Unreleased section v0.2.0
-scripts/release.sh v0.2.0    # after merging it: checks CI passed on main, then tags
+tag=v0.3.0                  # replace with the next release's version
+scripts/release.sh "$tag"  # opens a PR naming CHANGELOG.md's Unreleased section
+# Merge the PR, then update your main checkout before running it again.
+git pull --ff-only
+scripts/release.sh "$tag"  # checks CI passed on main, then tags
 ```
 
 ## What the tag runs
 
-`.github/workflows/release.yml`, in order:
+`.github/workflows/release.yml` checks first, publishes the release, then runs the formula and
+install jobs independently:
 
 1. **check**: the tag is on main and `CHANGELOG.md` has its section; `./x check` and `./x audit`.
 2. **release**: archives for macOS and Linux (arm64 and amd64) with checksums and build

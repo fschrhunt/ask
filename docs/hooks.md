@@ -52,17 +52,22 @@ Fixed: Add was returning `a - b` instead of `a + b`.
 That run was asked only to add a `Sub` function. The `verify` hook below ran the tests, found an
 older bug, and the same agent fixed it before ask returned.
 
+For each example, create `~/.ask/hooks/`, save the script at the path in its comment, and make
+it executable (`chmod +x ~/.ask/hooks/verify`, for example). The Node example needs Node.js 18
+or newer; the context, guard and naming scripts need `jq`, and the naming script also needs an
+authenticated Claude Code CLI.
+
 ## Example: verify write runs with the tests
 
-Runs the project's own tests after every write run, whatever the language, and hands failures back
-to the same agent to fix:
+Runs the test command selected from common project files after a successful write run, and
+hands failures back to the same agent to fix:
 
 ```js
 #!/usr/bin/env node
 // ~/.ask/hooks/verify: after a write run, run the project's tests; if they fail, hand the failures
 // back to the same agent to fix.
-import { execSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+const { execSync } = require('node:child_process');
+const { existsSync, readFileSync } = require('node:fs');
 
 if (process.argv[2] === 'events') {
   console.log('result');
@@ -91,8 +96,8 @@ try {
 # ~/.ask/hooks/guard: refuse write runs outside ~/code.
 [ "$1" = events ] && { echo task; exit 0; }
 case "$PWD" in
-  "$HOME"/code/*) ;;
-  *) grep -q '"write":true' && echo '{"refuse": "write runs only under ~/code"}' ;;
+  "$HOME"/code|"$HOME"/code/*) ;;
+  *) jq -c 'if .task.write then {refuse: "write runs only under ~/code"} else empty end' ;;
 esac
 ```
 
@@ -156,5 +161,5 @@ jq -cn --arg name "$name" '{name: $name}'
 "Fix issue #12: Login crashes on empty password"         fix-issue-12-login       → login-empty-password
 ```
 
-It adds about four seconds to each new run, and nothing to follow-ups. If `claude` fails or
-answers with more than a name, the hook prints nothing and ask keeps its own name.
+It adds one model call to each new run, and nothing to follow-ups; its latency and cost depend
+on the model. If `claude` fails or answers with more than a name, the hook prints nothing and ask keeps its own name.

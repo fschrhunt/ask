@@ -15,9 +15,12 @@ not on ask's `PATH`: Claude Code in `~/.local/bin`, `~/.claude/local`, `/opt/hom
 `/usr/local/bin`, `~/.npm-global/bin` or `~/.local/share/pnpm`; Node.js in Homebrew, `/usr/local/bin`,
 Volta, nvm (the newest), fnm or `~/.local/bin`. Without one, `ask models` shows what to install.
 
+Installing the ask package does not install its CLI, Node.js or credentials. `ask models`
+checks model listing, not whether a task can authenticate and run.
+
 ## Models
 
-`claude models` lists the current models: `fable-5.1`, `opus-5.5`, `sonnet-5.5`, `haiku-4.5`.
+`ask models` includes the Claude agent's built-in model list: `fable-5.1`, `opus-5.5`, `sonnet-5.5`, `haiku-4.5`.
 Name any other the same way, family then version (`sonnet-5` becomes Claude Code's
 `claude-sonnet-5`), or by Claude Code's full id (`claude-haiku-4-5-20251001`), and add the ones you
 use to `~/.ask/models.json`. Names match without regard to case.
@@ -64,7 +67,7 @@ Code as `--max-budget-usd`, which stops after the model call that passes it. The
 | `ASK_NODE` | The Node.js executable to run the agent with. |
 
 The agent also reads ask's contract variables: `ASK_MODEL`, `ASK_EFFORT`, `ASK_ACCESS`,
-`ASK_SCHEMA`, `ASK_SESSION` and `ASK_REPORT` (see [Agents](../../docs/agents.md)).
+`ASK_SCHEMA`, `ASK_SESSION`, `ASK_REPORT` and `ASK_MAX_COST` (see [Agents](../../docs/agents.md)).
 
 ## Testing
 

@@ -25,15 +25,22 @@ curl -fsSL https://fschrhunt.com/ask/install.sh | sh
 
 ## Start
 
+Install at least one coding agent CLI: authenticate Claude Code or Codex, or connect a provider
+in Opencode. Install Node.js 18 or newer for the official ask agents. Then, in a project directory:
+
 ```sh
 ask setup                                        # connect the coding agents you have
+ask models                                       # choose an available agent:model id
 ask -m claude:sonnet-5.5 "Why does the login test fail?"
 ask -c login-test-fail -w "Fix it, then run the test."
 ```
 
-`ask setup` finds Claude Code, Codex and Opencode, connects the ones you pick, and shows what it
-will change before it saves. Each agent keeps its own login, tools and sandbox; ask just hands it
-the task and gives you the answer.
+The examples use Claude Code; choose a model from `ask models` for your installation. Use the
+run name or id printed by the first run for `-c` (names can have a numeric suffix or be set by a hook).
+
+`ask setup` finds Claude Code, Codex and Opencode and installs the agents you pick immediately.
+It shows changes to defaults and app integrations before saving them. Each agent keeps its own
+login, tools and sandbox; ask just hands it the task and gives you the answer.
 
 <table>
   <tr>
@@ -49,8 +56,8 @@ the task and gives you the answer.
     </td>
     <td width="33%" valign="top">
       <b>Recorded and accountable</b><br>
-      Every run is named, kept and shown with time, changes, tokens and cost, live. Cost limits
-      stop a run before it overspends.
+      Every run is named and kept, with time, changes and usage when reported. Cost limits
+      stop a run when reported cost exceeds its limit; a model call or step can take it over.
     </td>
   </tr>
 </table>
@@ -95,9 +102,11 @@ go install github.com/fschrhunt/ask/cmd/ask@latest             # Go 1.26 or newe
 ```
 
 One binary, no additional UI runtime to install. `ask update` keeps a curl install current. Each agent needs its CLI
-logged in, and the official ones need Node.js 18 or newer. More in [Install](docs/install.md).
+authenticated or a provider connected, and the official ones need Node.js 18 or newer. More in [Install](docs/install.md).
 
 ## Docs
+
+Quick reference: `ask help`; command options: `ask help COMMAND`.
 
 Built into ask: `ask docs` lists every page and `ask docs PAGE` shows one, offline and matching
 your version.

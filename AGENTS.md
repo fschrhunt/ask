@@ -15,7 +15,8 @@ library only. The official agents use Node.js 18+, built-ins only.
 ./x hooks                          # once per clone: gofmt and vet before each commit
 ```
 
-`ask --help` is the contract for flags and output.
+`ask help` and `ask help COMMAND` are the contract for flags and output. Prefer these forms in
+guidance and examples; `--help` and `-h` remain supported aliases.
 
 ## Where things live
 

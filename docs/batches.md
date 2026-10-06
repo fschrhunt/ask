@@ -8,14 +8,17 @@ ask batch [-j N] [-m MODEL] [-w] [--worktree] FILE
 ask batch [-j N] [-m MODEL] [-w] [--worktree] -        # tasks on stdin
 ```
 
+Choose model ids from `ask models`; the ids and run names below illustrate one installation.
+Use the names or ids printed by your own runs for `show`, `-c` and `--resume`.
+
 ## Tasks
 
-A batch is a JSON array, or one JSON object per line:
+A batch is a JSON array, or one JSON object per line. Save this example as `tasks.json`:
 
 ```json
 [
   { "id": "api", "prompt": "Summarize the public API in src/." },
-  { "id": "tests", "prompt": "Which tests are flaky, and why?", "model": "codex:gpt-6.1-sol" },
+  { "id": "tests", "prompt": "Which tests look prone to flakiness from their code, and why?", "model": "codex:gpt-6.1-sol" },
   { "id": "fix", "prompt": "Fix the typo in README.md.", "write": true }
 ]
 ```
@@ -30,7 +33,7 @@ A batch is a JSON array, or one JSON object per line:
 | `continue` | A run to follow up, like `"login-test-fail"` or `"summarize-public-api-src/api"` (see [Runs](runs.md#follow-ups)). |
 | `dir` | Directory the agent works in. Default: the batch's `-C`, else the current directory. |
 | `json`, `schema` | Like `--json` and `--schema`; `schema` is the schema itself, not a file. |
-| `timeout` | Seconds for this task. Default: the batch's `-t`, else 900. |
+| `timeout` | Seconds for this task. Default: the batch's `-t`, then your `timeout` setting, else 900. |
 | `max_cost` | Dollars this task may spend; 0 for no limit. Default: the batch's `--max-cost`, else its model's limit or your setting (see [Usage](usage.md#cost-limits)). |
 
 Options given to `ask batch` are defaults; a task's own fields win, except that a task cannot
@@ -53,7 +56,7 @@ ask summarize-public-api-src/fix · started · Haiku 4.5 · write · ~/code/app
 ask summarize-public-api-src/api · ok · Haiku 4.5 · 18.1s · 22.4k in · 640 out · $0.07
 ask summarize-public-api-src/fix · ok · Haiku 4.5 · 25.3s · 1 file changed · 30.2k in · 410 out · $0.03
 ask summarize-public-api-src/tests · failed · GPT-6.1 Sol · 15:00 · timed out
-ask summarize-public-api-src · 2/3 ok · 15:00 · 52.6k in · 1.1k out · $0.11
+ask summarize-public-api-src · 2/3 ok · 15:00 · 52.6k in · 1.1k out · $0.10
 ```
 
 ## Results
@@ -87,6 +90,21 @@ stdout gets one JSON array, in task order, whatever order the tasks finished in:
     "usage": null,
     "session": "a21e...",
     "dir": "/home/me/code/app"
+  },
+  {
+    "run": "summarize-public-api-src/fix",
+    "id": "fix",
+    "model": "claude:haiku-4.5",
+    "write": true,
+    "name": "Haiku 4.5",
+    "ok": true,
+    "answer": "Fixed the typo in README.md.",
+    "seconds": 25.3,
+    "usage": { "input": 30200, "output": 410, "cost": 0.03 },
+    "session": "e19b...",
+    "dir": "/home/me/code/app",
+    "changes": [{ "path": "README.md", "change": "modified" }],
+    "commits": 0
   }
 ]
 ```
@@ -95,7 +113,7 @@ Write tasks in a git repository also have `changes` and `commits`, and worktree 
 something have `worktree: {path, branch}`. The batch exits 1 if any task failed. Result records include the effective `model` and `write` access after task hooks, so follow-ups inherit what actually ran. With `jq`:
 
 ```sh
-ask batch tasks.json | jq -r '.[] | select(.ok) | "\(.id): \(.answer)"'
+ask batch -m claude:haiku-4.5 tasks.json | jq -r '.[] | select(.ok) | "\(.id): \(.answer)"'
 ```
 
 ## Patterns

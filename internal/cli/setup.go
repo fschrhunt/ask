@@ -271,7 +271,7 @@ func setupCommand(p home.Paths, opts home.Object) (int, error) {
 		}
 		return 0, nil
 	}
-	fmt.Fprintln(os.Stderr, "\nask: run ask setup in a terminal to set it up, or ask settings set KEY VALUE (see ask settings --help)")
+	fmt.Fprintln(os.Stderr, "\nask: run ask setup in a terminal, or ask setup --yes to connect detected CLIs without prompts; see ask help setup")
 	return 0, nil
 }
 
