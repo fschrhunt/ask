@@ -26,8 +26,9 @@ When the run record format changed, pin a record from the release in `test/fixtu
 ## Who can write to main
 
 Only the `formula` job. It runs in the `release` environment, which only `v*` tags can use, and
-pushes with that environment's `RELEASE_DEPLOY_KEY` secret: a deploy key that main's ruleset lets
-past its pull request rule. Nothing else in the repository can push to main.
+pushes with that environment's `RELEASE_DEPLOY_KEY` secret: a deploy key explicitly
+allowed to update main under its protection policy. Nothing else in the repository
+can push to main.
 
 Setting it up, or replacing the key, takes an admin of the repository:
 
@@ -35,7 +36,7 @@ Setting it up, or replacing the key, takes an admin of the repository:
 2. Make a key with `ssh-keygen -t ed25519 -N "" -f key` in a temporary folder.
 3. Add `key.pub` as a deploy key with write access, and `key` as the environment's
    `RELEASE_DEPLOY_KEY` secret; then delete both files.
-4. Add deploy keys to the bypass list of main's ruleset.
+4. Allow the deploy key to update main under its protection policy.
 
 ## Where people get it
 
