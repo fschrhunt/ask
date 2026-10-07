@@ -11,6 +11,29 @@
 - Installer help now works when the script is piped to `sh`, and lists version and directory
   options without installing anything.
 
+- Clarify `./x` help and argument handling and simplify PR verification guidance;
+  keep offline Baymax in the shared check and use `./x build` for release builds.
+- Made long run options primary in help and docs (`--model`, `--write`, `--continue`,
+  `--directory`, `--timeout`); kept short forms and added `--directory` while retaining `--dir`.
+  `--title` remains long-only; `-t` still means timeout.
+- Added Baymax (`./x baymax [AGENT...]`), the offline packaged-harness integration doctor.
+  `./x check` includes it; `./x node` is a compatibility alias. Shared test plumbing replaces
+  duplicated adapter runners while harness-specific assertions stay beside their packages.
+  Baymax also checks package refresh/removal, actual writes and worktree isolation, and process
+  shutdown on cancellation and timeout.
+
+- Added packaged harnesses for Copilot, Gemini CLI, Pi, e, Cursor, Aider, Amp, Goose, Cline,
+  Kilo, Continue, OpenHands, Qwen Code, Kimi Code and Mistral Vibe. `ask setup` discovers them;
+  `ask docs packages` and each agent's page cover model setup and feature limits. Harnesses
+  without enforceable read access refuse read runs rather than silently granting writes.
+- The single OpenCode package detects the installed CLI and supports v1.1.65+ and v2 with their
+  respective flags, permission formats and usage exports.
+
+- Official Claude, Codex and OpenCode sessions share the same editable `Model · Task` title.
+- `--title TEXT` overrides the prompt text used in that session title for runs, batches and benches.
+- `ask wait` takes no arguments or options; it returns whichever running run finishes first.
+- `ask wait` with no active runs now exits successfully with a brief status message; `ask setup NAME`
+  points to `ask settings NAME`, and model help uses that same selector command.
 - The ask skill now requires agents to use ask instead of a built-in subagent for handoffs; setup
   updates older ask-written skills when accepted.
 
@@ -72,7 +95,7 @@ recorded, with live usage.
 - `ask settings` holds every control: agents, defaults, worktrees, and the apps that use ask. Edits
   wait in a draft and are saved only after a review that shows each file's diff. `get`, `set` and
   `unset` do the same for scripts.
-- `ask docs` has every page built in; `ask help` and `COMMAND --help` give the short form.
+- `ask docs` has every page built in; `ask help` and `ask help COMMAND` give the short form.
 
 **Extending**
 - Hooks change tasks and check results (a `verify` hook can run the tests and hand failures back),

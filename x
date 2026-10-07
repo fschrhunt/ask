@@ -4,22 +4,45 @@
 set -eu
 cd "$(dirname "$0")"
 
+# Print supported targets and their argument contracts.
 usage() {
-    echo "usage: ./x [check|fmt|lint|test|node|shell|guard|audit|dev|hooks] [args...]" >&2
-    exit 2
+    cat <<'EOF'
+usage: ./x [command] [args...]
+  check              Default; Go formatting, vet and tests, offline Baymax integration checks, shellcheck and architectural guards
+  fmt [--check]      Format Go sources, or check without writing
+  lint               Run go vet
+  test [args...]     Forward arguments to go test (default: ./...)
+  build [args...]    Forward arguments to go build (default: ./...)
+  baymax [names...]  Offline packaged-agent integration checks (node is an alias)
+  shell | guard      Shellcheck or architectural guards
+  audit              Network vulnerability audit, separate from check
+  dev [args...]      Build and run ask from this checkout
+  hooks              Install the existing Git hooks
+  help | --help | -h Show this help
+EOF
 }
 
-command=${1:-check}
+# Reject invalid arguments before running any command that could write files.
+invalid() { usage >&2; exit 2; }
+
+command=${1-check}
 if [ "$#" -gt 0 ]; then shift; fi
+
+case "$command" in
+    check|lint|shell|guard|audit|hooks) [ "$#" -eq 0 ] || invalid ;;
+    fmt)
+        [ "$#" -eq 0 ] || { [ "$#" -eq 1 ] && [ "$1" = "--check" ]; } || invalid
+        ;;
+    help|--help|-h) [ "$#" -eq 0 ] || invalid; usage; exit 0 ;;
+esac
 
 case "$command" in
     # Everything a pull request must pass, except audit, which needs the network.
     check)
-        [ "$#" -eq 0 ] || usage
         ./x fmt --check
         ./x lint
         ./x test
-        ./x node
+        ./x baymax
         ./x shell
         ./x guard
         ;;
@@ -40,9 +63,13 @@ case "$command" in
         if [ "$#" -eq 0 ]; then set -- ./...; fi
         go test "$@"
         ;;
-    # The official agents' own tests, against the fake CLIs in each package's test/bin.
-    node)
-        for d in packages/*/; do (cd "$d" && node --test) || exit 1; done
+    build)
+        if [ "$#" -eq 0 ]; then set -- ./...; fi
+        go build "$@"
+        ;;
+    # Baymax owns offline adapter and real-ask integration checks; node is the old alias.
+    baymax|node)
+        exec node test/baymax/runner.mjs "$@"
         ;;
     shell)
         command -v shellcheck >/dev/null 2>&1 || { echo "shell: shellcheck is not on PATH" >&2; exit 2; }
@@ -57,9 +84,8 @@ case "$command" in
         exec "${TMPDIR:-/tmp}/ask-dev" "$@"
         ;;
     hooks)
-        [ "$#" -eq 0 ] || usage
         git config core.hooksPath .githooks
         printf 'git hooks installed: pre-commit runs gofmt and go vet.\n'
         ;;
-    *) usage ;;
+    *) invalid ;;
 esac

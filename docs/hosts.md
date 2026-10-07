@@ -24,7 +24,7 @@ with known models gets `Batch of N`, plus distinct display names when there are 
 unknown tasks get `Batch`. Tasks may also come from a literal heredoc, given to `ask batch -` or
 written by an earlier `cat > FILE <<'EOF'` in the same command, since that file doesn't exist yet
 when the host asks. A batch file path is resolved from the invocation
-directory, even when `-C` sets the tasks' working directory. Resumes get `Resume RUN`.
+directory, even when `--directory` sets the tasks' working directory. Resumes get `Resume RUN`.
 
 Job text comes from the trimmed description, with its first letter capitalized; leading
 ` · ` parts the title already says, like the model in `Sonnet 5.5 · Fix it`, are dropped. Without one,
@@ -57,6 +57,24 @@ run shows as `Sonnet 5.5 · Fix the login test · write` and runs in the backgro
 agent wrote. For any other command it prints nothing and Claude Code carries on. It never blocks
 a command: unreadable input prints nothing and exits 0. The original command is never changed.
 
+## Agent sessions
+
+Every official agent receives the same `ASK_TITLE`, formatted as `Model · Job`, with effort and
+write/worktree suffixes when they apply. `--title TEXT` overrides the prompt text in that title;
+batch task objects may use their own `title` field. Claude Code sets its session name, Codex names
+its thread through the app-server, OpenCode sets its session title, and Pi and e name their
+sessions. A `title` hook can customize
+the result before it reaches the agent. This applies whether ask was started from a host app or a
+terminal.
+
+Receiving `ASK_TITLE` does not guarantee a native title: some harnesses have no noninteractive
+session-naming API. Each official agent's page documents whether it applies the title. ask's own
+host titles still work independently of that harness feature.
+
+```sh
+ask --model codex:gpt-6.1-sol --title "Review login" "Inspect the login flow."
+```
+
 ## Other hosts
 
 Any host that can relabel a shell command before running it can use the same title:
@@ -66,6 +84,6 @@ ask title --command "$command" --description "$description"
 ```
 
 It prints the title, or nothing when the command isn't an ask task. Hosts that speak Claude Code's
-hook format can use `ask title --hook` as it is. Codex accepts that format, but its shell tool has
-no description to show, so there is nothing to title there. See [Hooks](hooks.md) for ask's own
-`title` event, which can change any title.
+hook format can use `ask title --hook` as it is. Codex's shell tool has no description to show, but
+its agent thread is still named as described above. See [Hooks](hooks.md) for ask's own `title`
+event, which can customize host and agent-session titles.

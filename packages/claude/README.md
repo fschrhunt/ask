@@ -1,7 +1,7 @@
 # claude
 
 The official ask agent for [Claude Code](https://claude.com/claude-code).
-It runs `claude -p` for ask, so `ask -m claude:sonnet-5.5 "..."` hands a task to Claude Code.
+It runs `claude -p` for ask, so `ask --model claude:sonnet-5.5 "..."` hands a task to Claude Code.
 
 ## Install
 
@@ -37,13 +37,13 @@ An effort (`claude:opus-5.5#high`) is passed as `--effort`.
   take no optional locks and no fsmonitor (`GIT_OPTIONAL_LOCKS=0`, `core.fsmonitor=false`), so
   reading git status never rewrites the index. The prompt starts with an instruction to answer from
   the files in the working directory and never guess.
-- **Write runs** (`ask -w`) bypass permissions: the agent edits files and runs commands freely.
+- **Write runs** (`ask --write`) bypass permissions: the agent edits files and runs commands freely.
 
 A `--schema` is passed to Claude Code's `--json-schema`, and the answer is its structured output.
 
 ## Follow-ups
 
-Every run starts with its own session id, reported to ask at once, so `ask -c RUN` resumes it with
+Every run starts with its own session id, reported to ask at once, so `ask --continue RUN` resumes it with
 `--resume`, even after a run that was stopped. A follow-up's prompt is passed as is.
 
 ## Usage
@@ -57,7 +57,7 @@ that did most of the work (`Opus 5.5`).
 Claude Code reports cost only when it ends, so ask can't stop it on cost itself. The agent passes
 ask's limit (`ASK_MAX_COST`, from `--max-cost`, models.json or the `max_cost` setting) to Claude
 Code as `--max-budget-usd`, which stops after the model call that passes it. The run fails as
-`stopped at the $2.00 cost limit`, keeps its session, and `ask -c RUN` continues it.
+`stopped at the $2.00 cost limit`, keeps its session, and `ask --continue RUN` continues it.
 
 ## Environment
 
@@ -66,7 +66,7 @@ Code as `--max-budget-usd`, which stops after the model call that passes it. The
 | `ASK_CLAUDE_BIN` | The `claude` executable to run, instead of looking on `PATH` and in the usual places. |
 | `ASK_NODE` | The Node.js executable to run the agent with. |
 
-The agent also reads ask's contract variables: `ASK_MODEL`, `ASK_EFFORT`, `ASK_ACCESS`,
+The agent also reads ask's contract variables: `ASK_MODEL`, `ASK_EFFORT`, `ASK_ACCESS`, `ASK_TITLE`,
 `ASK_SCHEMA`, `ASK_SESSION`, `ASK_REPORT` and `ASK_MAX_COST` (see [Agents](../../docs/agents.md)).
 
 ## Testing

@@ -18,7 +18,14 @@ fi
 
 # 2. ask knows no particular agent. Only setup, which offers the official ones on a first run,
 #    may name them as values; anywhere else they appear in examples and prose only.
-if grep -rnE --include='*.go' --exclude='*_test.go' --exclude-dir=setup '[{(,=] *"(claude|codex|opencode)"' internal \
+agents=
+for dir in packages/*/agents; do
+    name=${dir%/agents}; name=${name##*/}
+    # "continue" is also an existing task field; grep cannot distinguish that from the harness.
+    [ "$name" = continue ] && continue
+    agents=${agents:+$agents|}$name
+done
+if grep -rnE --include='*.go' --exclude='*_test.go' --exclude-dir=setup "[{(,=] *\"($agents)\"" internal \
     | grep -v '`' | grep .; then
     bad "an official agent's name is used as a value outside internal/setup"
 fi

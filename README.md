@@ -4,7 +4,7 @@
 
   <h3>Every model, as a subagent.</h3>
 
-  <p>Hand tasks to Claude Code, Codex and Opencode, on any model they run,<br>
+  <p>Hand tasks to your coding agents, on any model they run,<br>
   from your terminal or from another agent. One task or many at once, recorded, with live usage.</p>
 
   <p>
@@ -31,23 +31,24 @@ in Opencode. Install Node.js 18 or newer for the official ask agents. Then, in a
 ```sh
 ask setup                                        # connect the coding agents you have
 ask models                                       # choose an available agent:model id
-ask -m claude:sonnet-5.5 "Why does the login test fail?"
-ask -c login-test-fail -w "Fix it, then run the test."
+ask --model claude:sonnet-5.5 "Why does the login test fail?"
+ask --continue login-test-fail --write "Fix it, then run the test."
 ```
 
 The examples use Claude Code; choose a model from `ask models` for your installation. Use the
-run name or id printed by the first run for `-c` (names can have a numeric suffix or be set by a hook).
+run name or id printed by the first run for `--continue` (names can have a numeric suffix or be set by a hook).
 
-`ask setup` finds Claude Code, Codex and Opencode and installs the agents you pick immediately.
+`ask setup` finds supported coding CLIs and installs the agents you pick immediately.
 It shows changes to defaults and app integrations before saving them. Each agent keeps its own
-login, tools and sandbox; ask just hands it the task and gives you the answer.
+login; ask hands it the task and gives you the answer. See [official packages](packages/README.md)
+for each harness's tools, access controls and continuation support.
 
 <table>
   <tr>
     <td width="33%" valign="top">
       <b>Like a native subagent</b><br>
-      Read-only by default, <code>-w</code> to change files, <code>--worktree</code> for its own
-      branch. <code>ask -c RUN</code> follows up in the same conversation.
+      Read-only by default, <code>--write</code> to change files, <code>--worktree</code> for its own
+      branch. <code>ask --continue RUN</code> follows up in the same conversation.
     </td>
     <td width="33%" valign="top">
       <b>Every model</b><br>
@@ -65,8 +66,8 @@ login, tools and sandbox; ask just hands it the task and gives you the answer.
 ## Many at once
 
 `ask batch` runs tasks in parallel, on one model or several, each in its own worktree if you
-like, and prints every answer as one JSON array. Start runs in the background and collect them
-with `ask wait`.
+like, and prints every answer as one JSON array. Start runs in the background and use
+`ask wait` to collect the next one that finishes, or `ask show RUN` for a completed run.
 
 <p align="center"><img src="assets/screens/dark/batch.svg#gh-dark-mode-only" alt="ask batch running a review on three models at once" width="760">
   <img src="assets/screens/light/batch.svg#gh-light-mode-only" alt="ask batch running a review on three models at once" width="760"></p>
@@ -117,6 +118,13 @@ your version.
 | [Usage](docs/usage.md) · [Runs](docs/runs.md) · [Batches](docs/batches.md) · [Bench](docs/bench.md) · [Models](docs/models.md) | Running tasks, following up, many at once, comparing models, cost limits |
 | [Agents](docs/agents.md) · [Hooks](docs/hooks.md) · [Commands](docs/commands.md) · [Packages](docs/packages.md) | Extending ask |
 | [Hosts](docs/hosts.md) · [Compatibility](docs/compatibility.md) | Other tools using ask, and what stays stable |
+
+## Baymax
+
+Baymax is ask's mascot and integration doctor. He checks packaged harnesses, writing behavior
+and package lifecycle through the real ask binary. Run `./x baymax` from a checkout, or
+`./x baymax copilot` for one harness. See [Baymax](docs/contributing/baymax.md) for coverage,
+requirements and limitations.
 
 <br>
 

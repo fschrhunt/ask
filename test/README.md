@@ -11,9 +11,18 @@ Go tests need only Go, git and a POSIX shell.
 ./x test                                    # everything, including internal/ unit tests
 ./x test ./test -run 'TestRuns'             # one feature
 ./x test ./test -run 'TestRuns/stop_stops'  # one behavior
+./x baymax                               # packaged harnesses, offline through real ask
+./x baymax copilot                        # Copilot only
+./x baymax copilot pi                     # Copilot and Pi, checked separately
 ```
 
 ## One file per feature
+
+Packaged harness checks are owned by [Baymax](../docs/contributing/baymax.md), in
+`test/baymax/`. It replaces the old `./x node` package loop (now an alias), shares adapter-test
+process/report plumbing, and tests installed packages through the real binary using simulators.
+It requires no vendor CLIs, credentials or running agents. Harness-specific assertions and
+fake CLI protocols stay in `packages/NAME/test/`.
 
 Each file holds one `TestX`, a list of subtests that read as plain sentences, and matches the
 docs page for that feature.

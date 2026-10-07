@@ -15,67 +15,47 @@ import (
 	"github.com/fschrhunt/ask/internal/tui"
 )
 
-// wait blocks until every named run has finished, then prints them as ask show does: one run's
-// answer, or for several runs their results as one JSON array. -t gives up after that many
-// seconds; a run that stopped before finishing counts as failed.
-func wait(p home.Paths, opts home.Object, words []string) (int, error) {
-	if len(words) == 0 {
-		return 0, home.Usage("ask wait takes runs, like ask wait login-test-fail")
+// wait waits for the first active run to finish and prints its result like ask show.
+func wait(p home.Paths, words []string) (int, error) {
+	if len(words) != 0 {
+		return 0, home.Usage("ask wait takes no arguments")
 	}
-	var deadline time.Time
-	if opts.Has("-t") {
-		n, e := number("-t", opts.S("-t"), false)
-		if e != nil {
-			return 0, e
+	return waitAny(p)
+}
+
+// waitAny returns the first run that was active when waiting began and then finishes.
+func waitAny(p home.Paths) (int, error) {
+	active := map[string]bool{}
+	for _, r := range runs.All(p) {
+		if runs.Owner(r) != 0 {
+			active[r.ID] = true
 		}
-		deadline = time.Now().Add(time.Duration(n * float64(time.Second)))
 	}
-	for _, ref := range words {
-		if _, _, e := runs.Open(p, ref); e != nil {
-			return 0, e
-		}
+	if len(active) == 0 {
+		fmt.Fprintln(os.Stderr, "ask: no runs are running")
+		return 0, nil
 	}
 	for {
-		busy := ""
-		for _, ref := range words {
-			r, _, _ := runs.Open(p, ref)
-			if r != nil && runs.Owner(r) != 0 {
-				busy = ref
-				break
+		for _, r := range runs.All(p) {
+			if !active[r.ID] || runs.Owner(r) != 0 {
+				continue
 			}
-		}
-		if busy == "" {
-			break
-		}
-		if !deadline.IsZero() && time.Now().After(deadline) {
-			fmt.Fprintf(os.Stderr, "ask %s · still running after %ss\n", busy, opts.S("-t"))
-			return 1, nil
+			for i, result := range r.Results {
+				if result != nil {
+					continue
+				}
+				ref := runs.Ref(r, i)
+				resume := "ask -c " + ref
+				if len(r.Tasks) > 1 {
+					resume = "ask batch --resume " + r.Label()
+				}
+				fmt.Fprintf(os.Stderr, "ask %s · stopped · resume: %s\n", ref, resume)
+				return 1, nil
+			}
+			return show(p, home.Object{}, []string{r.ID})
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
-	if len(words) == 1 {
-		if r, i, _ := runs.Open(p, words[0]); i >= 0 && r.Results[i] == nil {
-			fmt.Fprintf(os.Stderr, "ask %s · stopped · resume: ask -c %s\n", runs.Ref(r, i), runs.Ref(r, i))
-			return 1, nil
-		}
-		return show(p, opts, words)
-	}
-	all, code := []home.Object{}, 0
-	for _, ref := range words {
-		r, i, _ := runs.Open(p, ref)
-		list := r.Results
-		if i >= 0 {
-			list = list[i : i+1]
-		}
-		for _, x := range list {
-			if !x.B("ok") {
-				code = 1
-			}
-			all = append(all, x)
-		}
-	}
-	fmt.Fprintln(os.Stdout, home.JSON(home.ResultRecords(all), true))
-	return code, nil
 }
 
 // kept is a worktree a run left behind, with whether it can go and why.

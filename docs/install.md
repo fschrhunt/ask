@@ -82,9 +82,10 @@ ask install codex         # Codex
 ask install opencode      # Opencode
 ```
 
-Installing an ask agent does not install its coding agent CLI or sign you in. Claude Code and
-Codex need their CLIs installed and authenticated; Opencode needs its CLI installed with at least
-one provider connected. All three official ask agents need Node.js 18 or newer. The agent finds the CLI even
+Installing an ask agent does not install its coding agent CLI or sign you in. For example,
+Claude Code and Codex need their CLIs installed and authenticated; OpenCode needs its CLI
+installed with at least one provider connected. Official ask agents need Node.js 18 or newer;
+see [official packages](../packages/README.md) for each harness's prerequisites. The agent finds the CLI even
 when it isn't on your `PATH`, and setup says what is missing if anything is. To write your own,
 see [Agents](agents.md): a minimal one is a few lines of shell.
 
@@ -103,7 +104,7 @@ The output depends on the agents installed here. In a project directory, choose 
 from `ask models` and try a first run (this example uses Claude Code):
 
 ```sh
-ask -m claude:haiku-4.5 "What does this project do?"
+ask --model claude:haiku-4.5 "What does this project do?"
 ```
 
 ## Update

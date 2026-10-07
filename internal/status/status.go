@@ -124,6 +124,14 @@ func EventLine(r *runs.Run, e runs.Event) string {
 			continues = "follow-up " + t.S("continues")
 		}
 		text := line(ref, "started", e.Started.Name, access, where, continues)
+		for _, note := range e.Started.Notes {
+			first, _, _ := strings.Cut(note.Text, "\n")
+			first = SafeText(first)
+			if length(first) > 100 {
+				first = clip(first, 99) + "…"
+			}
+			text += "\n" + line(ref, "note", "hook "+note.Name, first)
+		}
 		if e.Started.Worktree != nil && e.Started.Worktree.Dirty {
 			text += "\n" + line(ref, "note", "the worktree starts from HEAD; uncommitted changes in "+home.Tilde(t.S("dir"))+" are not in it")
 		}

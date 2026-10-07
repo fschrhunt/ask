@@ -221,8 +221,8 @@ func exitText(r process.Result) string {
 
 // Run sends the prompt on stdin and reads the optional report even after failure or timeout.
 // While the agent runs, progress (if not nil) gets each new usage the agent rewrites its report
-// with. A task's max_cost goes to the agent as ASK_MAX_COST, and ask stops the agent once its
-// reported cost passes it; the session survives, so a follow-up continues the work.
+// with. The user-facing title goes as ASK_TITLE; max_cost goes as ASK_MAX_COST, and ask stops the
+// agent once its reported cost passes it; the session survives, so a follow-up continues the work.
 func (a *Registry) Run(m Model, prompt string, t home.Object, progress func(home.Object)) home.Object {
 	work, err := os.MkdirTemp("", "ask-")
 	if err != nil {
@@ -234,6 +234,9 @@ func (a *Registry) Run(m Model, prompt string, t home.Object, progress func(home
 		access = "write"
 	}
 	vars := map[string]string{"ASK_MODEL": m.ID, "ASK_EFFORT": m.Effort, "ASK_ACCESS": access, "ASK_REPORT": filepath.Join(work, "report.json")}
+	if title := t.S("title"); title != "" {
+		vars["ASK_TITLE"] = title
+	}
 	if t.Has("schema") && t.Get("schema") != nil {
 		vars["ASK_SCHEMA"] = filepath.Join(work, "schema.json")
 		if e := os.WriteFile(vars["ASK_SCHEMA"], []byte(home.JSON(t.Get("schema"), false)), 0600); e != nil {

@@ -18,13 +18,13 @@ A task in a batch is `RUN/TASK`, using the task's id (or its position, from 1):
 
 ## Follow-ups
 
-`-c RUN` continues that run's agent conversation: the agent remembers what it read, said and did.
+`--continue RUN` continues that run's agent conversation: the agent remembers what it read, said and did.
 
 ```sh
-ask -m claude:sonnet-5.5 "Why does the login test fail?"
+ask --model claude:sonnet-5.5 "Why does the login test fail?"
 # ask login-test-fail · ok · Sonnet 5.5 · 48.0s · ...
-ask -c login-test-fail -w "Fix it, then run the test."
-ask -c login-test-fail -w "Now add a test for the expired-token case."
+ask --continue login-test-fail --write "Fix it, then run the test."
+ask --continue login-test-fail --write "Now add a test for the expired-token case."
 ```
 
 A follow-up is a new run that takes over the conversation's name, so the name always reaches the
@@ -36,8 +36,8 @@ A follow-up:
 - runs where the first run ran: the same directory, or the same worktree if it kept one (a
   removed worktree is created again, under a new name if another run has taken that one).
   `--worktree` can't move a follow-up of a run in your checkout into a worktree; ask refuses it;
-- keeps the model and access (`-r`/`-w`) unless you give new ones. The model may change within
-  the same agent (`-c login-test-fail -m claude:haiku-4.5`), but not to another agent;
+- keeps the model and access (`--read`/`--write`) unless you give new ones. The model may change within
+  the same agent (`--continue login-test-fail --model claude:haiku-4.5`), but not to another agent;
 - can continue a run that failed or timed out, so the agent can finish what it started;
 
 A batch task can be a follow-up too, with `"continue": "RUN"` (see [Batches](batches.md)).
@@ -81,19 +81,21 @@ Showing a whole batch prints its outcome count on stderr and exits 1 if any task
 
 ## Waiting for runs
 
-`ask wait` blocks until runs finish, then prints them the way `ask show` does. Start runs in the
-background, keep working, and collect them when you need the answers. Wait until their started
-lines appear before using the names; shell background jobs may not have created their run records yet:
+`ask wait` blocks until the first currently running run finishes, then prints its answer the way
+`ask show` does. It takes no names or options and watches only runs active when waiting begins.
+Start runs in the background, keep working, and collect whichever answer arrives first. Wait
+until their started lines appear before calling `ask wait`; shell background jobs may not have
+created their run records yet:
 
 ```sh
-ask -m claude:sonnet-5.5 "Why does the login test fail?" &
-ask -m codex:gpt-6.1-sol "Review the session code for races." &
-ask wait login-test-fail                         # one run: its answer on stdout
-ask wait login-test-fail review-session-code-races # several: their results as one JSON array
-ask wait review-session-code-races -t 1800        # give up after 30 minutes (exit 1)
+ask --model claude:sonnet-5.5 "Why does the login test fail?" &
+ask --model codex:gpt-6.1-sol "Review the session code for races." &
+# Wait for both started lines on stderr before collecting an answer.
+ask wait # first run to finish
 ```
 
-A run that was stopped before finishing exits 1 with how to continue it.
+If no run is active, it prints `ask: no runs are running` and exits 0. A run that was stopped before
+finishing exits 1 with how to continue it.
 
 ## Stopping a run
 
@@ -149,4 +151,4 @@ run's folder removes its saved answers and ability to continue it. Use
 `ask clean` to account for kept worktrees before removing records.
 
 Hosts can name a background run with `ask title --command STRING --description TEXT`; see
-[Hosts](hosts.md) for title forms and a Claude Code integration.
+[Hosts](hosts.md) for title forms and agent-session naming.

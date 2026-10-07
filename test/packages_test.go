@@ -9,6 +9,20 @@ import (
 
 // TestPackages pins ask install, update and remove: official agents, git packages, and the sources ask refuses.
 func TestPackages(t *testing.T) {
+	t.Run("the expanded harness packages install offline and expose their docs", func(t *testing.T) {
+		s := fresh(t)
+		for _, name := range []string{"copilot", "gemini", "pi", "e"} {
+			s.script("agents", name, `echo explicit-model`)
+			r := s.ask("install", name)
+			eq(t, r.code, 0)
+			match(t, r.stderr, `installed ask/packages/`+name+`: agents: `+name)
+			path := filepath.Join(s.home, "packages", "ask", "packages", name, "agents", name)
+			if info, err := os.Stat(path); err != nil || info.Mode()&0111 == 0 {
+				t.Fatalf("%s launcher not installed as executable: %v", name, err)
+			}
+			eq(t, s.ask("docs", name, "--raw").code, 0)
+		}
+	})
 	t.Run("a package from git adds agents, hooks and commands; yours win; install alone updates it", func(t *testing.T) {
 		s := fresh(t)
 		repo := filepath.Join(s.tmp, "src", "team", "tools")
@@ -91,9 +105,9 @@ func TestPackages(t *testing.T) {
 		os.WriteFile(filepath.Join(filepath.Dir(filepath.Dir(agent)), ".ask-version"), []byte("old\n"), 0644)
 		s.ask("runs")
 		eq(t, strings.Contains(s.read(agent), "stale"), false)
-		bad := s.ask("install", "gemini")
+		bad := s.ask("install", "not-an-official-agent")
 		eq(t, bad.code, 2)
-		match(t, bad.stderr, `no official agent "gemini"; ask installs claude, codex, opencode by name`)
+		match(t, bad.stderr, `no official agent "not-an-official-agent"; ask installs .* by name`)
 	})
 	t.Run("ask install says whether each agent a package brings is ready", func(t *testing.T) {
 		s := fresh(t)

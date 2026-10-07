@@ -9,6 +9,7 @@ import (
 	"github.com/fschrhunt/ask/internal/agent"
 	"github.com/fschrhunt/ask/internal/git"
 	"github.com/fschrhunt/ask/internal/home"
+	"github.com/fschrhunt/ask/internal/hooks"
 	"github.com/fschrhunt/ask/internal/schema"
 )
 
@@ -48,11 +49,12 @@ type Started struct {
 	Worktree *git.Worktree
 	Task     home.Object
 	Name     string
+	Notes    []hooks.Note
 }
 
 // Run returns one complete result, converting task errors into failed results.
 // progress (if not nil) gets the agent's usage so far while it runs.
-func Run(a *agent.Registry, t home.Object, started func(Started), progress func(home.Object)) home.Object {
+func Run(a *agent.Registry, t home.Object, h *hooks.Hooks, started func(Started), progress func(home.Object)) home.Object {
 	begin := time.Now()
 	dir := t.S("dir")
 	var w *git.Worktree
@@ -68,13 +70,20 @@ func Run(a *agent.Registry, t home.Object, started func(Started), progress func(
 		}
 	}
 	if e == nil {
-		started(Started{Dir: dir, Worktree: w, Task: t, Name: a.Name(m, "")})
+		name := a.Name(m, "")
+		title := Title(name, t.S("prompt"), t.S("title"), t.B("write"), t.B("worktree"))
+		var notes []hooks.Note
+		if h != nil {
+			title, notes = h.Title(title, nil, "", dir, t)
+		}
+		started(Started{Dir: dir, Worktree: w, Task: t, Name: name, Notes: notes})
 		var before *git.Snapshot
 		if t.B("write") {
 			before = git.Take(dir)
 		}
 		runTask := t.Clone()
 		runTask.Set("dir", dir)
+		runTask.Set("title", title)
 		r = a.Run(m, fullPrompt(t), runTask, progress)
 		if before != nil {
 			files, commits = git.Changes(before)

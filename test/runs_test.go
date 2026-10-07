@@ -155,27 +155,45 @@ func TestRuns(t *testing.T) {
 		match(t, r.stderr, `is running \(pid `+strconv.Itoa(os.Getpid())+`\)`)
 	})
 	t.Run("wait", func(t *testing.T) {
-		t.Run("waits for a running run, then prints its answer; several runs print a JSON array", func(t *testing.T) {
+		t.Run("waits for a running run, then prints its answer", func(t *testing.T) {
 			s := fresh(t)
 			slow := s.start([]string{"-m", "fake:small", "slow one"}, "", map[string]string{"FAKE_SLOW": "slow"})
 			until(t, func() bool { return exists(filepath.Join(s.home, "runs")) && len(s.dirs()) == 1 })
-			r := s.ask("wait", "slow-one")
+			r := s.ask("wait")
 			eq(t, r.code, 0)
 			eq(t, r.stdout, "fake: slow one\n")
 			slow.wait(t)
-			s.ask("-m", "fake:small", "second")
-			both := s.ask("wait", "slow-one", "second")
-			eq(t, both.code, 0)
-			eq(t, len(objects(t, both.stdout)), 2)
 		})
-		t.Run("-t gives up on a run still going", func(t *testing.T) {
+		t.Run("reports idle normally and rejects args and options", func(t *testing.T) {
 			s := fresh(t)
-			s.start([]string{"-m", "fake:small", "hang here"}, "", map[string]string{"FAKE_HANG": "hang"})
-			until(t, func() bool { return exists(filepath.Join(s.home, "runs")) && len(s.dirs()) == 1 })
-			r := s.ask("wait", "hang", "-t", "0.3")
-			eq(t, r.code, 1)
-			match(t, r.stderr, `ask hang · still running after 0.3s`)
+			idle := s.ask("wait")
+			eq(t, idle.code, 0)
+			eq(t, idle.stderr, "ask: no runs are running\n")
+			r := s.ask("wait", "named")
+			eq(t, r.code, 2)
+			r = s.ask("wait", "-t", "3")
+			eq(t, r.code, 2)
 		})
+		t.Run("without names returns the first of several active runs to finish", func(t *testing.T) {
+			s := fresh(t)
+			slow := s.start([]string{"-m", "fake:small", "slow reply"}, "", map[string]string{"FAKE_SLOW": "slow"})
+			hang := s.start([]string{"-m", "fake:small", "hang around"}, "", map[string]string{"FAKE_HANG": "hang"})
+			until(t, func() bool { return len(s.calls()) == 2 })
+			r := s.ask("wait")
+			eq(t, r.code, 0)
+			eq(t, r.stdout, "fake: slow reply\n")
+			if e := hang.cmd.Process.Signal(syscall.SIGTERM); e != nil {
+				t.Fatal(e)
+			}
+			hang.wait(t)
+			slow.wait(t)
+		})
+	})
+	t.Run("setup with an agent name points to settings", func(t *testing.T) {
+		s := fresh(t)
+		r := s.ask("setup", "opencode")
+		eq(t, r.code, 2)
+		match(t, r.stderr, `did you mean ask settings opencode\?`)
 	})
 	t.Run("clean removes landed worktrees and old runs, and nothing else", func(t *testing.T) {
 		s := fresh(t)

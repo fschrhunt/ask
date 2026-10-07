@@ -42,7 +42,7 @@ func modelLines(a *agent.Registry) string {
 			}
 		}
 		if len(words) > 12 {
-			words = []string{fmt.Sprintf("%d models; ask models lists them, ask settings %s chooses", len(words), entry.Name)}
+			words = []string{fmt.Sprintf("%d models; ask models --all lists; ask settings %s chooses", len(words), entry.Name)}
 		}
 		if len(words) == 0 {
 			words = []string{"(lists none; give an id)"}
@@ -69,8 +69,8 @@ func overview(a *agent.Registry) string {
 	lines := []string{`ask · hand tasks to coding agents
 
 Usage
-  ask -m MODEL [options] PROMPT    Run a task
-  ask -c RUN [options] PROMPT      Follow up in the same conversation
+  ask --model MODEL [options] PROMPT       Run a task
+  ask --continue RUN [options] PROMPT      Follow up in the same conversation
 
 Commands
   setup      Set ask up the first time
@@ -78,7 +78,7 @@ Commands
   batch      Run many tasks in parallel
   bench      Compare models on the same tasks
   show       Print a saved answer
-  wait       Wait for runs to finish, then print them
+  wait       Wait for the next run to finish, then print it
   runs       List recent runs
   stop       Stop a running run
   clean      Remove finished worktrees and old runs
@@ -111,17 +111,17 @@ Commands
 		lines = append(lines, strings.Join(own, "\n"))
 	}
 	lines = append(lines, `Options
-  -m, --model MODEL    agent:id[#effort]
-  -w, --write          Allow edits and commands (default: read only)
-  --worktree           Work in a new git worktree (with -w)
-  -C, --dir DIR        Directory to work in
-  -t, --timeout S      Seconds per task (default: 900, or your settings)
+  --model MODEL        agent:id[#effort]
+  --write              Allow edits and commands (default: read only)
+  --worktree           Work in a new git worktree (with --write)
+  --directory DIR      Directory to work in
+  --timeout SECONDS    Seconds per task (default: 900, or your settings)
   --max-cost USD       Cost limit per task (default: model or settings)
   --json, --schema F   Require JSON, or JSON matching a schema
   --no-hooks           Skip your hooks
 
 Models
-`+modelLines(a), "ask help run for run options · ask help COMMAND for the rest\ndocs  ask docs")
+`+modelLines(a), "Short forms: -m, -w, -c, -C, -t · ask help run · ask help COMMAND\ndocs  ask docs")
 	return strings.Join(lines, "\n\n")
 }
 
@@ -133,17 +133,18 @@ func topicHelp(topic string) string {
 		return `ask · run one task, or follow up on one
 
 Usage
-  ask -m MODEL [options] PROMPT
-  ask -c RUN [options] PROMPT
+  ask --model MODEL [options] PROMPT
+  ask --continue RUN [options] PROMPT
 
 Options
-  -m, --model MODEL    agent:id[#effort], from ask models (or your default)
-  -c, --continue RUN   Follow up on RUN or RUN/TASK, in its conversation
-  -w, --write          Allow edits and commands (default: read only)
-  -r, --read           Explicitly require read-only access
-  --worktree           Work in a new git worktree and branch (with -w)
-  -C, --dir DIR        Directory to work in (default: current)
-  -t, --timeout S      Seconds per task (default: 900, or your settings)
+  --model MODEL        agent:id[#effort], from ask models (or your default)
+  --continue RUN       Follow up on RUN or RUN/TASK, in its conversation
+  --write              Allow edits and commands (default: read only)
+  --read               Explicitly require read-only access (alias: -r)
+  --worktree           Work in a new git worktree and branch (with --write)
+  --directory DIR      Directory to work in (default: current; alias: --dir, -C)
+  --timeout SECONDS    Seconds per task (default: 900, or your settings; alias: -t)
+  --title TEXT         Replace prompt text in agent session titles
   --max-cost USD       Dollars per task; 0 for no limit
   --json               Require a JSON answer
   --schema FILE        Require JSON matching this schema
@@ -163,13 +164,14 @@ Runs
   Pipe a prompt on stdin, or use - in place of PROMPT.
 
 Examples
-  ask -m claude:haiku-4.5 "Where is login checked?"
-  ask -c login-checked -w "Fix it and run the test."` + "\n\ndocs  ask docs usage"
+  ask --model claude:haiku-4.5 "Where is login checked?"
+  ask --model codex:gpt-6.1-sol --title "Review login" "Inspect the login flow."
+  ask --continue login-checked --write "Fix it and run the test."` + "\n\nShort forms: -m, -w, -c, -C, -t\ndocs  ask docs usage"
 	case "bench":
 		return `ask bench · compare models on the same tasks
 
 Usage
-  ask bench -m MODEL -m MODEL [options] FILE|-
+  ask bench --model MODEL --model MODEL [options] FILE|-
 
 Every task runs on every model, -n times each. An attempt passes when
 its agent finishes and the task's check exits 0.
@@ -180,9 +182,13 @@ Tasks · a batch file, without model, plus
              Runs as you, even for read-only tasks; only use trusted checks
 
 Options
-  -m MODEL       A model to compare; give one -m per model
+  --model MODEL  A model to compare; repeat for each model
   -n N           Attempts per task and model (default: 1)
-  -r, -w, -C, -t Defaults for every task, as in batch
+  --read         Require read-only tasks
+  --write        Allow edits and commands
+  --directory DIR  Directory for every task
+  --timeout SECONDS  Time limit per task
+  --title TEXT   Default session-title text for every attempt
   --max-cost USD Each attempt's cost limit
   -j N           Attempts at once (default: 4, or your settings)
   --keep         Keep write attempts' worktrees (default: discarded)
@@ -198,7 +204,7 @@ Output
   exit     0 when the bench ran, whatever passed · 2 usage error
 
 Examples
-  ask bench -m claude:sonnet-5.5 -m codex:gpt-6.1-sol -n 3 bench.json
+  ask bench --model claude:sonnet-5.5 --model codex:gpt-6.1-sol -n 3 bench.json
   ask show RUN                     # the table again` + "\n\ndocs  ask docs bench"
 	case "batch":
 		return `ask batch · run tasks in parallel
@@ -210,12 +216,13 @@ Usage
 Tasks · a JSON array, or one object per line
   prompt     The task (required)
   id         Result id (default: position)
-  model      agent:id[#effort] (default: -m, then followed-up run, then settings)
+  model      agent:id[#effort] (default: --model, then followed-up run, then settings)
   continue   RUN or RUN/TASK to follow up
-  write      Allow edits (default: -r/-w, then followed-up run, else read)
+  write      Allow edits (default: --read/--write, then followed-up run, else read)
   worktree   Work in a new git worktree (default: --worktree)
-  dir        Directory (default: -C); follow-ups keep their previous directory
-  timeout    Seconds (default: -t, then your settings, else 900)
+  dir        Directory (default: --directory); follow-ups keep their previous directory
+  timeout    Seconds (default: --timeout, then your settings, else 900)
+  title      Text used in this task's session title (default: prompt)
   max_cost   Dollars this task may spend; 0 for no limit
              (default: --max-cost, then prior positive limit, then model/settings)
   json       Require a JSON answer
@@ -233,16 +240,17 @@ Results · a JSON array on stdout, in task order
   followups         Follow-ups your hooks asked for
 
 Options
-  -m, -r, -w, --worktree, -C, -t   Defaults for every task
-  --json, --schema FILE           Defaults for JSON answers or a schema
-  --max-cost USD                 Each task's cost limit
-  -j N                           Tasks at once (default: 4, or your settings)
-  --no-hooks                     Skip your hooks
+  --model, --read, --write, --worktree, --directory, --timeout   Task defaults
+  --title TEXT                 Default session-title text for every task
+  --json, --schema FILE         Defaults for JSON answers or a schema
+  --max-cost USD               Each task's cost limit
+  -j N                         Tasks at once (default: 4, or your settings)
+  --no-hooks                   Skip your hooks
 
-Use - for stdin; omitting FILE also reads stdin. Explicit -r refuses write tasks.
+Use - for stdin; omitting FILE also reads stdin. Explicit --read refuses write tasks.
 
 Examples
-  ask batch -j 4 -m claude:haiku-4.5 tasks.json
+  ask batch -j 4 --model claude:haiku-4.5 tasks.json
   ask batch --resume summarize-public-api` + "\n\ndocs  ask docs batches"
 	case "show":
 		return `ask show · print a run again, without starting its agent
@@ -275,23 +283,17 @@ Examples
   ask runs
   ask runs --all -n 50` + "\n\ndocs  ask docs runs"
 	case "wait":
-		return `ask wait · wait for runs to finish, then print them
+		return `ask wait · wait for the next run to finish, then print it
 
 Usage
-  ask wait RUN [RUN...] [-t S] [--json]
-
-Options
-  -t S     Give up after S seconds (exit 1)
-  --json   One run's whole result, as with ask show
+	  ask wait
 
 Output
-  one run     Its answer on stdout, its status line on stderr, like ask show
-  several     Their results as one JSON array on stdout
-  exit        0 all ok · 1 one failed, stopped or still running · 2 usage error
+	  The first running run's answer on stdout, its status line on stderr, like ask show
+	  exit        0 answer received, or no runs running · 1 failed or stopped
 
 Examples
-  ask wait login-test-fail
-  ask wait fix-api fix-tests -t 1800` + "\n\ndocs  ask docs runs"
+	  ask wait` + "\n\ndocs  ask docs runs"
 	case "clean":
 		return `ask clean · remove worktrees whose work has landed, and old runs
 
@@ -345,7 +347,7 @@ Examples
   ask models --all
   ask models codex:gpt-5.6-sol opencode:gpt-4o --disable
   ask models claude:opus-5.5 --max-cost 10
-  ask settings opencode              # choose in a filterable list` + "\n\ndocs  ask docs models"
+  ask settings NAME                  # in a terminal, choose that agent's models` + "\n\ndocs  ask docs models"
 	case "title":
 		return `ask title · name a command for a host's task list
 
@@ -371,7 +373,7 @@ Usage
   ask install [SOURCE...]
 
 Source
-  NAME         An official agent, built into ask: claude, codex, opencode
+  NAME         An official agent, built into ask (see ask docs packages)
   OWNER/REPO   A GitHub repository
   URL          Any git repository
   PATH         A local git repository, like ./tools or ~/code/tools
@@ -454,8 +456,8 @@ Options
 
 Pages
   index, install, setup, settings, usage, runs, batches, bench, models, agents, hosts,
-  hooks, commands, packages, compatibility, and the official agents: claude,
-  codex, opencode. A page's first letters are enough, like ask docs batch.
+  hooks, commands, packages, compatibility, and each official agent's own page.
+  A page's first letters are enough, like ask docs batch.
 
 Examples
   ask docs settings
@@ -506,7 +508,7 @@ func printHelp(text string) {
 				if cmd, rest, ok := strings.Cut(line, " · "); ok {
 					lines[i] = "\x1b[1m" + cmd + "\x1b[0m\x1b[2m · " + rest + "\x1b[0m"
 				}
-			case strings.HasPrefix(line, "docs  ") || strings.HasPrefix(line, "ask help run for"):
+			case strings.HasPrefix(line, "docs  ") || strings.HasPrefix(line, "Short forms:"):
 				lines[i] = "\x1b[2m" + line + "\x1b[0m"
 			case line != "" && line[0] != ' ':
 				lines[i] = "\x1b[1m" + line + "\x1b[0m"

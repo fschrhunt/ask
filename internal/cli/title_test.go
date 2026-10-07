@@ -2,6 +2,8 @@ package cli
 
 import (
 	"testing"
+
+	"github.com/fschrhunt/ask/internal/task"
 )
 
 // TestTitleJobDropsWhatTheLabelSays keeps a host's "Model · Job" description from naming the model twice.
@@ -13,7 +15,7 @@ func TestTitleJobDropsWhatTheLabelSays(t *testing.T) {
 		{"Fix login · tests", "Sonnet 5.5", "Fix login · tests"},
 		{"Sonnet 5.5", "Sonnet 5.5", "Sonnet 5.5"},
 	} {
-		if got := titleJob(c[0], "", c[1]); got != c[2] {
+		if got := task.JobTitle(c[0], "", c[1]); got != c[2] {
 			t.Fatalf("%q with %q: %q", c[0], c[1], got)
 		}
 	}

@@ -4,8 +4,9 @@
 and teaches the apps you work in to use ask. Change anything later with
 [`ask settings`](settings.md).
 
-Before setup, install and authenticate the coding agent CLIs you want to use: Claude Code or
-Codex, or Opencode with at least one provider connected. The official ask agents also need
+Before setup, install and authenticate the coding agent CLIs you want to use. For example,
+authenticate Claude Code or Codex, or connect at least one provider in OpenCode. See
+[official packages](../packages/README.md) for each harness's prerequisites. The official ask agents also need
 Node.js 18 or newer. Setup installs ask's agents and integrations; it does not install those
 CLIs or Node.js, or sign you in. See [Install](install.md#set-up).
 
@@ -45,7 +46,10 @@ ask setup  connects your coding agents; nothing else changes until you review it
 ```
 
 - **Agents** are the official ones for the CLIs it finds, built into ask; they install as you pick
-  them and are checked at once.
+  them and are checked at once. The [packages list](packages.md) includes Copilot, Gemini CLI,
+  Pi, e, Cursor, Aider, Amp, Goose, Cline, Kilo, Continue, OpenHands, Qwen Code, Kimi Code and
+  Mistral Vibe, alongside Claude, Codex and OpenCode. OpenCode detects v1 or v2 automatically.
+  Each agent's page states its feature limits.
 - **Defaults** go to your [settings](settings.md): the model, and where worktrees go.
 - **The ask skill** goes to each app that reads skills and is installed here: Claude Code, Codex,
   Opencode, Cursor and pi. It tells their agents that ask exists and requires ask instead of a

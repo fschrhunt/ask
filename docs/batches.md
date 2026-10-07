@@ -4,12 +4,12 @@
 JSON array.
 
 ```sh
-ask batch [-j N] [-m MODEL] [-w] [--worktree] FILE
-ask batch [-j N] [-m MODEL] [-w] [--worktree] -        # tasks on stdin
+ask batch [-j N] [--model MODEL] [--write] [--worktree] FILE
+ask batch [-j N] [--model MODEL] [--write] [--worktree] -        # tasks on stdin
 ```
 
 Choose model ids from `ask models`; the ids and run names below illustrate one installation.
-Use the names or ids printed by your own runs for `show`, `-c` and `--resume`.
+Use the names or ids printed by your own runs for `show`, `--continue` and `--resume`.
 
 ## Tasks
 
@@ -27,25 +27,26 @@ A batch is a JSON array, or one JSON object per line. Save this example as `task
 | --- | --- |
 | `prompt` | The task. Required. |
 | `id` | A name for the result. Default: the task's position, from 1. |
-| `model` | `agent:id[#effort]`. Required unless the batch's `-m`, a follow-up or the `model` [setting](settings.md) gives one. |
-| `write` | `true` for read and write. Default: the batch's `-r`/`-w`, then the followed-up task's access, else read only. With the batch's `-r`, `true` is refused. |
+| `model` | `agent:id[#effort]`. Required unless the batch's `--model`, a follow-up or the `model` [setting](settings.md) gives one. |
+| `write` | `true` for read and write. Default: the batch's `--read`/`--write`, then the followed-up task's access, else read only. With the batch's `--read`, `true` is refused. |
 | `worktree` | `true` to work in its own git worktree and branch (creating one needs write). Default: the batch's `--worktree`. |
 | `continue` | A run to follow up, like `"login-test-fail"` or `"summarize-public-api-src/api"` (see [Runs](runs.md#follow-ups)). |
-| `dir` | Directory the agent works in. For new tasks: this field, then the batch's `-C`, else the current directory. A follow-up always uses its previous directory or worktree, ignoring `dir` and `-C`. |
+| `dir` | Directory the agent works in. For new tasks: this field, then the batch's `--directory`, else the current directory. A follow-up always uses its previous directory or worktree, ignoring `dir` and `--directory`. |
 | `json`, `schema` | Like `--json` and `--schema`; `schema` is the schema itself, not a file. |
-| `timeout` | Seconds for this task. Default: the batch's `-t`, then your `timeout` setting, else 900. |
+| `timeout` | Seconds for this task. Default: the batch's `--timeout`, then your `timeout` setting, else 900. |
+| `title` | Text used in the agent session title. Default: the prompt. |
 | `max_cost` | Dollars this task may spend; 0 for no limit. Default: the batch's `--max-cost`, then a positive recorded limit from the followed-up task, then its model's limit or your setting (see [Usage](usage.md#cost-limits)). |
 
-Options given to `ask batch` are defaults; a task's own fields win, except that a task cannot
-widen an explicit `-r` to write, and a follow-up's directory stays fixed. Omitting `write`
-on a follow-up can retain write access; use `-r` or `"write": false` to request read-only
+Options given to `ask batch` are defaults, including `--title`; a task's own fields win, except
+that a task cannot widen an explicit `--read` to write, and a follow-up's directory stays fixed.
+Omitting `write` on a follow-up can retain write access; use `--read` or `"write": false` to request read-only
 access. A prior unlimited run has no positive recorded cost limit to inherit, so model or
 settings limits apply unless you explicitly give `max_cost` again.
 
 ## Running
 
 ```sh
-ask batch -j 4 -m claude:haiku-4.5 tasks.json
+ask batch -j 4 --model claude:haiku-4.5 tasks.json
 ```
 
 `-j` is how many tasks run at once (default 4, or the `jobs` [setting](settings.md)). In a terminal, stderr shows live task rows (queued, running with elapsed time and usage so far,
@@ -116,7 +117,7 @@ Write tasks in a git repository also have `changes` and `commits`, and worktree 
 something have `worktree: {path, branch}`. The batch exits 1 if any task failed. Result records include the effective `model` and `write` access after task hooks, so follow-ups inherit what actually ran. With `jq`:
 
 ```sh
-ask batch -m claude:haiku-4.5 tasks.json | jq -r '.[] | select(.ok) | "\(.id): \(.answer)"'
+ask batch --model claude:haiku-4.5 tasks.json | jq -r '.[] | select(.ok) | "\(.id): \(.answer)"'
 ```
 
 ## Patterns
@@ -134,7 +135,7 @@ done | ask batch -
 ```sh
 gh issue list --label bug --limit 5 --json number,title,body |
   jq -c '.[] | {id: "issue-\(.number)", prompt: "Fix issue #\(.number): \(.title)\n\n\(.body)"}' |
-  ask batch -w --worktree -m claude:sonnet-5.5 -
+  ask batch --write --worktree --model claude:sonnet-5.5 -
 ```
 
 Each issue becomes a task with its own branch (`ask/RUN-1-issue-12`, where RUN is the batch's
@@ -144,7 +145,7 @@ merge them one by one.
 **Follow up on every task of a batch:**
 
 ```sh
-ask show summarize-public-api-src | jq -c '.[] | select(.ok) | {continue: .run, prompt: "Now write a test for that."}' | ask batch -w -
+ask show summarize-public-api-src | jq -c '.[] | select(.ok) | {continue: .run, prompt: "Now write a test for that."}' | ask batch --write -
 ```
 
 ## Resuming

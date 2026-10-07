@@ -18,7 +18,26 @@ import (
 type Agent struct{ Name, CLI, Title string }
 
 // Agents are the official agents ask setup offers, built into ask from packages/NAME.
-var Agents = []Agent{{"claude", "claude", "Claude Code"}, {"codex", "codex", "Codex"}, {"opencode", "opencode", "Opencode"}}
+var Agents = []Agent{
+	{"claude", "claude", "Claude Code"},
+	{"codex", "codex", "Codex"},
+	{"opencode", "opencode", "OpenCode (v1 or v2)"},
+	{"copilot", "copilot", "GitHub Copilot CLI"},
+	{"gemini", "gemini", "Gemini CLI"},
+	{"pi", "pi", "Pi"},
+	{"e", "e", "e"},
+	{"cursor", "cursor-agent", "Cursor CLI"},
+	{"aider", "aider", "Aider"},
+	{"amp", "amp", "Amp"},
+	{"qwen", "qwen", "Qwen Code"},
+	{"kimi", "kimi", "Kimi Code"},
+	{"goose", "goose", "Goose"},
+	{"cline", "cline", "Cline CLI"},
+	{"kilo", "kilo", "Kilo CLI"},
+	{"continue", "cn", "Continue CLI"},
+	{"openhands", "openhands", "OpenHands CLI"},
+	{"vibe", "vibe", "Mistral Vibe"},
+}
 
 // FindCLI returns where a CLI is installed, looking on PATH and where installers put it, or "".
 func FindCLI(name string) string {
@@ -32,6 +51,9 @@ func FindCLI(name string) string {
 		if info, e := os.Stat(path); e == nil && !info.IsDir() && info.Mode()&0111 != 0 {
 			return path
 		}
+	}
+	if name == "cursor-agent" {
+		return FindCLI("agent")
 	}
 	return ""
 }
@@ -74,8 +96,8 @@ Run ` + "`ask help`" + ` for usage, ` + "`ask help COMMAND`" + ` for a command's
 - ` + "`ask -c RUN \"follow-up\"`" + `: continue that run's conversation. RUN is the name in its status line.
 - ` + "`ask batch FILE`" + `: many tasks in parallel, one JSON result array.
 
-Run ask in the background when you can, then ` + "`ask wait RUN`" + ` (or several runs) to collect the
-answers; status lines on stderr say how each run went.
+Run ask in the background when you can, then ` + "`ask wait`" + ` to collect the first running run
+that finishes. ` + "`ask show RUN`" + ` prints a completed run; status lines on stderr say how it went.
 `
 
 // SkillState is "missing", "current", "outdated" (written by an older ask) or "yours".

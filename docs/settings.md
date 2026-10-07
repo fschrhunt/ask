@@ -89,7 +89,7 @@ without the file, ask uses the built-in defaults below.
 | `branches` | The branch of a run's worktree, holding `{name}` once | `ask/{name}` |
 
 `{name}` is the run's name, like `add-rate-limiting-login`, or `NAME-POSITION-TASK` for a batch
-task. With the example above, `ask -w --worktree "Add rate limiting to login"` works in
+task. With the example above, `ask --write --worktree "Add rate limiting to login"` works in
 `~/code/worktrees/ask-add-rate-limiting-login` on branch `ask/add-rate-limiting-login`.
 
 `ask settings set` also takes `hook` (`on` or `off`) and `skills` (`claude-code`, `codex`,

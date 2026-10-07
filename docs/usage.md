@@ -1,20 +1,20 @@
 # Usage
 
 ```sh
-ask -m MODEL [options] PROMPT
+ask --model MODEL [options] PROMPT
 ```
 
 `ask help` is a compact reference with the models installed here. `ask help batch`,
 `ask help hooks` and `ask help agents` describe their contracts.
 
-Choose `MODEL` from `ask models`. Every run uses an explicit model: from `-m`, a follow-up, or
+Choose `MODEL` from `ask models`. Every run uses an explicit model: from `--model`, a follow-up, or
 your default [setting](settings.md). The examples below use particular agents and models;
 replace them with ids available in your installation. `RUN` is a name or id printed by ask
 (see [Runs](runs.md)).
 
 ```sh
-ask -m claude:sonnet-5.5 "Where is the retry logic, and what are its limits?"
-ask -m codex:gpt-6.1-sol#high "Review the last commit for bugs."
+ask --model claude:sonnet-5.5 "Where is the retry logic, and what are its limits?"
+ask --model codex:gpt-6.1-sol#high "Review the last commit for bugs."
 ```
 
 ## The prompt
@@ -23,21 +23,30 @@ Give it as arguments, or on stdin with `-` or no prompt at all. Words after `--`
 prompt, even ones that look like options:
 
 ```sh
-ask -m claude:sonnet-5.5 "Summarize src/"
-git diff | ask -m codex:gpt-6.1-sol -
-ask -m claude:sonnet-5.5 < task.md
+ask --model claude:sonnet-5.5 "Summarize src/"
+git diff | ask --model codex:gpt-6.1-sol -
+ask --model claude:sonnet-5.5 < task.md
 ```
+
+`--title TEXT` replaces the prompt text in the agent's session title, without changing the task:
+
+```sh
+ask --model codex:gpt-6.1-sol --title "Review login" "Inspect the login flow for races."
+```
+
+Short forms `-m`, `-w`, `-c`, `-C` and `-t` remain supported. `--title` is long-only;
+`-t` means timeout.
 
 ## Read or write
 
 | Option | Access |
 | --- | --- |
-| `-r`, `--read` | Read only. The default. |
-| `-w`, `--write` | Read and write: the agent may edit files and run commands, as you. |
+| `--read`, `-r` | Read only. The default. |
+| `--write`, `-w` | Read and write: the agent may edit files and run commands, as you. |
 
 ```sh
-ask -m claude:sonnet-5.5 "Which functions have no tests?"           # read
-ask -m claude:sonnet-5.5 -w "Add tests for parseFlags, then run them" # write
+ask --model claude:sonnet-5.5 "Which functions have no tests?"                 # read
+ask --model claude:sonnet-5.5 --write "Add tests for parseFlags, then run them" # write
 ```
 
 ask passes your prompt to the agent as you wrote it, with the access in `ASK_ACCESS`. The agent
@@ -46,7 +55,7 @@ enforces read-only in its CLI's own way, and may add its own guidance for read r
 agents, a read run on Claude Code or Opencode can only read and search files, and runs no shell
 commands at all, not even `git log`; one on Codex may run commands in Codex's read-only sandbox.
 
-Running tests or builds writes files, so it needs `-w`. In a batch or bench, an explicit `-r` is a
+Running tests or builds writes files, so it needs `--write`. In a batch or bench, an explicit `--read` is a
 ceiling: a task with `"write": true` is refused, not run with write access.
 
 ## What a write run changed
@@ -71,11 +80,11 @@ so your own uncommitted work never shows up as the agent's.
 
 ## Working in a worktree
 
-`--worktree` (with `-w`) gives the run its own git worktree and branch, so several write runs
+`--worktree` (with `--write`) gives the run its own git worktree and branch, so several write runs
 can work in separate checkouts in parallel:
 
 ```sh
-ask -m claude:sonnet-5.5 -w --worktree -C ~/code/app "Add rate limiting to the login route."
+ask --model claude:sonnet-5.5 --write --worktree --directory ~/code/app "Add rate limiting to the login route."
 ```
 
 ```text
@@ -110,19 +119,19 @@ checkout are not in the worktree; ask says so when it starts.
 
 ## Where the agent works
 
-`-C DIR` sets the directory the agent works in (default: where you run ask):
+`--directory DIR` sets where the agent works (default: where you run ask). `--dir` and `-C` are aliases:
 
 ```sh
-ask -m claude:sonnet-5.5 -C ~/code/app "How does login work?"
+ask --model claude:sonnet-5.5 --directory ~/code/app "How does login work?"
 ```
 
 ## Time limit
 
-`-t SECONDS` stops a run that takes too long (default 900, at most 2000000). The run fails with `timed out`, and
+`--timeout SECONDS` stops a run that takes too long (default 900, at most 2000000). `-t` is its short form. The run fails with `timed out`, and
 everything the agent started is stopped.
 
 ```sh
-ask -m codex:gpt-6.1-sol -w -t 3600 "Upgrade the project to Node 24 and fix what breaks."
+ask --model codex:gpt-6.1-sol --write --timeout 3600 "Upgrade the project to Node 24 and fix what breaks."
 ```
 
 ## Cost limits
@@ -132,7 +141,7 @@ A cost limit stops a task that spends more than you meant to. It is off unless y
 ```sh
 ask settings set max_cost 2                       # every task: a $2 cost limit (the max_cost setting)
 ask models claude:opus-5.5 --max-cost 10          # this model: its own limit, instead
-ask -m claude:opus-5.5 --max-cost 25 -w "Port the parser to Rust."   # this run only
+ask --model claude:opus-5.5 --max-cost 25 --write "Port the parser to Rust."   # this run only
 ```
 
 The run's own `--max-cost` wins, then the model's limit in models.json, then the setting; `0`
@@ -149,7 +158,7 @@ ask port-parser-rust · failed · Opus 5.5 · 6:12 · 412.0k in · 9.1k out · $
 How closely a limit holds depends on what the agent's CLI reports. Opencode reports cost after
 every step, so ask stops it within a step of the limit. Claude Code reports cost only when it
 ends, so its agent hands the limit to Claude Code's own budget, which stops after the model call
-that passes it. Codex reports no cost, so limits don't apply to it; use `-t` to bound its time.
+that passes it. Codex reports no cost, so limits don't apply to it; use `--timeout` to bound its time.
 
 ## JSON answers
 
@@ -179,7 +188,7 @@ cat > findings.json <<'EOF'
   "required": ["bugs"]
 }
 EOF
-ask -m claude:sonnet-5.5 --schema findings.json "Find bugs in src/parser.js" | jq '.bugs[].file'
+ask --model claude:sonnet-5.5 --schema findings.json "Find bugs in src/parser.js" | jq '.bugs[].file'
 ```
 
 ask honors boolean schemas (`false` rejects every answer) and checks `type`, `enum`, `const`, `properties`, `required`, `additionalProperties: false` and `items` (including `items: false`).
@@ -192,12 +201,12 @@ ask find-bugs-src-parser · failed · Sonnet 5.5 · 12.3s · answer does not mat
 
 ## Follow-ups
 
-Every run gets a name from its prompt. Continue the same agent conversation with `-c`; see
+Every run gets a name from its prompt. Continue the same agent conversation with `--continue`; see
 [Runs](runs.md).
 
 ```sh
-ask -m claude:sonnet-5.5 "Why does the login test fail?"
-ask -c login-test-fail -w "Fix it."
+ask --model claude:sonnet-5.5 "Why does the login test fail?"
+ask --continue login-test-fail --write "Fix it."
 ```
 
 ## Output
