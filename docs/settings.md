@@ -94,5 +94,7 @@ task. With the example above, `ask --write --worktree "Add rate limiting to logi
 
 `ask settings set` also takes `hook` (`on` or `off`) and `skills` (`claude-code`, `codex`,
 `opencode`, `cursor`, `pi` or `all`), which live in those apps' own files. An unknown key or a
-value of the wrong kind is an error that names the key, so a typo never silently does nothing. Settings change only new runs: a follow-up finds its worktree where the
-current `worktrees` setting puts it.
+value of the wrong kind is an error that names the key, so a typo never silently does nothing.
+Existing records keep their values. A new follow-up inherits the recorded model and access,
+and finds its worktree where the current `worktrees` setting puts it; keep that setting stable
+while continuing work in a kept worktree.

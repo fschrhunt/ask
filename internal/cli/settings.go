@@ -327,7 +327,7 @@ func settingsCommand(p home.Paths, opts home.Object, words []string) (int, error
 		return 0, nil
 	}
 	if len(words) > 1 {
-		return 0, home.Usage("ask settings takes get, set, unset or an agent's name; see ask settings --help")
+		return 0, home.Usage("ask settings takes get, set, unset or an agent's name")
 	}
 	name := words[0]
 	if find.Path(p, "agents", name) == "" && !packages.Builtin(name) {

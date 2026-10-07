@@ -8,8 +8,9 @@ ask login-test-fail · started · Sonnet 5.5 · read · ~/code/app
 ask login-test-fail · ok · Sonnet 5.5 · 14.2s · 31.0k in · 812 out · $0.09
 ```
 
-`RUN` in commands is that name. A name stays apart from earlier runs with a number
-(`login-test-fail-2`), and a [name hook](hooks.md#naming-runs) can choose better ones. Every run
+`RUN` in commands is a placeholder for that name or the run's id. Use the name printed by your
+run rather than assuming an example's name matches. A name stays apart from earlier runs with
+a number (`login-test-fail-2`), and a [name hook](hooks.md#naming-runs) can choose better ones. Every run
 also has a fixed six-character id, like `k3f9a2`, that works wherever a name does.
 
 A task in a batch is `RUN/TASK`, using the task's id (or its position, from 1):
@@ -17,13 +18,13 @@ A task in a batch is `RUN/TASK`, using the task's id (or its position, from 1):
 
 ## Follow-ups
 
-`-c RUN` continues that run's agent conversation: the agent remembers what it read, said and did.
+`--continue RUN` continues that run's agent conversation: the agent remembers what it read, said and did.
 
 ```sh
 ask --model claude:sonnet-5.5 "Why does the login test fail?"
 # ask login-test-fail · ok · Sonnet 5.5 · 48.0s · ...
 ask --continue login-test-fail --write "Fix it, then run the test."
-ask --continue login-test-fail "Now add a test for the expired-token case."
+ask --continue login-test-fail --write "Now add a test for the expired-token case."
 ```
 
 A follow-up is a new run that takes over the conversation's name, so the name always reaches the
@@ -35,8 +36,8 @@ A follow-up:
 - runs where the first run ran: the same directory, or the same worktree if it kept one (a
   removed worktree is created again, under a new name if another run has taken that one).
   `--worktree` can't move a follow-up of a run in your checkout into a worktree; ask refuses it;
-- keeps the model and access (`-r`/`-w`) unless you give new ones. The model may change within
-  the same agent (`-c login-test-fail -m claude:haiku-4.5`), but not to another agent;
+- keeps the model and access (`--read`/`--write`) unless you give new ones. The model may change within
+  the same agent (`--continue login-test-fail --model claude:haiku-4.5`), but not to another agent;
 - can continue a run that failed or timed out, so the agent can finish what it started;
 
 A batch task can be a follow-up too, with `"continue": "RUN"` (see [Batches](batches.md)).
@@ -81,12 +82,15 @@ Showing a whole batch prints its outcome count on stderr and exits 1 if any task
 ## Waiting for runs
 
 `ask wait` blocks until the first currently running run finishes, then prints its answer the way
-`ask show` does. It takes no names or options. Start runs in the background, keep working, and
-collect whichever answer arrives first:
+`ask show` does. It takes no names or options and watches only runs active when waiting begins.
+Start runs in the background, keep working, and collect whichever answer arrives first. Wait
+until their started lines appear before calling `ask wait`; shell background jobs may not have
+created their run records yet:
 
 ```sh
 ask --model claude:sonnet-5.5 "Why does the login test fail?" &
 ask --model codex:gpt-6.1-sol "Review the session code for races." &
+# Wait for both started lines on stderr before collecting an answer.
 ask wait # first run to finish
 ```
 
@@ -142,8 +146,9 @@ name (runs from before names have none):
 └── lock           held with an operating system lock while ask runs the run; the kernel names its pid
 ```
 
-ask creates new run directories with mode 0700 and records with mode 0600. Delete old folders
-whenever you like; nothing else refers to them.
+ask creates new run directories with mode 0700 and records with mode 0600. Deleting a finished
+run's folder removes its saved answers and ability to continue it. Use
+`ask clean` to account for kept worktrees before removing records.
 
 Hosts can name a background run with `ask title --command STRING --description TEXT`; see
 [Hosts](hosts.md) for title forms and agent-session naming.

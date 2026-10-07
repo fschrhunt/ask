@@ -2,7 +2,8 @@
 
 These pages are built into ask: `ask docs` lists them and `ask docs PAGE` shows one, matching the
 ask you have. ask hands a task to a coding agent you already use and gives you its answer. These pages cover
-everything it does, with examples you can copy.
+everything it does. Replace example model ids with ones from `ask models`, and run names with
+the names or ids printed by your runs.
 
 | Page | What it covers |
 | --- | --- |
@@ -21,5 +22,8 @@ everything it does, with examples you can copy.
 | [Packages](packages.md) | Sharing agents, hooks and commands, and keeping them up to date |
 | [Compatibility](compatibility.md) | The contracts ask keeps across releases |
 
-Quick reference and local models: `ask --help`. Contract details: `ask batch --help`,
+Quick reference and local models: `ask help`. Contract details: `ask help batch`,
 `ask help hooks`, `ask help agents`.
+
+`ask docs PAGE --url` prints the page's GitHub URL on current main; that web page may differ
+from the version bundled with your installed ask.

@@ -24,6 +24,9 @@ built into the ask binary so `ask install NAME` needs no download:
 | [`openhands/`](openhands/) | OpenHands CLI (`openhands --headless`) | `ask install openhands` |
 | [`vibe/`](vibe/) | Mistral Vibe (`vibe -p`) | `ask install vibe` |
 
+Installing these packages connects ask to existing CLIs; it does not install or authenticate
+them. All official agents need Node.js 18 or newer. See each package's README for prerequisites.
+
 They get no special treatment: each uses only the agent contract in
 [docs/agents.md](../docs/agents.md), the same one anyone's agent uses. ask's core knows nothing
 about them; `scripts/guard.sh` checks that.

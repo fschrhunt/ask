@@ -24,6 +24,12 @@ func TestBench(t *testing.T) {
 			{"fake:small", 4.0, 2.0, 40.0, 0.04}, {"fake:big", 4.0, 2.0, 40.0, 0.04}})
 		attempts := report["attempts"].([]any)
 		eq(t, len(attempts), 8)
+		shown := s.ask("show", runID(t, r.stderr)+"/2", "--json")
+		eq(t, shown.code, 0)
+		result := obj(t, shown.stdout)
+		eq(t, result.s("id"), "says")
+		eq(t, result.s("model"), "fake:small")
+		eq(t, result.s("session"), s.runFile("results.json")[1].s("session"))
 		last := object(attempts[7].(map[string]any))
 		eq(t, []any{last.s("task"), last.s("model"), last.n("n"), last.b("ok"), last.b("passed"), last.s("note")},
 			[]any{"never", "fake:big", 2.0, true, false, "check: nope"})

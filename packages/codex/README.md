@@ -15,10 +15,13 @@ ask's `PATH`: Codex in `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`,
 `/home/linuxbrew/.linuxbrew/bin` or the Codex app; Node.js in Homebrew, `/usr/local/bin`, Volta,
 nvm (the newest), fnm or `~/.local/bin`. Without one, `ask models` shows what to install.
 
+Installing the ask package does not install its CLI, Node.js or credentials. `ask models`
+checks model listing, not whether a task can authenticate and run.
+
 ## Models
 
-`codex models` lists the models in Codex's own model cache (`~/.codex/models_cache.json`, or under
-`$CODEX_HOME`), without review models, with Codex's display names (`gpt-6.1-sol` shows as GPT-6.1 Sol). Run
+`ask models` includes the models in Codex's own model cache (`~/.codex/models_cache.json`, or under
+`$CODEX_HOME`), without review or reserved models, with Codex's display names (`gpt-6.1-sol` shows as GPT-6.1 Sol). Run
 Codex once to fill the cache. Ids are Codex's own and match without regard to case. An effort
 (`codex:gpt-6.1-sol#high`) is passed as `model_reasoning_effort`.
 
@@ -47,8 +50,8 @@ reports no cost. The report names the model by Codex's display name.
 
 ## Cost limits
 
-Codex reports no cost, so ask's cost limits don't apply to it; a ChatGPT plan isn't billed per
-token anyway. Use `-t` to bound how long a run may take.
+The agent reports no cost, so ask cannot enforce a cost limit for Codex, regardless of how
+you authenticate it. Use `-t` to bound how long a run may take.
 
 ## Environment
 

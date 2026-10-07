@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Clarify docs, setup instructions and CLI help, with consistent `ask help COMMAND` guidance,
+  accurate benchmark and setup behavior, and clearer examples and prerequisites. Help flags
+  remain supported.
+- Keep review diffs off the command line to support large changes, qualify benchmark position
+  selectors for nonnumeric task ids, and document batch follow-ups' access, directory and cost
+  inheritance.
+- Installer help now works when the script is piped to `sh`, and lists version and directory
+  options without installing anything.
+
 - Clarify `./x` help and argument handling and simplify PR verification guidance;
   keep offline Baymax in the shared check and use `./x build` for release builds.
 - Made long run options primary in help and docs (`--model`, `--write`, `--continue`,
@@ -86,7 +95,7 @@ recorded, with live usage.
 - `ask settings` holds every control: agents, defaults, worktrees, and the apps that use ask. Edits
   wait in a draft and are saved only after a review that shows each file's diff. `get`, `set` and
   `unset` do the same for scripts.
-- `ask docs` has every page built in; `ask help` and `COMMAND --help` give the short form.
+- `ask docs` has every page built in; `ask help` and `ask help COMMAND` give the short form.
 
 **Extending**
 - Hooks change tasks and check results (a `verify` hook can run the tests and hand failures back),

@@ -2,14 +2,45 @@ package test
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
 )
 
-// TestCommands pins ask NAME: user commands, their arguments, exit codes and signals.
+// TestCommands pins ask NAME: arguments, exit codes, signals and the documented review workflow.
 func TestCommands(t *testing.T) {
+	t.Run("the documented review command sends large diffs intact", func(t *testing.T) {
+		if _, e := exec.LookPath("jq"); e != nil {
+			t.Skip("the documented review example requires jq")
+		}
+		s := fresh(t)
+		dir, git := s.repo()
+		s.cwd = dir
+		s.write(filepath.Join(dir, "a.txt"), strings.Repeat("a \"quote\" and \\ path\n", 10000))
+		git("add", ".")
+		git("commit", "-qm", "large change")
+		diff := strings.TrimRight(git("diff", "HEAD~1..HEAD"), "\n")
+		_, example, ok := strings.Cut(s.read(filepath.Join(root, "docs", "commands.md")), "```sh\n#!/bin/sh\n# ~/.ask/commands/review:")
+		if !ok {
+			t.Fatal("review example not found")
+		}
+		body, _, ok := strings.Cut(example, "\n```")
+		if !ok {
+			t.Fatal("review example has no closing fence")
+		}
+		body = strings.NewReplacer("claude:opus-5.5", "fake:small", "codex:gpt-6.1-sol", "fake:big", "opencode:glm-5.3-flash", "fake:small#high").Replace(body)
+		s.script("commands", "review", "# ~/.ask/commands/review:"+body)
+		r := s.ask("review", "HEAD~1..HEAD")
+		eq(t, r.code, 0)
+		calls := s.calls()
+		eq(t, len(calls), 3)
+		for _, call := range calls {
+			eq(t, call.s("stdin"), "Review this diff for HEAD~1..HEAD. List real bugs only, with file and line.\n\n"+diff)
+		}
+	})
 	t.Run("a command gets the resolved ask binary, even through a symlink", func(t *testing.T) {
 		s := fresh(t)
 		link := filepath.Join(s.tmp, "ask-link")

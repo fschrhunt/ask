@@ -19,6 +19,8 @@ curl -fsSL https://fschrhunt.com/ask/install.sh | sh -s -- --version v0.1.0 --di
 
 `ASK_INSTALL_DIR` and `ASK_VERSION` do the same as `--dir` and `--version`. The script is
 [`install.sh`](../install.sh) in ask's repository; read it before you run it if you like.
+To see installer options without installing, pipe it to `sh -s -- --help`. For ask's own
+commands after installation, use `ask help` or `ask help COMMAND`.
 
 ## Homebrew
 
@@ -35,7 +37,7 @@ again. Each release updates the formula, [`ask.rb`](../ask.rb), so
 
 ## With Go
 
-Go 1.26 or newer can build and install ask:
+Go 1.26 or newer can build and install ask (also required for the source build below):
 
 ```sh
 go install github.com/fschrhunt/ask/cmd/ask@latest
@@ -80,7 +82,10 @@ ask install codex         # Codex
 ask install opencode      # Opencode
 ```
 
-Each needs its CLI installed and logged in, and Node.js 18 or newer. The agent finds the CLI even
+Installing an ask agent does not install its coding agent CLI or sign you in. For example,
+Claude Code and Codex need their CLIs installed and authenticated; OpenCode needs its CLI
+installed with at least one provider connected. Official ask agents need Node.js 18 or newer;
+see [official packages](../packages/README.md) for each harness's prerequisites. The agent finds the CLI even
 when it isn't on your `PATH`, and setup says what is missing if anything is. To write your own,
 see [Agents](agents.md): a minimal one is a few lines of shell.
 
@@ -95,7 +100,8 @@ claude:sonnet-5.5
 claude:haiku-4.5
 ```
 
-And try a first run:
+The output depends on the agents installed here. In a project directory, choose one of the ids
+from `ask models` and try a first run (this example uses Claude Code):
 
 ```sh
 ask --model claude:haiku-4.5 "What does this project do?"

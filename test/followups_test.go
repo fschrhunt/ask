@@ -25,6 +25,22 @@ func TestFollowups(t *testing.T) {
 		eq(t, b.s("stdin"), "what word?")
 		match(t, second.stderr, `follow-up `+runID(t, first.stderr))
 	})
+	t.Run("a batch follow-up inherits access and cost but keeps its directory", func(t *testing.T) {
+		s := fresh(t)
+		work := filepath.Join(s.tmp, "work")
+		other := filepath.Join(s.tmp, "other")
+		s.mkdir(work)
+		s.mkdir(other)
+		first := s.ask("-m", "fake:small", "-w", "-C", work, "--max-cost", "2", "change it")
+		eq(t, first.code, 0)
+		tasks, _ := json.Marshal([]object{{"continue": runID(t, first.stderr), "prompt": "more", "dir": other}})
+		second := s.run([]string{"batch", "-C", other, "-"}, string(tasks), nil)
+		eq(t, second.code, 0)
+		call := s.calls()[1]
+		eq(t, call.s("access"), "write")
+		eq(t, call.s("max_cost"), "2")
+		eq(t, call.s("cwd"), work)
+	})
 	t.Run("a follow-up keeps write access unless it says -r, and may change the model within the agent", func(t *testing.T) {
 		s := fresh(t)
 		first := s.ask("-m", "fake:big", "-w", "change it")

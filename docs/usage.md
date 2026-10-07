@@ -4,11 +4,13 @@
 ask --model MODEL [options] PROMPT
 ```
 
-`ask --help` is a compact reference with the models installed here. `ask batch --help`,
+`ask help` is a compact reference with the models installed here. `ask help batch`,
 `ask help hooks` and `ask help agents` describe their contracts.
 
-Every run names its model. ask never picks one for you, the same way you name a model when you
-start a subagent.
+Choose `MODEL` from `ask models`. Every run uses an explicit model: from `--model`, a follow-up, or
+your default [setting](settings.md). The examples below use particular agents and models;
+replace them with ids available in your installation. `RUN` is a name or id printed by ask
+(see [Runs](runs.md)).
 
 ```sh
 ask --model claude:sonnet-5.5 "Where is the retry logic, and what are its limits?"
@@ -26,12 +28,21 @@ git diff | ask --model codex:gpt-6.1-sol -
 ask --model claude:sonnet-5.5 < task.md
 ```
 
+`--title TEXT` replaces the prompt text in the agent's session title, without changing the task:
+
+```sh
+ask --model codex:gpt-6.1-sol --title "Review login" "Inspect the login flow for races."
+```
+
+Short forms `-m`, `-w`, `-c`, `-C` and `-t` remain supported. `--title` is long-only;
+`-t` means timeout.
+
 ## Read or write
 
 | Option | Access |
 | --- | --- |
-| `-r`, `--read` | Read only. The default. |
-| `-w`, `--write` | Read and write: the agent may edit files and run commands, as you. |
+| `--read`, `-r` | Read only. The default. |
+| `--write`, `-w` | Read and write: the agent may edit files and run commands, as you. |
 
 ```sh
 ask --model claude:sonnet-5.5 "Which functions have no tests?"                 # read
@@ -44,7 +55,7 @@ enforces read-only in its CLI's own way, and may add its own guidance for read r
 agents, a read run on Claude Code or Opencode can only read and search files, and runs no shell
 commands at all, not even `git log`; one on Codex may run commands in Codex's read-only sandbox.
 
-Running tests or builds writes files, so it needs `-w`. In a batch or bench, an explicit `-r` is a
+Running tests or builds writes files, so it needs `--write`. In a batch or bench, an explicit `--read` is a
 ceiling: a task with `"write": true` is refused, not run with write access.
 
 ## What a write run changed
@@ -69,8 +80,8 @@ so your own uncommitted work never shows up as the agent's.
 
 ## Working in a worktree
 
-`--worktree` (with `-w`) gives the run its own git worktree and branch, so it can't touch your
-checkout and several write runs can go in parallel:
+`--worktree` (with `--write`) gives the run its own git worktree and branch, so several write runs
+can work in separate checkouts in parallel:
 
 ```sh
 ask --model claude:sonnet-5.5 --write --worktree --directory ~/code/app "Add rate limiting to the login route."
@@ -88,11 +99,18 @@ The `worktrees` and `branches` [settings](settings.md) put them elsewhere, like
 If the run changed something, both are kept for you to review and merge:
 
 ```sh
-git -C ~/code/app diff main...ask/add-rate-limiting-login
+git -C ~/.ask/worktrees/add-rate-limiting-login status --short
+git -C ~/.ask/worktrees/add-rate-limiting-login diff HEAD
+# After reviewing, commit any uncommitted edits in the worktree.
+git -C ~/code/app diff HEAD...ask/add-rate-limiting-login
 git -C ~/code/app merge ask/add-rate-limiting-login
 git -C ~/code/app worktree remove ~/.ask/worktrees/add-rate-limiting-login
 git -C ~/code/app branch -d ask/add-rate-limiting-login
 ```
+
+Use the actual path and branch from the run's output. ask does not automatically commit the
+agent's edits: merging a branch includes only committed changes. `diff HEAD` shows tracked
+uncommitted edits; inspect untracked files listed by `status` too.
 
 After all hook follow-ups, ask removes a worktree only when git reports it clean and its HEAD
 still points to the starting commit. An idle follow-up keeps earlier work. A read-only follow-up
@@ -121,14 +139,17 @@ ask --model codex:gpt-6.1-sol --write --timeout 3600 "Upgrade the project to Nod
 A cost limit stops a task that spends more than you meant to. It is off unless you set one:
 
 ```sh
-ask settings set max_cost 2                       # every task: at most $2 (the max_cost setting)
+ask settings set max_cost 2                       # every task: a $2 cost limit (the max_cost setting)
 ask models claude:opus-5.5 --max-cost 10          # this model: its own limit, instead
-ask --model claude:opus-5.5 --max-cost 25 "Port the parser to Rust."   # this run only
+ask --model claude:opus-5.5 --max-cost 25 --write "Port the parser to Rust."   # this run only
 ```
 
 The run's own `--max-cost` wins, then the model's limit in models.json, then the setting; `0`
-means no limit. A follow-up keeps the limit of the run it continues unless you give it one. When a task passes its limit, the agent is stopped and nothing is lost: its
-conversation is kept, so you decide whether it's worth more.
+means no limit. A follow-up keeps a positive recorded limit unless you give it one. A prior
+unlimited run has no limit to inherit, so the model's limit or your setting applies unless
+you explicitly pass `--max-cost 0` again.
+When a task passes its limit, the agent is stopped. If it has reported a session, you can
+continue the conversation and decide whether it's worth more.
 
 ```text
 ask port-parser-rust · failed · Opus 5.5 · 6:12 · 412.0k in · 9.1k out · $25.31 · stopped at the $25.00 cost limit; ask -c port-parser-rust continues it
@@ -137,7 +158,7 @@ ask port-parser-rust · failed · Opus 5.5 · 6:12 · 412.0k in · 9.1k out · $
 How closely a limit holds depends on what the agent's CLI reports. Opencode reports cost after
 every step, so ask stops it within a step of the limit. Claude Code reports cost only when it
 ends, so its agent hands the limit to Claude Code's own budget, which stops after the model call
-that passes it. Codex reports no cost, so limits don't apply to it; use `-t` to bound its time.
+that passes it. Codex reports no cost, so limits don't apply to it; use `--timeout` to bound its time.
 
 ## JSON answers
 
@@ -170,7 +191,8 @@ EOF
 ask --model claude:sonnet-5.5 --schema findings.json "Find bugs in src/parser.js" | jq '.bugs[].file'
 ```
 
-ask honors boolean schemas (`false` rejects every answer) and checks `type`, `enum`, `const`, `properties`, `required`, `additionalProperties: false` and `items` (including `items: false`). An
+ask honors boolean schemas (`false` rejects every answer) and checks `type`, `enum`, `const`, `properties`, `required`, `additionalProperties: false` and `items` (including `items: false`).
+Other schema keywords are ignored by ask; an agent may enforce more. An
 answer that is not JSON, or does not match, fails the run with the reason:
 
 ```text
@@ -179,7 +201,7 @@ ask find-bugs-src-parser · failed · Sonnet 5.5 · 12.3s · answer does not mat
 
 ## Follow-ups
 
-Every run gets a name from its prompt. Continue the same agent conversation with `-c`; see
+Every run gets a name from its prompt. Continue the same agent conversation with `--continue`; see
 [Runs](runs.md).
 
 ```sh
@@ -200,7 +222,7 @@ ask login-test-fail · ok · Sonnet 5.5 · 14.2s · 31.0k in · 812 out · $0.09
 ```
 
 - **Exit code**: 0 on success, 1 when the run failed, 2 when ask was called wrong (the message says
-  what to fix and points to `ask COMMAND --help`). Missing or malformed model specifications
+  what to fix; `ask help COMMAND` shows the options). Missing or malformed model specifications
   also show available models grouped by agent.
 
 Stopping ask (Ctrl-C) stops the agent too.

@@ -19,7 +19,22 @@ while [ $# -gt 0 ]; do
     --version) [ $# -ge 2 ] || fail "--version needs a version, like v0.1.0"; version=$2; shift 2 ;;
     --version=*) version=${1#--version=}; shift ;;
     --dir) [ $# -ge 2 ] || fail "--dir needs a folder"; dir=$2; shift 2 ;;
-    -h|--help) sed -n '2,8p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help)
+      cat <<'HELP'
+Install ask on macOS or Linux from a checksum-verified GitHub release.
+
+Usage
+  curl -fsSL https://fschrhunt.com/ask/install.sh | sh
+  curl -fsSL https://fschrhunt.com/ask/install.sh | sh -s -- [options]
+
+Options
+  --version vX.Y.Z   Install a specific release (default: latest, or ASK_VERSION)
+  --dir DIR         Installation folder (default: ~/.local/bin, or ASK_INSTALL_DIR)
+  -h, --help        Show this help without installing anything
+
+Run the installer again to update, or use ask update. Then run ask setup.
+HELP
+      exit 0 ;;
     *) fail "unknown option $1; options: --version vX.Y.Z, --dir DIR" ;;
   esac
 done

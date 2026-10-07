@@ -58,7 +58,7 @@ case "$command" in
         fi
         ;;
     lint) go vet ./... ;;
-    # Extra arguments go to go test, like ./x test ./test -run 'TestCLI/no_arguments'.
+    # Extra arguments go to go test, like ./x test ./test -run 'TestRuns/stop_stops'.
     test)
         if [ "$#" -eq 0 ]; then set -- ./...; fi
         go test "$@"

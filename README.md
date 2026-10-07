@@ -25,23 +25,30 @@ curl -fsSL https://fschrhunt.com/ask/install.sh | sh
 
 ## Start
 
+Install at least one coding agent CLI: authenticate Claude Code or Codex, or connect a provider
+in Opencode. Install Node.js 18 or newer for the official ask agents. Then, in a project directory:
+
 ```sh
 ask setup                                        # connect the coding agents you have
-ask -m claude:sonnet-5.5 "Why does the login test fail?"
-ask -c login-test-fail -w "Fix it, then run the test."
+ask models                                       # choose an available agent:model id
+ask --model claude:sonnet-5.5 "Why does the login test fail?"
+ask --continue login-test-fail --write "Fix it, then run the test."
 ```
 
-`ask setup` finds supported coding CLIs, connects the ones you pick, and shows what it
-will change before it saves. Each agent keeps its own login; ask hands it the task and gives you
-the answer. See [official packages](packages/README.md) for each harness's tools, access controls
-and continuation support.
+The examples use Claude Code; choose a model from `ask models` for your installation. Use the
+run name or id printed by the first run for `--continue` (names can have a numeric suffix or be set by a hook).
+
+`ask setup` finds supported coding CLIs and installs the agents you pick immediately.
+It shows changes to defaults and app integrations before saving them. Each agent keeps its own
+login; ask hands it the task and gives you the answer. See [official packages](packages/README.md)
+for each harness's tools, access controls and continuation support.
 
 <table>
   <tr>
     <td width="33%" valign="top">
       <b>Like a native subagent</b><br>
-      Read-only by default, <code>-w</code> to change files, <code>--worktree</code> for its own
-      branch. <code>ask -c RUN</code> follows up in the same conversation.
+      Read-only by default, <code>--write</code> to change files, <code>--worktree</code> for its own
+      branch. <code>ask --continue RUN</code> follows up in the same conversation.
     </td>
     <td width="33%" valign="top">
       <b>Every model</b><br>
@@ -50,8 +57,8 @@ and continuation support.
     </td>
     <td width="33%" valign="top">
       <b>Recorded and accountable</b><br>
-      Every run is named, kept and shown with time, changes, tokens and cost, live. Cost limits
-      stop a run before it overspends.
+      Every run is named and kept, with time, changes and usage when reported. Cost limits
+      stop a run when reported cost exceeds its limit; a model call or step can take it over.
     </td>
   </tr>
 </table>
@@ -59,8 +66,8 @@ and continuation support.
 ## Many at once
 
 `ask batch` runs tasks in parallel, on one model or several, each in its own worktree if you
-like, and prints every answer as one JSON array. Start runs in the background and collect them
-with `ask wait`.
+like, and prints every answer as one JSON array. Start runs in the background and use
+`ask wait` to collect the next one that finishes, or `ask show RUN` for a completed run.
 
 <p align="center"><img src="assets/screens/dark/batch.svg#gh-dark-mode-only" alt="ask batch running a review on three models at once" width="760">
   <img src="assets/screens/light/batch.svg#gh-light-mode-only" alt="ask batch running a review on three models at once" width="760"></p>
@@ -96,9 +103,11 @@ go install github.com/fschrhunt/ask/cmd/ask@latest             # Go 1.26 or newe
 ```
 
 One binary, no additional UI runtime to install. `ask update` keeps a curl install current. Each agent needs its CLI
-logged in, and the official ones need Node.js 18 or newer. More in [Install](docs/install.md).
+authenticated or a provider connected, and the official ones need Node.js 18 or newer. More in [Install](docs/install.md).
 
 ## Docs
+
+Quick reference: `ask help`; command options: `ask help COMMAND`.
 
 Built into ask: `ask docs` lists every page and `ask docs PAGE` shows one, offline and matching
 your version.

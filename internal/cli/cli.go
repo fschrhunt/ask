@@ -217,7 +217,7 @@ func main(argv []string, version string) (int, error) {
 			return 0, home.Usage("ask setup takes no arguments; did you mean ask settings %s?", words[0])
 		}
 		if len(words) > 1 {
-			return 0, home.Usage("ask setup takes no arguments; see ask setup --help")
+			return 0, home.Usage("ask setup takes no arguments")
 		}
 		return setupCommand(p, opts)
 	case "settings":
@@ -226,7 +226,7 @@ func main(argv []string, version string) (int, error) {
 		return docsCommand(opts, words)
 	case "update":
 		if len(words) != 0 {
-			return 0, home.Usage("ask update takes no arguments; see ask update --help")
+			return 0, home.Usage("ask update takes no arguments")
 		}
 		return updateCommand(p, version, opts.B("--check"))
 	case "show":
@@ -235,7 +235,7 @@ func main(argv []string, version string) (int, error) {
 		return wait(p, words)
 	case "clean":
 		if len(words) != 0 {
-			return 0, home.Usage("ask clean takes no arguments; see ask clean --help")
+			return 0, home.Usage("ask clean takes no arguments")
 		}
 		return clean(p, opts)
 	case "stop":
@@ -285,8 +285,10 @@ func Main(argv []string, version string) int {
 			message := strings.Join(strings.Fields(e.Error()), " ")
 			if message == "unknown option -help; did you mean --help?" || message == "unknown option -version; did you mean --version?" {
 				fmt.Fprintf(os.Stderr, "ask: %s\n", message)
+			} else if topic == "help" {
+				fmt.Fprintf(os.Stderr, "ask: %s; see ask help\n", message)
 			} else {
-				fmt.Fprintf(os.Stderr, "ask: %s; see ask %s --help\n", message, topic)
+				fmt.Fprintf(os.Stderr, "ask: %s; see ask help %s\n", message, topic)
 			}
 			if strings.Contains(e.Error(), "needs a model") || strings.Contains(e.Error(), "bad model") || strings.Contains(e.Error(), "no agent") {
 				fmt.Fprintln(os.Stderr, modelLines(agent.New(home.New())))

@@ -128,6 +128,10 @@ say so."
 
 ## Example: Claude Code in shell
 
+Create `~/.ask/agents/` first (`mkdir -p ~/.ask/agents`), save this as
+`~/.ask/agents/claude`, then make it executable with the command below. This overrides the
+official Claude agent if installed. Model ids here are examples; use ids your CLI supports.
+
 The smallest useful agent. It maps ask's model names to Claude Code's (`sonnet-5.5` becomes
 `claude-sonnet-5-5`), gives read runs only Claude Code's reading and search tools, and lets write
 runs edit and run commands:
@@ -146,7 +150,7 @@ set -- -p --model "claude-$(printf '%s' "$ASK_MODEL" | tr . -)"
 if [ "$ASK_ACCESS" = write ]; then
   set -- "$@" --permission-mode bypassPermissions
 else
-  set -- "$@" --permission-mode default --allowedTools Read,Grep,Glob --disallowedTools Edit,Write,Bash
+  set -- "$@" --permission-mode default --allowedTools Read,Grep,Glob --disallowedTools Edit,Write,NotebookEdit,Bash
 fi
 
 exec claude "$@"   # the prompt arrives on stdin
@@ -159,18 +163,21 @@ ask -m claude:sonnet-5.5 "What does this project do?"
 ask -m claude:haiku-4.5 -w "Add a .editorconfig with 2-space indents."
 ```
 
+This minimal agent does not report sessions or usage, so it cannot support `ask -c`.
 A read run asked to change something answers that it can't; a write run makes the change.
 
 ## Example: Claude Code with sessions and usage
 
 The same agent in Node, using Claude Code's JSON output to report the session, so `ask -c` can
-follow up in the same conversation, and the tokens and cost for status lines:
+follow up in the same conversation, and the tokens and cost for status lines. Save this at
+`~/.ask/agents/claude` and make it executable as above; it needs Node.js 18 or newer. Unlike the
+official streaming agent, this example reports its session and usage only after the CLI exits:
 
 ```js
 #!/usr/bin/env node
 // ~/.ask/agents/claude: runs Claude Code for ask, with sessions (for ask -c) and usage.
-import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+const { execFileSync } = require('node:child_process');
+const { readFileSync, writeFileSync, renameSync } = require('node:fs');
 
 if (process.argv[2] === 'models') {
   console.log('sonnet-5.5\tSonnet 5.5\nhaiku-4.5\tHaiku 4.5');
@@ -181,7 +188,7 @@ const args = ['-p', '--output-format', 'json', '--model', `claude-${ASK_MODEL.re
 if (ASK_EFFORT) args.push('--effort', ASK_EFFORT);
 if (ASK_SESSION) args.push('--resume', ASK_SESSION);
 if (ASK_ACCESS === 'write') args.push('--permission-mode', 'bypassPermissions');
-else args.push('--permission-mode', 'default', '--allowedTools', 'Read,Grep,Glob', '--disallowedTools', 'Edit,Write,Bash');
+else args.push('--permission-mode', 'default', '--allowedTools', 'Read,Grep,Glob', '--disallowedTools', 'Edit,Write,NotebookEdit,Bash');
 
 let out;
 try {
@@ -191,13 +198,14 @@ try {
   process.exit(1);
 }
 const u = out.usage || {};
-writeFileSync(ASK_REPORT, JSON.stringify({
+writeFileSync(`${ASK_REPORT}.tmp`, JSON.stringify({
   session: out.session_id,
   input: (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0),
   output: u.output_tokens,
   cached: u.cache_read_input_tokens,
   cost: out.total_cost_usd,
 }));
+renameSync(`${ASK_REPORT}.tmp`, ASK_REPORT);
 if (out.is_error) {
   console.error(out.result);
   process.exit(1);

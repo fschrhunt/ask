@@ -4,10 +4,17 @@
 and teaches the apps you work in to use ask. Change anything later with
 [`ask settings`](settings.md).
 
+Before setup, install and authenticate the coding agent CLIs you want to use. For example,
+authenticate Claude Code or Codex, or connect at least one provider in OpenCode. See
+[official packages](../packages/README.md) for each harness's prerequisites. The official ask agents also need
+Node.js 18 or newer. Setup installs ask's agents and integrations; it does not install those
+CLIs or Node.js, or sign you in. See [Install](install.md#set-up).
+
 ## The first time
 
 In a terminal, `ask setup` walks you through it, then shows everything it will change before it
-saves anything:
+saves defaults or app integrations. Selected agents install immediately; the example below
+illustrates a machine with Claude Code and Codex:
 
 ```text
 ask setup  connects your coding agents; nothing else changes until you review it
@@ -18,7 +25,7 @@ ask setup  connects your coding agents; nothing else changes until you review it
 ✔ Default model, when you don't give -m claude:sonnet-5.5
 ✔ Where should --worktree runs work? Somewhere else
 ✔ Folder for each worktree, with {name} ~/code/worktrees/ask-{name}
-✔ Teach these apps to use ask Claude Code, Codex
+✔ Teach these apps to use ask Claude Code
 ✔ Show ask runs by model and task in Claude Code's task list? Yes
 
 ~/.ask/settings.json new  +4
@@ -55,11 +62,14 @@ Saying no saves nothing but the agents. Once ask is set up, `ask setup` opens yo
 
 ```sh
 ask setup --yes            # the recommended setup: agents for the CLIs found, skills, task titles
-ask setup --check          # report, and exit 1 while an installed agent can't run
+ask setup --check          # exit 1 if no agent is ready or any installed agent cannot run
 ask setup --check --json
 ```
 
-`--yes` shows what it changes as it saves. `--check --json` prints `agents` (each with `name`,
+`--yes` shows what it changes as it saves; it leaves your default model unset unless you
+already chose one. Use `-m` or `ask settings set model MODEL`, replacing `MODEL` with an id from
+`ask models`. Readiness checks ask agents to list models; they do not run a task or verify that
+your account can use each model. `--check --json` prints `agents` (each with `name`,
 `cli`, `installed`, `ready`, `models` and `reason`), `settings`, `skills` (by app: `missing`,
 `current`, `outdated` or `yours`) and `hook`. Without a terminal or options, `ask setup` prints the
 report.

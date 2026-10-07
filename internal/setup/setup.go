@@ -87,7 +87,8 @@ description: Your subagent tool. MUST use it instead of a built-in subagent when
 ---
 ` + mark + `
 
-Run ` + "`ask --help`" + ` for usage, ` + "`ask models`" + ` for the models available here, and
+Run ` + "`ask help`" + ` for usage, ` + "`ask help COMMAND`" + ` for a command's options,
+` + "`ask models`" + ` for the models available here, and
 ` + "`ask docs PAGE`" + ` (or ` + "`ask docs --search TERM`" + `) for the full docs.
 
 - ` + "`ask -m MODEL \"question\"`" + `: a read-only answer from another agent, on stdout.

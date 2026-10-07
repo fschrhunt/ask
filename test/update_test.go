@@ -17,8 +17,29 @@ import (
 )
 
 // TestUpdate pins ask update against a local stand-in for GitHub releases: --check reports a
-// newer release, an update replaces the binary, and a bad checksum changes nothing.
+// newer release, an update replaces the binary, a bad checksum changes nothing, and installer
+// help works without needing the script on disk.
 func TestUpdate(t *testing.T) {
+	t.Run("installer help works from a file and from stdin", func(t *testing.T) {
+		script, e := os.ReadFile(filepath.Join(root, "install.sh"))
+		if e != nil {
+			t.Fatal(e)
+		}
+		for _, stdin := range []bool{false, true} {
+			cmd := exec.Command("sh", filepath.Join(root, "install.sh"), "--help")
+			if stdin {
+				cmd = exec.Command("sh", "-s", "--", "--help")
+				cmd.Stdin = bytes.NewReader(script)
+			}
+			out, e := cmd.CombinedOutput()
+			if e != nil {
+				t.Fatalf("installer help: %s\n%s", e, out)
+			}
+			match(t, string(out), `--version vX\.Y\.Z`)
+			match(t, string(out), `--dir DIR`)
+			match(t, string(out), `Then run ask setup\.`)
+		}
+	})
 	s := fresh(t)
 	bin := filepath.Join(s.tmp, "bin", "ask")
 	build := exec.Command("go", "build", "-ldflags", "-X main.version=v0.1.0", "-o", bin, "./cmd/ask")

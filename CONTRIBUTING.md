@@ -27,6 +27,8 @@ A behavior change comes with one test for it, and a user-visible change with a l
 `CHANGELOG.md` and an update to `docs/`. Support for a coding agent belongs in its own agent, not
 in ask (see `docs/agents.md`).
 
-To report an issue, include the output of `ask --help` and `ask models`.
+To report an issue, include your operating system, the command you ran, what you expected, and
+what happened. Add the output of `ask --version`, `ask help`, and `ask setup --check`; redact
+private paths, prompts and other sensitive details before sharing them.
 
 By contributing you agree that your work is licensed under the MIT license of this project.

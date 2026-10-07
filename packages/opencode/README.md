@@ -1,12 +1,13 @@
 # opencode
 
 The official ask agent for [Opencode](https://opencode.ai). It runs
-`opencode run` for ask, so `ask -m opencode:deepseek-4.1-flash "..."` hands a task to Opencode.
+`opencode run` for ask, so `ask --model opencode:deepseek-4.1-flash "..."` hands a task to Opencode.
 
 ## Install
 
 ```sh
 ask install opencode
+ask models
 ```
 
 Requires Opencode v1.1.65 or newer in the v1 series, or v2, with at least one provider connected,
@@ -18,6 +19,9 @@ release that preserves permission key order; earlier schemas can reorder the cat
 The agent finds Opencode and Node.js even when they are not on ask's `PATH`: Opencode in `~/.opencode/bin`, `~/.local/bin`,
 `/opt/homebrew/bin`, `/usr/local/bin` or `~/.bun/bin`; Node.js in Homebrew, `/usr/local/bin`, Volta,
 nvm (the newest), fnm or `~/.local/bin`. Without one, `ask models` shows what to install.
+
+Installing the ask package does not install its CLI, Node.js or credentials. `ask models`
+checks model listing, not whether a task can authenticate and run.
 
 ## Models
 
@@ -52,7 +56,7 @@ agent cannot leave tool-specific allows in place. Follow-ups select a fresh rest
   Git runs Opencode starts itself take no optional locks and no fsmonitor. The prompt starts with
   an instruction to answer from the files in the working directory and never guess. They stop
   after 25 steps.
-- **Write runs** (`ask -w`) use the `build` agent with your own Opencode permissions, for up to 100
+- **Write runs** (`ask --write`) use the `build` agent with your own Opencode permissions, for up to 100
   steps.
 
 A run that hits its step cap is noted in ask's status line: its answer may be partial. Runs use
@@ -61,14 +65,15 @@ CLI directly and has no `--standalone` flag.
 
 ## Follow-ups
 
-The session id of Opencode's first event is reported to ask at once, so `ask -c RUN` continues it
+The session id of Opencode's first event is reported to ask at once, so `ask --continue RUN` continues it
 with `--session`. A follow-up's prompt is passed as is.
 
 ## Usage
 
 The agent rewrites ask's report after every step with the tokens and cost so far, so both show
 live. Opencode 2.0 prints no usage for the step that writes the answer, so once Opencode exits the
-agent reads that step's tokens and cost from `opencode session export --standalone` and adds them.
+agent tries to read that step's tokens and cost from `opencode session export --standalone`
+and add them. If export fails, usage can be incomplete.
 V1 uses `opencode export SESSION`, whose messages wrap assistant metadata and usage in `info`.
 Only unfinished messages from the current run are added, so streamed usage and earlier turns are
 not counted twice. Exports retry briefly for delayed saves; unavailable usage remains unreported.
@@ -77,7 +82,7 @@ not counted twice. Exports retry briefly for delayed saves; unavailable usage re
 
 Opencode reports cost after every step, so ask enforces its limit (`--max-cost`, models.json or
 the `max_cost` setting) itself: once the reported cost passes it, ask stops Opencode. The run fails
-as `stopped at the $2.00 cost limit`, keeps its session, and `ask -c RUN` continues it. Cost is
+as `stopped at the $2.00 cost limit`, keeps its session, and `ask --continue RUN` continues it. Cost is
 known after each step, so a run can go over the limit by up to one step's cost.
 
 ## Environment
